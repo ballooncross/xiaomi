@@ -1707,6 +1707,7 @@
   @media (max-width: 960px) {
     .app-shell {
       border: 0;
+      padding-bottom: 92px;
     }
 
     .topbar {
@@ -1714,14 +1715,21 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 14px;
+      backdrop-filter: none;
     }
 
     .primary-nav {
-      grid-column: 1 / -1;
-      width: 100%;
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 14px;
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      z-index: 30;
       overflow-x: auto;
       justify-content: stretch;
       scrollbar-width: none;
+      box-shadow: 0 18px 42px rgba(38, 29, 20, 0.24);
+      backdrop-filter: blur(18px);
     }
 
     .primary-nav::-webkit-scrollbar {
@@ -1730,7 +1738,7 @@
 
     .primary-nav button {
       flex: 1;
-      min-width: 74px;
+      min-width: 0;
     }
 
     .button {
@@ -1771,15 +1779,57 @@
       grid-template-columns: 1fr;
     }
 
-    .hero-story {
-      grid-column: span 1;
-      grid-template-columns: 1fr;
+    .story {
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr);
     }
 
-    .story-media {
-      min-height: 150px;
-      border-right: 0;
-      border-bottom: 1px solid var(--line);
+    .hero-story {
+      grid-column: span 1;
+      grid-template-columns: 112px minmax(0, 1fr);
+    }
+
+    .story-body {
+      padding: 13px;
+    }
+
+    .story-media,
+    .story-thumb {
+      align-self: start;
+      min-height: 0;
+      height: 128px;
+      aspect-ratio: auto;
+      border-right: 1px solid var(--line);
+      border-bottom: 0;
+    }
+
+    .story-thumb {
+      height: 112px;
+    }
+
+    .story h3,
+    .story:not(.hero-story) h3 {
+      font-size: 16px;
+      line-height: 1.16;
+    }
+
+    .story p {
+      margin-top: 8px;
+    }
+
+    .story-kicker {
+      margin-bottom: 7px;
+      font-size: 11px;
+    }
+
+    .chips,
+    .story-actions {
+      margin-top: 10px;
+    }
+
+    .source-link {
+      min-height: 29px;
+      white-space: normal;
     }
 
     .timeline-item {
