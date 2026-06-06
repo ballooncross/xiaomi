@@ -3,6 +3,7 @@
   import type { PageData } from './$types';
 
   type View = 'home' | 'concerts' | 'trends' | 'me';
+  type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
 
   let { data }: { data: PageData } = $props();
   let items = $state<RadarItem[]>([]);
@@ -24,6 +25,8 @@
   let editWatchCategory = $state('business');
   let editWatchPriority = $state(3);
   let editWatchMode = $state<WatchTopic['mode']>('follow');
+  let preferenceQuery = $state('');
+  let preferenceView = $state<PreferenceView>('all');
   let feedbackPending = $state<string | null>(null);
   let addWatchPending = $state(false);
   let topicPending = $state<string | null>(null);
@@ -50,6 +53,14 @@
     { id: 'saved', label: 'Saved' }
   ];
 
+  const preferenceTabs: Array<{ id: PreferenceView; label: string }> = [
+    { id: 'all', label: 'All' },
+    { id: 'artist', label: 'Musicians' },
+    { id: 'topic', label: 'Topics' },
+    { id: 'source', label: 'Sources' },
+    { id: 'blacklist', label: 'Blocked' }
+  ];
+
   const visibleItems = $derived(
     items
       .filter((item) => {
@@ -72,9 +83,12 @@
       .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed')
       .slice(0, 4)
   );
-  const watchTopics = $derived(topics.filter((topic) => topic.type === 'artist' && topic.mode !== 'blacklist').slice(0, 8));
-  const interestTopics = $derived(topics.filter((topic) => topic.type !== 'artist' && topic.mode !== 'blacklist').slice(0, 8));
-  const blacklistTopics = $derived(topics.filter((topic) => topic.mode === 'blacklist').slice(0, 8));
+  const watchTopics = $derived(topics.filter((topic) => topic.type === 'artist' && topic.mode !== 'blacklist'));
+  const interestTopics = $derived(topics.filter((topic) => topic.type !== 'artist' && topic.mode !== 'blacklist'));
+  const blacklistTopics = $derived(topics.filter((topic) => topic.mode === 'blacklist'));
+  const filteredPreferenceTopics = $derived(filterPreferenceTopics(topics, preferenceQuery, preferenceView));
+  const preferenceMatchCount = $derived(countPreferenceTopics(topics, preferenceQuery, preferenceView));
+  const followedTopicCount = $derived(topics.filter((topic) => topic.mode !== 'blacklist').length);
   const greeting = $derived(getGreeting(activeView, visibleItems.length));
   const digestPreview = $derived(buildDigestPreview(items));
   const addWatchTitle = $derived(getAddWatchTitle(newWatchType, newWatchMode));
@@ -120,7 +134,11 @@
 
   function imageForItem(item: RadarItem) {
     if (item.imageUrl) return item.imageUrl;
+    const topicText = item.topics.join(' ').toLowerCase();
     if (item.kind === 'concert') return '/visuals/concert.svg';
+    if (topicText.includes('byd') || topicText.includes('electric vehicle') || topicText.includes('ev market')) {
+      return '/visuals/ev.svg';
+    }
     if (item.kind === 'news') return item.topics.some((topic) => topic.toLowerCase().includes('geopolitics'))
       ? '/visuals/geopolitics.svg'
       : '/visuals/news.svg';
@@ -273,6 +291,31 @@
     return haystack.includes(normalized);
   }
 
+  function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
+    return sourceTopics
+      .filter((topic) => matchesPreferenceTopic(topic, query, view))
+      .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name))
+      .slice(0, 24);
+  }
+
+  function countPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
+    return sourceTopics.filter((topic) => matchesPreferenceTopic(topic, query, view)).length;
+  }
+
+  function matchesPreferenceTopic(topic: WatchTopic, query: string, view: PreferenceView) {
+    if (view !== 'all') {
+      if (view === 'blacklist' || view === 'follow') {
+        if (topic.mode !== view) return false;
+      } else if (topic.type !== view || topic.mode === 'blacklist') {
+        return false;
+      }
+    }
+
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return true;
+    return [topic.name, topic.type, topic.category, topic.mode, ...topic.aliases].join(' ').toLowerCase().includes(normalized);
+  }
+
   function buildDigestPreview(sourceItems: RadarItem[]) {
     const activeItems = sourceItems.filter((item) => item.status !== 'dismissed').slice(0, 6);
     const lines = ['Personal Radar · Daily Brew', ''];
@@ -307,6 +350,12 @@
     if (category === 'business') return 'e.g. Dreame, 追觅, consumer hardware risk';
     if (category === 'career') return 'e.g. AI product roles Singapore';
     return 'e.g. US-China AI policy, SEA funding';
+  }
+
+  function preferenceMeta(topic: WatchTopic) {
+    const type = topic.type === 'artist' ? 'Musician' : topic.type === 'source' ? 'Source' : 'Topic';
+    const mode = topic.mode === 'blacklist' ? 'Blocked' : 'Followed';
+    return `${type} · ${mode} · ${topic.category} · P${topic.priority}`;
   }
 
   function getGreeting(view: View, count: number) {
@@ -366,7 +415,10 @@
     </div>
     <div class="top-actions">
       <button class:active={searchOpen} class="icon-button" aria-label="Search" onclick={() => (searchOpen = !searchOpen)}>
-        ⌕
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.2"></circle>
+          <path d="m16 16 4.2 4.2"></path>
+        </svg>
       </button>
       <button class:active={digestOpen} class="button" onclick={() => (digestOpen = !digestOpen)}>Digest</button>
       <button class="button primary" onclick={() => openAddWatch('topic', 'business')}>Add watch</button>
@@ -636,76 +688,84 @@
         </div>
       </section>
 
-      <section class="mini-card">
+      <section class="mini-card preference-card">
         <div class="mini-card-head">
-          <h2>Watchlist</h2>
-          <button type="button" onclick={() => openAddWatch('artist', 'concerts')}>Add musician</button>
+          <div>
+            <h2>Preferences</h2>
+            <span>{followedTopicCount} followed · {blacklistTopics.length} blocked</span>
+          </div>
+          <div class="preference-add">
+            <button type="button" onclick={() => openAddWatch('artist', 'concerts')}>Musician</button>
+            <button type="button" onclick={() => openAddWatch('topic', 'business')}>Interest</button>
+            <button type="button" onclick={() => openAddBlacklist()}>Block</button>
+          </div>
         </div>
-        <div class="topic-list">
-          {#each watchTopics as topic}
-            <article class="topic-row">
-              <div>
-                <strong>{topic.name}</strong>
-                <span>{topic.category} · priority {topic.priority}</span>
-              </div>
-              <div class="topic-actions">
-                <button type="button" onclick={() => startEditTopic(topic)}>Edit</button>
-                <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'blacklist')}>
-                  Blacklist
-                </button>
-                <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>Remove</button>
-              </div>
-            </article>
+
+        <div class="preference-summary" aria-label="Preference summary">
+          <button type="button" onclick={() => (preferenceView = 'artist')}>
+            <strong>{watchTopics.length}</strong>
+            <span>Musicians</span>
+          </button>
+          <button type="button" onclick={() => (preferenceView = 'topic')}>
+            <strong>{interestTopics.length}</strong>
+            <span>Interests</span>
+          </button>
+          <button type="button" onclick={() => (preferenceView = 'blacklist')}>
+            <strong>{blacklistTopics.length}</strong>
+            <span>Blocked</span>
+          </button>
+        </div>
+
+        <div class="preference-search">
+          <svg class="mini-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.2"></circle>
+            <path d="m16 16 4.2 4.2"></path>
+          </svg>
+          <input bind:value={preferenceQuery} placeholder="Search musician, topic, source..." />
+        </div>
+
+        <div class="preference-tabs" aria-label="Preference filters">
+          {#each preferenceTabs as tab}
+            <button
+              class:active={preferenceView === tab.id}
+              type="button"
+              onclick={() => (preferenceView = tab.id)}
+            >
+              {tab.label}
+            </button>
           {/each}
         </div>
-      </section>
 
-      <section class="mini-card">
-        <div class="mini-card-head">
-          <h2>Interests</h2>
-          <button type="button" onclick={() => openAddWatch('topic', 'business')}>Add interest</button>
+        <div class="preference-result-line">
+          <span>{preferenceMatchCount} matches</span>
+          {#if preferenceMatchCount > filteredPreferenceTopics.length}
+            <span>Showing first {filteredPreferenceTopics.length}</span>
+          {/if}
         </div>
-        <div class="topic-list">
-          {#each interestTopics as topic}
-            <article class="topic-row">
-              <div>
+
+        <div class="preference-list">
+          {#each filteredPreferenceTopics as topic}
+            <article class:blocked={topic.mode === 'blacklist'} class="preference-row">
+              <div class="preference-row-main">
                 <strong>{topic.name}</strong>
-                <span>{topic.category} · priority {topic.priority}</span>
+                <span>{preferenceMeta(topic)}</span>
               </div>
               <div class="topic-actions">
                 <button type="button" onclick={() => startEditTopic(topic)}>Edit</button>
-                <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'blacklist')}>
-                  Blacklist
-                </button>
-                <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>Remove</button>
-              </div>
-            </article>
-          {/each}
-        </div>
-      </section>
-
-      <section class="mini-card">
-        <div class="mini-card-head">
-          <h2>Blacklist</h2>
-          <button type="button" onclick={() => openAddBlacklist()}>Add block</button>
-        </div>
-        <div class="topic-list">
-          {#each blacklistTopics as topic}
-            <article class="topic-row blocked">
-              <div>
-                <strong>{topic.name}</strong>
-                <span>{topic.type} · hidden from discovery</span>
-              </div>
-              <div class="topic-actions">
-                <button type="button" onclick={() => startEditTopic(topic)}>Edit</button>
-                <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'follow')}>
-                  Follow
-                </button>
+                {#if topic.mode === 'blacklist'}
+                  <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'follow')}>
+                    Follow
+                  </button>
+                {:else}
+                  <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'blacklist')}>
+                    Block
+                  </button>
+                {/if}
                 <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>Remove</button>
               </div>
             </article>
           {:else}
-            <p class="quiet-copy">Popular concerts are auto-discovered unless you blacklist an artist, topic, or source.</p>
+            <p class="quiet-copy">No matching preferences. Add a musician, interest, source, or block rule.</p>
           {/each}
         </div>
       </section>
@@ -722,7 +782,7 @@
           <div class="brew">
             <div>
               <strong>Trend topics</strong>
-              <span>Singapore tech jobs, SEA funding, US-China AI policy.</span>
+              <span>Singapore tech jobs, SEA funding, US-China AI policy, BYD and EV car market signals.</span>
             </div>
           </div>
           <div class="brew">
@@ -866,6 +926,20 @@
 
   .icon-button {
     width: 36px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+
+  .search-icon,
+  .mini-search-icon {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .button {
@@ -1328,7 +1402,16 @@
     text-transform: uppercase;
   }
 
-  .mini-card-head button {
+  .mini-card-head span {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .mini-card-head button,
+  .preference-add button {
     border: 1px solid color-mix(in srgb, var(--jade) 42%, var(--line));
     border-radius: 999px;
     min-height: 28px;
@@ -1340,36 +1423,166 @@
     white-space: nowrap;
   }
 
-  .mini-card-head button:hover {
+  .mini-card-head button:hover,
+  .preference-add button:hover {
     background: var(--jade);
     color: var(--accent-text);
   }
 
-  .topic-list {
-    display: grid;
-    gap: 8px;
+  .preference-card {
+    background:
+      linear-gradient(180deg, rgba(255, 253, 247, 0.96), rgba(215, 242, 220, 0.34)),
+      #fffdf7;
   }
 
-  .topic-row {
+  .preference-add {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .preference-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .preference-summary button {
+    min-width: 0;
     border: 1px solid var(--line);
     border-radius: 10px;
-    padding: 9px;
+    padding: 9px 8px;
+    background: color-mix(in srgb, var(--cream) 72%, white);
+    text-align: left;
+    color: var(--ink);
+  }
+
+  .preference-summary strong {
+    display: block;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .preference-summary span {
+    display: block;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .preference-search {
+    min-height: 38px;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 6px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff8eb;
+    padding: 0 10px;
+  }
+
+  .mini-search-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--muted);
+  }
+
+  .preference-search input {
+    min-width: 0;
+    height: 36px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .preference-tabs {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .preference-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .preference-tabs button {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    min-height: 28px;
+    padding: 0 9px;
+    background: #fffdf7;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+
+  .preference-tabs button.active {
+    background: var(--plum);
+    border-color: var(--plum);
+    color: var(--accent-text);
+  }
+
+  .preference-result-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 10px 0 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .preference-list {
+    display: grid;
+    gap: 8px;
+    max-height: 430px;
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .preference-row {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
     background: color-mix(in srgb, var(--mint) 70%, white);
     display: grid;
     gap: 8px;
   }
 
-  .topic-row.blocked {
+  .preference-row.blocked {
     background: color-mix(in srgb, var(--rose) 58%, white);
   }
 
-  .topic-row strong {
+  .preference-row-main {
+    min-width: 0;
+  }
+
+  .preference-row strong {
     display: block;
+    overflow-wrap: anywhere;
     font-size: 12px;
     line-height: 1.25;
   }
 
-  .topic-row span,
+  .preference-row span {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
   .quiet-copy {
     color: var(--muted);
     font-size: 11px;

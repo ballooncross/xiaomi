@@ -18,6 +18,14 @@ export const defaultWatchTopics: WatchTopic[] = [
     ['Dreame', '追觅', 'consumer hardware unicorn', 'company financial issue', 'organization issue'],
     'business',
     5
+  ),
+  topic(
+    'topic-byd-ev-market',
+    'topic',
+    'BYD and EV cars market',
+    ['BYD', 'electric vehicles', 'EV market', 'Chinese EV', 'EV price war', 'battery market'],
+    'business',
+    5
   )
 ];
 
@@ -146,6 +154,24 @@ export const demoItems: RadarItem[] = [
     artists: [],
     raw: {},
     score: 82,
+    status: 'new'
+  },
+  {
+    id: 'demo-byd-ev-market',
+    sourceId: 'demo',
+    sourceType: 'demo',
+    externalId: 'demo-byd-ev-market',
+    kind: 'opportunity',
+    title: 'BYD and EV market moves worth tracking',
+    summary: 'EV pricing, battery supply, exports, and Chinese carmaker competition can reveal product and market opportunities early.',
+    description:
+      'Track BYD, Chinese EV exports, battery cost changes, price pressure, dealer expansion, and Singapore/SEA EV adoption signals.',
+    url: 'https://news.google.com/search?q=BYD%20EV%20market%20price%20war%20battery%20exports',
+    imageUrl: '/visuals/ev.svg',
+    topics: ['BYD and EV cars market', 'BYD', 'EV market', 'business'],
+    artists: [],
+    raw: {},
+    score: 81,
     status: 'new'
   }
 ];

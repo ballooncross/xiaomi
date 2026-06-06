@@ -20,6 +20,8 @@ The MVP is program-first and AI-assisted:
 
 No Docker/container is needed.
 
+Persistence is D1-first. `npm run dev` uses in-memory demo data for the fastest UI loop, and Wrangler local D1 gives you a real persisted SQLite-backed development database when you want to test jobs, feedback, edits, and watchlist changes across restarts.
+
 ## Quick Start
 
 ```bash

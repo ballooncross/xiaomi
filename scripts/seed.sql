@@ -11,6 +11,7 @@ INSERT OR IGNORE INTO watch_topics (id, type, name, aliases, category, priority,
   ('topic-sea-funding', 'topic', 'SEA startup funding', '["Southeast Asia startup funding", "SEA fintech funding"]', 'business', 4, 'follow'),
   ('topic-us-china-ai', 'topic', 'US-China AI policy', '["US China tech restrictions", "AI chip export controls"]', 'geopolitics', 4, 'follow'),
   ('topic-hot-company-risk', 'topic', 'Hot product/company risk signals', '["Dreame", "追觅", "consumer hardware unicorn", "company financial issue", "organization issue"]', 'business', 5, 'follow'),
+  ('topic-byd-ev-market', 'topic', 'BYD and EV cars market', '["BYD", "electric vehicles", "EV market", "Chinese EV", "EV price war", "battery market"]', 'business', 5, 'follow'),
   ('topic-sg-events', 'topic', 'Singapore concerts and live events', '["Singapore concert", "Singapore live nation", "SISTIC concert"]', 'concerts', 5, 'follow');
 
 INSERT OR IGNORE INTO sources (id, type, name, config_json, frequency_minutes) VALUES

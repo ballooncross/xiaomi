@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
   <title id="title">Personal Radar logo</title>
-  <desc id="desc">A warm radar mark combining a coffee ring, plum accent, and signal beam.</desc>
-  <rect width="128" height="128" rx="28" fill="#fff8eb"/>
-  <circle cx="64" cy="64" r="43" fill="none" stroke="#7a4a2d" stroke-width="7" opacity="0.24"/>
-  <path d="M64 64 99 31a49 49 0 0 1 12 33H64Z" fill="#1f6f5b"/>
-  <path d="M64 64 28 86a43 43 0 0 1-5-22h41Z" fill="#b33a2b"/>
-  <path d="M64 64 82 106a45 45 0 0 1-36-1Z" fill="#d9a441"/>
-  <circle cx="64" cy="64" r="15" fill="#fff8eb" stroke="#2f261e" stroke-width="7"/>
-  <circle cx="64" cy="64" r="5" fill="#8f1d4f"/>
-  <path d="M37 33c11-9 30-14 51-6" fill="none" stroke="#8f1d4f" stroke-width="6" stroke-linecap="round"/>
-  <path d="M29 103c13 9 34 13 55 7" fill="none" stroke="#1f6f5b" stroke-width="6" stroke-linecap="round"/>
+  <desc id="desc">A clean personal radar mark with a coffee base, jade ring, and plum signal point.</desc>
+  <rect width="128" height="128" rx="30" fill="#fff8eb"/>
+  <path d="M28 92c16 13 56 13 72 0" fill="none" stroke="#d9a441" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="64" cy="58" r="34" fill="#f5e3c6" stroke="#2f261e" stroke-width="7"/>
+  <circle cx="64" cy="58" r="21" fill="none" stroke="#1f6f5b" stroke-width="6"/>
+  <path d="M64 58 88 34" fill="none" stroke="#1f6f5b" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="88" cy="34" r="8" fill="#8f1d4f" stroke="#fff8eb" stroke-width="4"/>
+  <path d="M43 48c9-8 25-12 42-6" fill="none" stroke="#b33a2b" stroke-width="5" stroke-linecap="round"/>
+  <path d="M45 73c10 7 28 8 41 0" fill="none" stroke="#7a4a2d" stroke-width="5" stroke-linecap="round" opacity="0.62"/>
 </svg>

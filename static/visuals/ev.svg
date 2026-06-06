@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">EV market visual</title>
+  <desc id="desc">A colorful electric vehicle market card with a compact car, charging signal, and city line.</desc>
+  <rect width="640" height="360" fill="#fff8eb"/>
+  <rect x="0" y="244" width="640" height="116" fill="#d7f2dc"/>
+  <path d="M42 235h556" stroke="#2f261e" stroke-width="5" stroke-linecap="round" opacity=".16"/>
+  <path d="M72 218h70v-58h42v58h56v-88h52v88h58v-44h44v44h72v-74h54v74h48" fill="none" stroke="#1f6f5b" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M150 224c18-44 46-66 94-66h136c47 0 82 22 107 66l24 6c18 5 30 21 30 40v19H103v-21c0-19 13-36 32-40l15-4Z" fill="#b33a2b"/>
+  <path d="M218 177h158c31 0 56 14 77 42H175c10-27 24-42 43-42Z" fill="#fff8eb"/>
+  <path d="M265 170l-28 54h65l-19 53 75-76h-66l28-31h-55Z" fill="#d9a441" stroke="#2f261e" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="184" cy="289" r="34" fill="#2f261e"/>
+  <circle cx="184" cy="289" r="15" fill="#fff8eb"/>
+  <circle cx="455" cy="289" r="34" fill="#2f261e"/>
+  <circle cx="455" cy="289" r="15" fill="#fff8eb"/>
+  <path d="M515 117h42c18 0 32 14 32 32v112" fill="none" stroke="#8f1d4f" stroke-width="12" stroke-linecap="round"/>
+  <path d="M533 117V82m28 35V82" stroke="#8f1d4f" stroke-width="12" stroke-linecap="round"/>
+  <path d="M512 156h78" stroke="#8f1d4f" stroke-width="12" stroke-linecap="round"/>
+</svg>
