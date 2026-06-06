@@ -51,7 +51,7 @@ export async function runTrendFetchJob(env: Env): Promise<JobResult> {
   return { inserted, updated, considered: fetched.length, notified: 0, detail };
 }
 
-export async function runDailyDigestJob(env: Env): Promise<JobResult> {
+export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual_digest' = 'daily_digest'): Promise<JobResult> {
   const db = getDb(env);
   const items = await db.listItems(12);
   const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
@@ -59,11 +59,15 @@ export async function runDailyDigestJob(env: Env): Promise<JobResult> {
   const telegram = await sendTelegramMessage(env, message);
   await db.logNotification({
     channel: 'telegram',
-    type: 'daily_digest',
+    type,
     status: telegram.ok ? 'sent' : 'skipped',
     message
   });
-  await db.logJob({ jobName: 'daily-digest', status: telegram.ok ? 'ok' : 'skipped', detail: telegram.detail });
+  await db.logJob({
+    jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
+    status: telegram.ok ? 'ok' : 'skipped',
+    detail: telegram.detail
+  });
   return { inserted: 0, updated: 0, considered: items.length, notified: telegram.ok ? 1 : 0, detail: telegram.detail };
 }
 

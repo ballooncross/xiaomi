@@ -30,6 +30,8 @@
   let feedbackPending = $state<string | null>(null);
   let addWatchPending = $state(false);
   let topicPending = $state<string | null>(null);
+  let digestSendPending = $state(false);
+  let digestSendMessage = $state('');
   let addWatchError = $state('');
   let editWatchError = $state('');
 
@@ -39,26 +41,26 @@
   });
 
   const navItems: Array<{ id: View; label: string }> = [
-    { id: 'home', label: 'Home' },
-    { id: 'concerts', label: 'Concerts' },
-    { id: 'trends', label: 'Trends' },
-    { id: 'me', label: 'Me' }
+    { id: 'home', label: '首页' },
+    { id: 'concerts', label: '演出' },
+    { id: 'trends', label: '趋势' },
+    { id: 'me', label: '我的' }
   ];
 
   const filters = [
-    { id: 'for-you', label: 'For you' },
-    { id: 'career', label: 'Career' },
-    { id: 'business', label: 'Business' },
-    { id: 'geopolitics', label: 'Geopolitics' },
-    { id: 'saved', label: 'Saved' }
+    { id: 'for-you', label: '推荐' },
+    { id: 'career', label: '职业' },
+    { id: 'business', label: '商业' },
+    { id: 'geopolitics', label: '地缘政治' },
+    { id: 'saved', label: '已保存' }
   ];
 
   const preferenceTabs: Array<{ id: PreferenceView; label: string }> = [
-    { id: 'all', label: 'All' },
-    { id: 'artist', label: 'Musicians' },
-    { id: 'topic', label: 'Topics' },
-    { id: 'source', label: 'Sources' },
-    { id: 'blacklist', label: 'Blocked' }
+    { id: 'all', label: '全部' },
+    { id: 'artist', label: '音乐人' },
+    { id: 'topic', label: '主题' },
+    { id: 'source', label: '来源' },
+    { id: 'blacklist', label: '已屏蔽' }
   ];
 
   const visibleItems = $derived(
@@ -115,35 +117,51 @@
     feedbackPending = null;
   }
 
+  async function sendTelegramSummary() {
+    digestSendPending = true;
+    digestSendMessage = '';
+    const response = await fetch('/api/digest', { method: 'POST' });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    digestSendMessage = response.ok ? '已发送到 Telegram。' : result.error || '发送失败，请稍后再试。';
+    digestSendPending = false;
+  }
+
   function formatDate(value: string | undefined) {
-    if (!value) return { month: 'NEW', day: '01' };
+    if (!value) return { month: '新', day: '01' };
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return { month: 'NEW', day: '01' };
+    if (Number.isNaN(date.getTime())) return { month: '新', day: '01' };
     return {
-      month: date.toLocaleDateString('en-SG', { month: 'short' }).toUpperCase(),
+      month: date.toLocaleDateString('zh-CN', { month: 'short' }).toUpperCase(),
       day: date.toLocaleDateString('en-SG', { day: '2-digit' })
     };
   }
 
   function itemKicker(item: RadarItem) {
-    if (item.kind === 'concert') return `Concert watch · ${item.score} score`;
-    if (item.kind === 'opportunity') return 'Business chance';
-    if (item.topics.some((topic) => topic.toLowerCase().includes('job'))) return 'Career signal';
-    return 'Trend signal';
+    if (item.kind === 'concert') return `演出关注 · ${item.score} 分`;
+    if (item.kind === 'opportunity') return '商业机会';
+    if (item.topics.some((topic) => topic.toLowerCase().includes('job'))) return '职业信号';
+    return '趋势信号';
   }
 
   function sourceLabel(item: RadarItem) {
-    if (!item.url) return 'Source';
+    if (!item.url) return '来源';
     try {
       const host = new URL(item.url).hostname.replace(/^www\./, '');
       if (host.includes('ticketmaster')) return 'Ticketmaster';
       if (host.includes('livenation')) return 'Live Nation';
       if (host.includes('songkick')) return 'Songkick';
-      if (host.includes('news.google')) return 'Google News';
+      if (host.includes('news.google')) return 'Google 新闻';
       return host;
     } catch {
-      return item.sourceType === 'demo' ? 'Source' : item.sourceType;
+      return item.sourceType === 'demo' ? '来源' : item.sourceType;
     }
+  }
+
+  function itemKindLabel(item: RadarItem) {
+    if (item.kind === 'concert') return '演出';
+    if (item.kind === 'opportunity') return '机会';
+    if (item.kind === 'news') return '新闻';
+    return '趋势';
   }
 
   function imageForItem(item: RadarItem) {
@@ -193,7 +211,7 @@
     addWatchError = '';
     const name = newWatchName.trim();
     if (!name) {
-      addWatchError = 'Enter a watch name first.';
+      addWatchError = '请先输入关注名称。';
       return;
     }
 
@@ -216,7 +234,7 @@
       newWatchName = '';
       addWatchOpen = false;
     } else {
-      addWatchError = 'Could not add this watch. Try again.';
+      addWatchError = '无法添加这个关注，请重试。';
     }
     addWatchPending = false;
   }
@@ -238,7 +256,7 @@
     editWatchError = '';
     const name = editWatchName.trim();
     if (!editingTopicId || !name) {
-      editWatchError = 'Enter a watch name first.';
+      editWatchError = '请先输入关注名称。';
       return;
     }
 
@@ -262,7 +280,7 @@
       topics = topics.map((topic) => (topic.id === result.topic.id ? result.topic : topic));
       editingTopicId = null;
     } else {
-      editWatchError = 'Could not save this watch. Try again.';
+      editWatchError = '无法保存这个偏好，请重试。';
     }
     topicPending = null;
   }
@@ -332,82 +350,88 @@
 
   function buildDigestPreview(sourceItems: RadarItem[]) {
     const activeItems = sourceItems.filter((item) => item.status !== 'dismissed').slice(0, 6);
-    const lines = ['Personal Radar · Daily Brew', ''];
+    const lines = ['个人雷达 · 每日摘要', ''];
     for (const item of activeItems) {
       lines.push(`• ${item.title}`);
       lines.push(`  ${item.summary}`);
     }
-    if (activeItems.length === 0) lines.push('No active items to send yet.');
+    if (activeItems.length === 0) lines.push('暂无可发送的活跃项目。');
     return lines.join('\n');
   }
 
   function getAddWatchTitle(type: WatchTopic['type'], mode: WatchTopic['mode']) {
-    if (mode === 'blacklist') return 'Add blacklist rule';
-    if (type === 'artist') return 'Add musician';
-    if (type === 'source') return 'Add source';
-    return 'Add interest';
+    if (mode === 'blacklist') return '添加屏蔽规则';
+    if (type === 'artist') return '添加音乐人';
+    if (type === 'source') return '添加来源';
+    return '添加兴趣';
   }
 
   function getAddWatchHint(type: WatchTopic['type'], category: string, mode: WatchTopic['mode']) {
-    if (mode === 'blacklist') return 'Hide matching concerts, topics, or sources from broad discovery';
-    if (type === 'artist') return 'Track Singapore concert and event signals';
-    if (type === 'source') return 'Track a trusted site, blog, or official account';
-    if (category === 'business') return 'Track companies, products, markets, or founder signals';
-    if (category === 'career') return 'Track job market, skill, and hiring signals';
-    return 'Track the topic in your daily trend feed';
+    if (mode === 'blacklist') return '从自动发现中隐藏匹配的演出、主题或来源';
+    if (type === 'artist') return '跟踪新加坡演唱会和活动信号';
+    if (type === 'source') return '跟踪可信网站、博客或官方账号';
+    if (category === 'business') return '跟踪公司、产品、市场或创业机会信号';
+    if (category === 'career') return '跟踪岗位市场、技能和招聘信号';
+    return '在每日趋势流中跟踪这个主题';
   }
 
   function getAddWatchPlaceholder(type: WatchTopic['type'], category: string, mode: WatchTopic['mode']) {
-    if (mode === 'blacklist') return 'e.g. artist or event keyword to hide';
-    if (type === 'artist') return 'e.g. One Spark, TWICE, Coldplay, 陈奕迅';
-    if (type === 'source') return 'e.g. JYPETWICE official X, CNA, Music Matters';
-    if (category === 'business') return 'e.g. Dreame, 追觅, consumer hardware risk';
-    if (category === 'career') return 'e.g. AI product roles Singapore';
-    return 'e.g. US-China AI policy, SEA funding';
+    if (mode === 'blacklist') return '例如：要隐藏的艺人或活动关键词';
+    if (type === 'artist') return '例如：One Spark、TWICE、Coldplay、陈奕迅';
+    if (type === 'source') return '例如：JYPETWICE 官方 X、CNA、Music Matters';
+    if (category === 'business') return '例如：Dreame、追觅、消费硬件风险';
+    if (category === 'career') return '例如：新加坡 AI 产品岗位';
+    return '例如：中美 AI 政策、东南亚融资';
   }
 
   function preferenceMeta(topic: WatchTopic) {
-    const type = topic.type === 'artist' ? 'Musician' : topic.type === 'source' ? 'Source' : 'Topic';
-    const mode = topic.mode === 'blacklist' ? 'Blocked' : 'Followed';
-    return `${type} · ${mode} · ${topic.category} · P${topic.priority}`;
+    const type = topic.type === 'artist' ? '音乐人' : topic.type === 'source' ? '来源' : '主题';
+    const mode = topic.mode === 'blacklist' ? '已屏蔽' : '已关注';
+    const categories: Record<string, string> = {
+      business: '商业',
+      career: '职业',
+      geopolitics: '地缘政治',
+      concerts: '演出'
+    };
+    return `${type} · ${mode} · ${categories[topic.category] ?? topic.category} · P${topic.priority}`;
   }
 
   function getGreeting(view: View, count: number) {
     if (view === 'concerts') {
       return {
-        eyebrow: 'Concert radar · Singapore',
-        title: `${count} active concert signals.`,
-        body: 'Only upcoming or still-actionable concert signals should appear here. Past Singapore stops stay out of the top feed.'
+        eyebrow: '演出雷达 · 新加坡',
+        title: `${count} 条活跃演出信号。`,
+        body: '这里仅显示未来或仍可行动的演出信号。已经结束的新加坡场次不会进入顶部推荐。'
       };
     }
     if (view === 'trends') {
       return {
-        eyebrow: 'Trend radar · Career, business, geopolitics',
-        title: `${count} trend signals to review.`,
-        body: 'Career, market, geopolitics, and business-chance items are grouped here so they are not buried under concert watches.'
+        eyebrow: '趋势雷达 · 职业、商业、地缘政治',
+        title: `${count} 条趋势信号待查看。`,
+        body: '职业、市场、地缘政治和商业机会会集中在这里，避免被演出关注淹没。'
       };
     }
     if (view === 'me') {
       return {
-        eyebrow: 'Your profile · Preferences',
-        title: 'Tune your radar.',
-        body: 'Saved and tracked items teach the system what to rank higher. Not relevant lowers similar signals.'
+        eyebrow: '我的资料 · 偏好',
+        title: '调校你的个人雷达。',
+        body: '保存和重点跟踪会提高类似信号的排序；标记不相关会降低类似内容。'
       };
     }
     return {
-      eyebrow: 'Morning brief · Singapore',
-      title: `${count} signals look worth checking.`,
-      body: 'Concert drops, topic spikes, and business chances filtered by your watchlist.'
+      eyebrow: '晨间简报 · 新加坡',
+      title: `${count} 条信号值得查看。`,
+      body: '根据你的关注列表筛选演出开票、主题热度和商业机会。'
     };
   }
 </script>
 
 <svelte:head>
-  <title>Personal Radar</title>
+  <title>个人雷达</title>
   <link rel="icon" href="/brand/personal-radar-logo.svg" />
   <meta
     name="description"
-    content="Personal monitoring app for Singapore concerts, trends, career signals, and business chances."
+    content="用于跟踪新加坡演出、趋势、职业信号和商业机会的个人监控应用。"
   />
 </svelte:head>
 
@@ -416,11 +440,11 @@
     <div class="brand">
       <img class="logo" src="/brand/personal-radar-logo.svg" alt="" />
       <div>
-        <strong>Personal Radar</strong>
-        <span>Mortal Cafe</span>
+        <strong>个人雷达</strong>
+        <span>凡人咖啡馆</span>
       </div>
     </div>
-    <div class="primary-nav desktop-nav" data-active={activeView} aria-label="Primary navigation">
+    <div class="primary-nav desktop-nav" data-active={activeView} aria-label="主导航">
       <span class="nav-indicator" aria-hidden="true"></span>
       {#each navItems as item}
         <button class:active={activeView === item.id} type="button" onclick={() => setView(item.id)}>
@@ -429,14 +453,14 @@
       {/each}
     </div>
     <div class="top-actions">
-      <button class:active={searchOpen} class="icon-button" aria-label="Search" onclick={() => (searchOpen = !searchOpen)}>
+      <button class:active={searchOpen} class="icon-button" aria-label="搜索" onclick={() => (searchOpen = !searchOpen)}>
         <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="6.2"></circle>
           <path d="m16 16 4.2 4.2"></path>
         </svg>
       </button>
-      <button class:active={digestOpen} class="button" onclick={() => (digestOpen = !digestOpen)}>Digest</button>
-      <button class="button primary" onclick={() => openAddWatch('topic', 'business')}>Add watch</button>
+      <button class:active={digestOpen} class="button" onclick={() => (digestOpen = !digestOpen)}>摘要</button>
+      <button class="button primary" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
     </div>
   </nav>
 
@@ -447,8 +471,8 @@
           {#if searchOpen}
             <div class="action-card search-card">
               <div class="action-card-head">
-                <label for="feed-search">Search radar</label>
-                <button class="close-button" type="button" aria-label="Close search" onclick={() => (searchOpen = false)}>
+                <label for="feed-search">搜索雷达</label>
+                <button class="close-button" type="button" aria-label="关闭搜索" onclick={() => (searchOpen = false)}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18"></path>
                   </svg>
@@ -458,9 +482,9 @@
                 <input
                   id="feed-search"
                   bind:value={searchQuery}
-                  placeholder="Try Dreame, AI roles, TWICE, Singapore..."
+                  placeholder="试试：追觅、AI 岗位、TWICE、新加坡..."
                 />
-                <button class="small-button" onclick={() => (searchQuery = '')}>Clear</button>
+                <button class="small-button" onclick={() => (searchQuery = '')}>清空</button>
               </div>
             </div>
           {/if}
@@ -469,16 +493,28 @@
             <div class="action-card">
               <div class="action-card-head">
                 <div>
-                  <strong>Daily digest preview</strong>
-                  <span>Telegram message draft</span>
+                  <strong>每日摘要预览</strong>
+                  <span>Telegram 消息草稿</span>
                 </div>
-                <button class="close-button" type="button" aria-label="Close digest preview" onclick={() => (digestOpen = false)}>
+                <button class="close-button" type="button" aria-label="关闭摘要预览" onclick={() => (digestOpen = false)}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18"></path>
                   </svg>
                 </button>
               </div>
               <pre>{digestPreview}</pre>
+              <div class="digest-actions">
+                <button
+                  class="small-button primary"
+                  type="button"
+                  disabled={digestSendPending || !data.telegramConfigured}
+                  onclick={sendTelegramSummary}
+                >
+                  {digestSendPending ? '发送中...' : '发送到 Telegram'}
+                </button>
+                {#if digestSendMessage}<span>{digestSendMessage}</span>{/if}
+                {#if !data.telegramConfigured}<span>Telegram 尚未配置。</span>{/if}
+              </div>
             </div>
           {/if}
 
@@ -489,7 +525,7 @@
                   <strong>{addWatchTitle}</strong>
                   <span>{addWatchHint}</span>
                 </div>
-                <button class="close-button" type="button" aria-label="Close add watch" onclick={() => (addWatchOpen = false)}>
+                <button class="close-button" type="button" aria-label="关闭添加关注" onclick={() => (addWatchOpen = false)}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18"></path>
                   </svg>
@@ -497,30 +533,30 @@
               </div>
               <div class="watch-form">
                 <input bind:value={newWatchName} placeholder={addWatchPlaceholder} />
-                <select bind:value={newWatchType} aria-label="Watch type">
-                  <option value="topic">Topic</option>
-                  <option value="artist">Artist</option>
-                  <option value="source">Source</option>
+                <select bind:value={newWatchType} aria-label="关注类型">
+                  <option value="topic">主题</option>
+                  <option value="artist">音乐人</option>
+                  <option value="source">来源</option>
                 </select>
-                <select bind:value={newWatchCategory} aria-label="Watch category">
-                  <option value="business">Business</option>
-                  <option value="career">Career</option>
-                  <option value="geopolitics">Geopolitics</option>
-                  <option value="concerts">Concerts</option>
+                <select bind:value={newWatchCategory} aria-label="关注分类">
+                  <option value="business">商业</option>
+                  <option value="career">职业</option>
+                  <option value="geopolitics">地缘政治</option>
+                  <option value="concerts">演出</option>
                 </select>
-                <select bind:value={newWatchPriority} aria-label="Priority">
-                  <option value={1}>Priority 1</option>
-                  <option value={2}>Priority 2</option>
-                  <option value={3}>Priority 3</option>
-                  <option value={4}>Priority 4</option>
-                  <option value={5}>Priority 5</option>
+                <select bind:value={newWatchPriority} aria-label="优先级">
+                  <option value={1}>优先级 1</option>
+                  <option value={2}>优先级 2</option>
+                  <option value={3}>优先级 3</option>
+                  <option value={4}>优先级 4</option>
+                  <option value={5}>优先级 5</option>
                 </select>
-                <select bind:value={newWatchMode} aria-label="Preference mode">
-                  <option value="follow">Follow</option>
-                  <option value="blacklist">Blacklist</option>
+                <select bind:value={newWatchMode} aria-label="偏好模式">
+                  <option value="follow">关注</option>
+                  <option value="blacklist">屏蔽</option>
                 </select>
                 <button class="small-button primary" disabled={addWatchPending} onclick={addWatchTopic}>
-                  {addWatchPending ? 'Adding...' : 'Add'}
+                  {addWatchPending ? '添加中...' : '添加'}
                 </button>
               </div>
               {#if addWatchError}<p class="form-error">{addWatchError}</p>{/if}
@@ -531,43 +567,43 @@
             <div class="action-card">
               <div class="action-card-head">
                 <div>
-                  <strong>Edit preference</strong>
-                  <span>Manual preferences boost, suppress, or remove discovered signals</span>
+                  <strong>编辑偏好</strong>
+                  <span>手动偏好会提升、压低或移除发现的信号</span>
                 </div>
-                <button class="close-button" type="button" aria-label="Close edit preference" onclick={() => (editingTopicId = null)}>
+                <button class="close-button" type="button" aria-label="关闭编辑偏好" onclick={() => (editingTopicId = null)}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18"></path>
                   </svg>
                 </button>
               </div>
               <div class="watch-form edit-form">
-                <input bind:value={editWatchName} placeholder="Preference name" />
-                <select bind:value={editWatchType} aria-label="Watch type">
-                  <option value="topic">Topic</option>
-                  <option value="artist">Artist</option>
-                  <option value="source">Source</option>
+                <input bind:value={editWatchName} placeholder="偏好名称" />
+                <select bind:value={editWatchType} aria-label="关注类型">
+                  <option value="topic">主题</option>
+                  <option value="artist">音乐人</option>
+                  <option value="source">来源</option>
                 </select>
-                <select bind:value={editWatchCategory} aria-label="Watch category">
-                  <option value="business">Business</option>
-                  <option value="career">Career</option>
-                  <option value="geopolitics">Geopolitics</option>
-                  <option value="concerts">Concerts</option>
+                <select bind:value={editWatchCategory} aria-label="关注分类">
+                  <option value="business">商业</option>
+                  <option value="career">职业</option>
+                  <option value="geopolitics">地缘政治</option>
+                  <option value="concerts">演出</option>
                 </select>
-                <select bind:value={editWatchPriority} aria-label="Priority">
-                  <option value={1}>Priority 1</option>
-                  <option value={2}>Priority 2</option>
-                  <option value={3}>Priority 3</option>
-                  <option value={4}>Priority 4</option>
-                  <option value={5}>Priority 5</option>
+                <select bind:value={editWatchPriority} aria-label="优先级">
+                  <option value={1}>优先级 1</option>
+                  <option value={2}>优先级 2</option>
+                  <option value={3}>优先级 3</option>
+                  <option value={4}>优先级 4</option>
+                  <option value={5}>优先级 5</option>
                 </select>
-                <select bind:value={editWatchMode} aria-label="Preference mode">
-                  <option value="follow">Follow</option>
-                  <option value="blacklist">Blacklist</option>
+                <select bind:value={editWatchMode} aria-label="偏好模式">
+                  <option value="follow">关注</option>
+                  <option value="blacklist">屏蔽</option>
                 </select>
                 <button class="small-button primary" disabled={topicPending === editingTopicId} onclick={saveTopicEdit}>
-                  {topicPending === editingTopicId ? 'Saving...' : 'Save'}
+                  {topicPending === editingTopicId ? '保存中...' : '保存'}
                 </button>
-                <button class="small-button" onclick={() => (editingTopicId = null)}>Cancel</button>
+                <button class="small-button" onclick={() => (editingTopicId = null)}>取消</button>
               </div>
               {#if editWatchError}<p class="form-error">{editWatchError}</p>{/if}
             </div>
@@ -580,20 +616,29 @@
           <div class="eyebrow">{greeting.eyebrow}</div>
           <h1>{greeting.title}</h1>
           <p>
-            {greeting.body} AI is
-            {data.aiEnabled ? ' available when configured' : ' off'}; rule scoring is always on.
+            {greeting.body} AI
+            {data.aiEnabled ? '已配置可用' : '已关闭'}；规则评分会一直启用。
           </p>
         </div>
         <aside class="daily-card">
-          <strong>Daily brew is ready</strong>
+          <strong>每日摘要已就绪</strong>
           <span>
-            Telegram {data.telegramConfigured ? 'enabled' : 'not configured'} · feedback updates future ranking.
+            Telegram {data.telegramConfigured ? '已启用' : '未配置'} · 你的反馈会影响后续排序。
           </span>
+          <button
+            class="small-button primary"
+            type="button"
+            disabled={digestSendPending || !data.telegramConfigured}
+            onclick={sendTelegramSummary}
+          >
+            {digestSendPending ? '发送中...' : '发送摘要到 Telegram'}
+          </button>
+          {#if digestSendMessage}<small>{digestSendMessage}</small>{/if}
         </aside>
       </div>
 
       {#if activeView === 'home'}
-        <div class="tabs" aria-label="Feed filters">
+        <div class="tabs" aria-label="信息流筛选">
           {#each filters as filter}
             <button
               class:active={activeFilter === filter.id}
@@ -608,8 +653,8 @@
       {/if}
 
       <div class="section-title">
-        <h2>{activeView === 'trends' ? 'Trend feed' : activeView === 'concerts' ? 'Concert feed' : activeView === 'me' ? 'Saved and tracked' : 'Top picks'}</h2>
-        <span>{activeView === 'me' ? 'Your feedback profile' : 'Tune ranking with feedback'}</span>
+        <h2>{activeView === 'trends' ? '趋势流' : activeView === 'concerts' ? '演出流' : activeView === 'me' ? '已保存与重点跟踪' : '重点推荐'}</h2>
+        <span>{activeView === 'me' ? '你的反馈资料' : '用反馈调校排序'}</span>
       </div>
 
       {#if topItem}
@@ -626,7 +671,7 @@
                 {#each [...topItem.artists, ...topItem.topics].slice(0, 4) as chip}
                   <span class="chip">{chip}</span>
                 {/each}
-                <span class="chip hot">{topItem.status === 'tracking' ? 'Tracking' : 'Notify if confirmed'}</span>
+                <span class="chip hot">{topItem.status === 'tracking' ? '重点跟踪' : '确认后提醒'}</span>
               </div>
               <div class="story-actions">
                 <button
@@ -634,12 +679,12 @@
                   disabled={feedbackPending === `${topItem.id}:track`}
                   onclick={() => sendFeedback(topItem.id, 'track')}
                 >
-                  Track closely
+                  重点跟踪
                 </button>
-                <button class="small-button" onclick={() => sendFeedback(topItem.id, 'save')}>Save</button>
-                <button class="small-button" onclick={() => sendFeedback(topItem.id, 'not_relevant')}>Not relevant</button>
+                <button class="small-button" onclick={() => sendFeedback(topItem.id, 'save')}>保存</button>
+                <button class="small-button" onclick={() => sendFeedback(topItem.id, 'not_relevant')}>不相关</button>
                 {#if topItem.url}
-                  <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">Source · {sourceLabel(topItem)}</a>
+                  <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">来源 · {sourceLabel(topItem)}</a>
                 {/if}
               </div>
             </div>
@@ -661,7 +706,7 @@
                 </div>
                 {#if item.url}
                   <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
-                    Source · {sourceLabel(item)}
+                    来源 · {sourceLabel(item)}
                   </a>
                 {/if}
               </div>
@@ -670,21 +715,21 @@
         </div>
       {:else}
         <section class="empty-state">
-          <h3>No matching signals yet</h3>
-          <p>Add watch topics or run a fetch job to populate your personal feed.</p>
+          <h3>暂无匹配信号</h3>
+          <p>添加关注主题，或运行抓取任务来填充你的个人信息流。</p>
         </section>
       {/if}
 
       <div class="section-title">
-        <h2>{activeView === 'trends' ? 'All trend categories' : 'Upcoming watch timeline'}</h2>
-        <span>{activeView === 'trends' ? 'Career · business · geopolitics' : 'Concert-first view'}</span>
+        <h2>{activeView === 'trends' ? '全部趋势分类' : '未来关注时间线'}</h2>
+        <span>{activeView === 'trends' ? '职业 · 商业 · 地缘政治' : '演出优先视图'}</span>
       </div>
       {#if activeView === 'trends'}
         <section class="timeline">
           {#each trendItems as item}
             <article class="timeline-item">
               <div class="date trend-date">
-                <span><small>{item.kind.toUpperCase()}</small>{item.score}</span>
+                <span><small>{itemKindLabel(item)}</small>{item.score}</span>
               </div>
               <img class="timeline-image" src={imageForItem(item)} alt="" loading="lazy" />
               <div>
@@ -692,7 +737,7 @@
                 <p>{item.summary}</p>
                 {#if item.url}
                   <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
-                    Source · {sourceLabel(item)}
+                    来源 · {sourceLabel(item)}
                   </a>
                 {/if}
               </div>
@@ -713,7 +758,7 @@
                 <p>{item.summary}</p>
                 {#if item.url}
                   <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
-                    Source · {sourceLabel(item)}
+                    来源 · {sourceLabel(item)}
                   </a>
                 {/if}
               </div>
@@ -725,8 +770,8 @@
               </div>
               <img class="timeline-image" src="/visuals/concert.svg" alt="" loading="lazy" />
               <div>
-                <h3>No confirmed upcoming concert dates yet</h3>
-                <p>Past TWICE and G.E.M. Singapore dates are intentionally excluded from this timeline.</p>
+                <h3>暂无确认的未来演出日期</h3>
+                <p>TWICE 和 G.E.M. 的新加坡历史场次会被排除在这条未来时间线之外。</p>
               </div>
             </article>
           {/each}
@@ -739,41 +784,41 @@
         <div class="avatar-row">
           <div class="avatar">S</div>
           <div>
-            <strong>Your radar</strong>
-            <span>Quiet hours · Telegram daily digest</span>
+            <strong>你的雷达</strong>
+            <span>安静时段 · Telegram 每日摘要</span>
           </div>
         </div>
         <div class="focus">
-          <div><strong>{items.length}</strong><span>signals</span></div>
-          <div><strong>{items.filter((item) => item.kind === 'concert').length}</strong><span>concerts</span></div>
+          <div><strong>{items.length}</strong><span>信号</span></div>
+          <div><strong>{items.filter((item) => item.kind === 'concert').length}</strong><span>演出</span></div>
         </div>
       </section>
 
       <section class="mini-card preference-card">
         <div class="mini-card-head">
           <div>
-            <h2>Preferences</h2>
-            <span>{followedTopicCount} followed · {blacklistTopics.length} blocked</span>
+            <h2>偏好</h2>
+            <span>{followedTopicCount} 个关注 · {blacklistTopics.length} 个屏蔽</span>
           </div>
           <div class="preference-add">
-            <button type="button" onclick={() => openAddWatch('artist', 'concerts')}>Musician</button>
-            <button type="button" onclick={() => openAddWatch('topic', 'business')}>Interest</button>
-            <button type="button" onclick={() => openAddBlacklist()}>Block</button>
+            <button type="button" onclick={() => openAddWatch('artist', 'concerts')}>音乐人</button>
+            <button type="button" onclick={() => openAddWatch('topic', 'business')}>兴趣</button>
+            <button type="button" onclick={() => openAddBlacklist()}>屏蔽</button>
           </div>
         </div>
 
-        <div class="preference-summary" aria-label="Preference summary">
+        <div class="preference-summary" aria-label="偏好概览">
           <button type="button" onclick={() => (preferenceView = 'artist')}>
             <strong>{watchTopics.length}</strong>
-            <span>Musicians</span>
+            <span>音乐人</span>
           </button>
           <button type="button" onclick={() => (preferenceView = 'topic')}>
             <strong>{interestTopics.length}</strong>
-            <span>Interests</span>
+            <span>兴趣</span>
           </button>
           <button type="button" onclick={() => (preferenceView = 'blacklist')}>
             <strong>{blacklistTopics.length}</strong>
-            <span>Blocked</span>
+            <span>已屏蔽</span>
           </button>
         </div>
 
@@ -782,10 +827,10 @@
             <circle cx="11" cy="11" r="6.2"></circle>
             <path d="m16 16 4.2 4.2"></path>
           </svg>
-          <input bind:value={preferenceQuery} placeholder="Search musician, topic, source..." />
+          <input bind:value={preferenceQuery} placeholder="搜索音乐人、主题、来源..." />
         </div>
 
-        <div class="preference-tabs" aria-label="Preference filters">
+        <div class="preference-tabs" aria-label="偏好筛选">
           {#each preferenceTabs as tab}
             <button
               class:active={preferenceView === tab.id}
@@ -798,9 +843,9 @@
         </div>
 
         <div class="preference-result-line">
-          <span>{preferenceMatchCount} matches</span>
+          <span>{preferenceMatchCount} 个匹配</span>
           {#if preferenceMatchCount > filteredPreferenceTopics.length}
-            <span>Showing first {filteredPreferenceTopics.length}</span>
+            <span>显示前 {filteredPreferenceTopics.length} 个</span>
           {/if}
         </div>
 
@@ -812,44 +857,44 @@
                 <span>{preferenceMeta(topic)}</span>
               </div>
               <div class="topic-actions">
-                <button type="button" onclick={() => startEditTopic(topic)}>Edit</button>
+                <button type="button" onclick={() => startEditTopic(topic)}>编辑</button>
                 {#if topic.mode === 'blacklist'}
                   <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'follow')}>
-                    Follow
+                    关注
                   </button>
                 {:else}
                   <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'blacklist')}>
-                    Block
+                    屏蔽
                   </button>
                 {/if}
-                <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>Remove</button>
+                <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>移除</button>
               </div>
             </article>
           {:else}
-            <p class="quiet-copy">No matching preferences. Add a musician, interest, source, or block rule.</p>
+            <p class="quiet-copy">没有匹配的偏好。你可以添加音乐人、兴趣、来源或屏蔽规则。</p>
           {/each}
         </div>
       </section>
 
       <section class="mini-card">
-        <h2>Today’s brew</h2>
+        <h2>今日摘要</h2>
         <div class="brew-list">
           <div class="brew">
             <div>
-              <strong>Concert sources</strong>
-              <span>Ticketmaster broad SG music discovery plus followed artists on Ticketmaster and Bandsintown.</span>
+              <strong>演出来源</strong>
+              <span>包含新加坡音乐活动广泛发现，以及在 Ticketmaster 和 Bandsintown 上按音乐人跟踪。</span>
             </div>
           </div>
           <div class="brew">
             <div>
-              <strong>Trend topics</strong>
-              <span>Singapore tech jobs, SEA funding, US-China AI policy, BYD and EV car market signals.</span>
+              <strong>趋势主题</strong>
+              <span>新加坡科技岗位、东南亚融资、中美 AI 政策、比亚迪和电动车市场信号。</span>
             </div>
           </div>
           <div class="brew">
             <div>
-              <strong>AI mode</strong>
-              <span>Optional: Gemini first, DeepSeek fallback, rule-based if unavailable.</span>
+              <strong>AI 模式</strong>
+              <span>可选：优先 Gemini，DeepSeek 兜底；不可用时使用规则评分。</span>
             </div>
           </div>
         </div>
@@ -859,7 +904,7 @@
 
 </main>
 
-<nav class="primary-nav mobile-nav" data-active={activeView} aria-label="Primary navigation">
+<nav class="primary-nav mobile-nav" data-active={activeView} aria-label="主导航">
   <span class="nav-indicator" aria-hidden="true"></span>
   {#each navItems as item}
     <button class:active={activeView === item.id} type="button" onclick={() => setView(item.id)}>
@@ -1132,6 +1177,20 @@
     font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
+  .digest-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .digest-actions span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
+  }
+
   .search-row,
   .watch-form {
     display: grid;
@@ -1240,6 +1299,19 @@
     color: #65584b;
     font-size: 12px;
     line-height: 1.4;
+  }
+
+  .daily-card button {
+    margin-top: 12px;
+  }
+
+  .daily-card small {
+    display: block;
+    margin-top: 7px;
+    color: #65584b;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.35;
   }
 
   .tabs {
