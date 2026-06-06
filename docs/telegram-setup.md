@@ -27,8 +27,8 @@ Use the full BotFather token, including the numeric prefix before `:`. The numbe
 For production, set the production bot token as Cloudflare secrets:
 
 ```bash
-wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name personal-radar
-wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.cron.toml
+npx wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name personal-radar
+npx wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.cron.toml
 ```
 
 ## Get Your Chat ID
@@ -52,8 +52,8 @@ TELEGRAM_CHAT_ID=your_dev_chat_id
 For production:
 
 ```bash
-wrangler pages secret put TELEGRAM_CHAT_ID --project-name personal-radar
-wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
+npx wrangler pages secret put TELEGRAM_CHAT_ID --project-name personal-radar
+npx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
 ```
 
 ## Test Daily Digest

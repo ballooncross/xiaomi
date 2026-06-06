@@ -24,10 +24,10 @@ The normal `npm run dev` loop intentionally uses in-memory demo data when no Clo
 For Cloudflare-like runtime testing:
 
 ```bash
-wrangler pages dev .svelte-kit/cloudflare --d1 DB=personal-radar
+npx wrangler pages dev .svelte-kit/cloudflare --d1 DB=personal-radar
 ```
 
-Run `npm run build` before `wrangler pages dev` if the output directory does not exist yet. Wrangler stores local D1 state under its local development files, so no separate database service needs to be started.
+Run `npm run build` before `npx wrangler pages dev` if the output directory does not exist yet. Wrangler stores local D1 state under its local development files, so no separate database service needs to be started.
 
 ## Manual Job Trigger
 

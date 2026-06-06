@@ -420,7 +420,8 @@
         <span>Mortal Cafe</span>
       </div>
     </div>
-    <div class="primary-nav" aria-label="Primary navigation">
+    <div class="primary-nav desktop-nav" data-active={activeView} aria-label="Primary navigation">
+      <span class="nav-indicator" aria-hidden="true"></span>
       {#each navItems as item}
         <button class:active={activeView === item.id} type="button" onclick={() => setView(item.id)}>
           {item.label}
@@ -445,7 +446,14 @@
         <section class="action-panel">
           {#if searchOpen}
             <div class="action-card search-card">
-              <label for="feed-search">Search radar</label>
+              <div class="action-card-head">
+                <label for="feed-search">Search radar</label>
+                <button class="close-button" type="button" aria-label="Close search" onclick={() => (searchOpen = false)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
+              </div>
               <div class="search-row">
                 <input
                   id="feed-search"
@@ -460,8 +468,15 @@
           {#if digestOpen}
             <div class="action-card">
               <div class="action-card-head">
-                <strong>Daily digest preview</strong>
-                <span>Telegram message draft</span>
+                <div>
+                  <strong>Daily digest preview</strong>
+                  <span>Telegram message draft</span>
+                </div>
+                <button class="close-button" type="button" aria-label="Close digest preview" onclick={() => (digestOpen = false)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
               </div>
               <pre>{digestPreview}</pre>
             </div>
@@ -470,8 +485,15 @@
           {#if addWatchOpen}
             <div class="action-card">
               <div class="action-card-head">
-                <strong>{addWatchTitle}</strong>
-                <span>{addWatchHint}</span>
+                <div>
+                  <strong>{addWatchTitle}</strong>
+                  <span>{addWatchHint}</span>
+                </div>
+                <button class="close-button" type="button" aria-label="Close add watch" onclick={() => (addWatchOpen = false)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
               </div>
               <div class="watch-form">
                 <input bind:value={newWatchName} placeholder={addWatchPlaceholder} />
@@ -508,8 +530,15 @@
           {#if editingTopicId}
             <div class="action-card">
               <div class="action-card-head">
-                <strong>Edit preference</strong>
-                <span>Manual preferences boost, suppress, or remove discovered signals</span>
+                <div>
+                  <strong>Edit preference</strong>
+                  <span>Manual preferences boost, suppress, or remove discovered signals</span>
+                </div>
+                <button class="close-button" type="button" aria-label="Close edit preference" onclick={() => (editingTopicId = null)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
               </div>
               <div class="watch-form edit-form">
                 <input bind:value={editWatchName} placeholder="Preference name" />
@@ -830,6 +859,15 @@
 
 </main>
 
+<nav class="primary-nav mobile-nav" data-active={activeView} aria-label="Primary navigation">
+  <span class="nav-indicator" aria-hidden="true"></span>
+  {#each navItems as item}
+    <button class:active={activeView === item.id} type="button" onclick={() => setView(item.id)}>
+      {item.label}
+    </button>
+  {/each}
+</nav>
+
 <style>
   .app-shell {
     min-height: 100vh;
@@ -926,10 +964,14 @@
       linear-gradient(135deg, rgba(215, 242, 220, 0.58), rgba(255, 253, 247, 0.88)),
       #fffdf7;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    isolation: isolate;
+    overflow: hidden;
+    position: relative;
   }
 
   .primary-nav button {
     border: 0;
+    flex: 1;
     min-width: 92px;
     min-height: 34px;
     border-radius: 999px;
@@ -937,12 +979,43 @@
     color: var(--muted);
     font-size: 13px;
     font-weight: 950;
+    position: relative;
+    z-index: 1;
+    transition: color 180ms ease;
   }
 
   .primary-nav button.active {
-    background: var(--jade);
     color: var(--accent-text);
+  }
+
+  .nav-indicator {
+    position: absolute;
+    left: 5px;
+    top: 5px;
+    bottom: 5px;
+    width: calc((100% - 10px) / 4);
+    border-radius: 999px;
+    background: var(--jade);
     box-shadow: 0 8px 18px rgba(31, 111, 91, 0.2);
+    transform: translateX(0);
+    transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 0;
+  }
+
+  .primary-nav[data-active='concerts'] .nav-indicator {
+    transform: translateX(100%);
+  }
+
+  .primary-nav[data-active='trends'] .nav-indicator {
+    transform: translateX(200%);
+  }
+
+  .primary-nav[data-active='me'] .nav-indicator {
+    transform: translateX(300%);
+  }
+
+  .mobile-nav {
+    display: none;
   }
 
   .icon-button,
@@ -1007,7 +1080,7 @@
     display: flex;
     justify-content: space-between;
     gap: 16px;
-    align-items: center;
+    align-items: start;
     margin-bottom: 10px;
   }
 
@@ -1018,9 +1091,38 @@
   }
 
   .action-card-head span {
+    display: block;
+    margin-top: 3px;
     color: var(--muted);
     font-size: 12px;
     font-weight: 850;
+  }
+
+  .close-button {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff8eb;
+    color: var(--muted);
+  }
+
+  .close-button:hover {
+    color: var(--accent-text);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .close-button svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
   }
 
   .action-card pre {
@@ -1039,11 +1141,21 @@
   }
 
   .watch-form {
-    grid-template-columns: minmax(180px, 1fr) 120px 140px 116px 120px auto;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    align-items: end;
   }
 
   .edit-form {
-    grid-template-columns: minmax(180px, 1fr) 120px 140px 116px 120px auto auto;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  }
+
+  .watch-form input {
+    grid-column: span 2;
+    min-width: 0;
+  }
+
+  .watch-form button {
+    min-height: 38px;
   }
 
   .search-row input,
@@ -1718,7 +1830,12 @@
       backdrop-filter: none;
     }
 
-    .primary-nav {
+    .desktop-nav {
+      display: none;
+    }
+
+    .mobile-nav {
+      display: flex;
       position: fixed;
       left: 16px;
       right: 16px;
@@ -1732,12 +1849,11 @@
       backdrop-filter: blur(18px);
     }
 
-    .primary-nav::-webkit-scrollbar {
+    .mobile-nav::-webkit-scrollbar {
       display: none;
     }
 
-    .primary-nav button {
-      flex: 1;
+    .mobile-nav button {
       min-width: 0;
     }
 
@@ -1748,6 +1864,10 @@
     .watch-form,
     .search-row {
       grid-template-columns: 1fr;
+    }
+
+    .watch-form input {
+      grid-column: 1;
     }
 
     .app-main {

@@ -5,13 +5,13 @@
 Log in:
 
 ```bash
-wrangler login
+npx wrangler login
 ```
 
 Create the D1 database:
 
 ```bash
-wrangler d1 create personal-radar
+npx wrangler d1 create personal-radar
 ```
 
 Copy the returned `database_id` into both:
@@ -28,28 +28,30 @@ npm run db:seed:remote
 
 ## 3. Configure Secrets
 
-Run these commands in your local terminal inside this project directory. They are not Cloudflare Console commands. `wrangler` is Cloudflare's CLI and talks to your Cloudflare account after `wrangler login`.
+Run these commands in your local terminal inside this project directory. They are not Cloudflare Console commands. `wrangler` is Cloudflare's CLI and talks to your Cloudflare account after `npx wrangler login`.
+
+This project installs Wrangler as a dev dependency, so use `npx wrangler ...` for direct CLI commands. Raw `wrangler ...` only works if you also install Wrangler globally or add the local npm bin directory to your shell `PATH`.
 
 Pages app:
 
 ```bash
-wrangler pages secret put ADMIN_TOKEN --project-name personal-radar
-wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name personal-radar
-wrangler pages secret put TELEGRAM_CHAT_ID --project-name personal-radar
-wrangler pages secret put TICKETMASTER_API_KEY --project-name personal-radar
-wrangler pages secret put GEMINI_API_KEY --project-name personal-radar
-wrangler pages secret put DEEPSEEK_API_KEY --project-name personal-radar
+npx wrangler pages secret put ADMIN_TOKEN --project-name personal-radar
+npx wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name personal-radar
+npx wrangler pages secret put TELEGRAM_CHAT_ID --project-name personal-radar
+npx wrangler pages secret put TICKETMASTER_API_KEY --project-name personal-radar
+npx wrangler pages secret put GEMINI_API_KEY --project-name personal-radar
+npx wrangler pages secret put DEEPSEEK_API_KEY --project-name personal-radar
 ```
 
 Cron worker:
 
 ```bash
-wrangler secret put ADMIN_TOKEN --config wrangler.cron.toml
-wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.cron.toml
-wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
-wrangler secret put TICKETMASTER_API_KEY --config wrangler.cron.toml
-wrangler secret put GEMINI_API_KEY --config wrangler.cron.toml
-wrangler secret put DEEPSEEK_API_KEY --config wrangler.cron.toml
+npx wrangler secret put ADMIN_TOKEN --config wrangler.cron.toml
+npx wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.cron.toml
+npx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
+npx wrangler secret put TICKETMASTER_API_KEY --config wrangler.cron.toml
+npx wrangler secret put GEMINI_API_KEY --config wrangler.cron.toml
+npx wrangler secret put DEEPSEEK_API_KEY --config wrangler.cron.toml
 ```
 
 Only set AI keys if you want AI enabled. The app falls back to rules when keys are missing.

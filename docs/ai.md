@@ -72,8 +72,8 @@ GEMINI_API_KEY=your_local_gemini_key
 For Cloudflare production:
 
 ```bash
-wrangler pages secret put GEMINI_API_KEY --project-name personal-radar
-wrangler secret put GEMINI_API_KEY --config wrangler.cron.toml
+npx wrangler pages secret put GEMINI_API_KEY --project-name personal-radar
+npx wrangler secret put GEMINI_API_KEY --config wrangler.cron.toml
 ```
 
 The first command sets the key for the deployed SvelteKit Pages app. The second sets the key for the separate scheduled cron Worker.
@@ -97,8 +97,8 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 For Cloudflare production:
 
 ```bash
-wrangler pages secret put DEEPSEEK_API_KEY --project-name personal-radar
-wrangler secret put DEEPSEEK_API_KEY --config wrangler.cron.toml
+npx wrangler pages secret put DEEPSEEK_API_KEY --project-name personal-radar
+npx wrangler secret put DEEPSEEK_API_KEY --config wrangler.cron.toml
 ```
 
 ## Local Key Files
@@ -114,7 +114,7 @@ For Cloudflare-like local development with Wrangler:
 
 ```bash
 cp .env.example .dev.vars
-wrangler pages dev .svelte-kit/cloudflare --d1 DB=personal-radar
+npx wrangler pages dev .svelte-kit/cloudflare --d1 DB=personal-radar
 ```
 
 For local vs production API keys, create separate keys where the provider allows it and put only the local/dev key in `.env.local`. Production keys should be set as Cloudflare secrets, not committed files.
