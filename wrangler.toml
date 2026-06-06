@@ -5,7 +5,7 @@ pages_build_output_dir = ".svelte-kit/cloudflare"
 [[d1_databases]]
 binding = "DB"
 database_name = "personal-radar"
-database_id = "replace-with-cloudflare-d1-id"
+database_id = "cd24444b-000a-4435-9c7b-ee3c659a41cf"
 
 [vars]
 AI_ENABLED = "auto"
