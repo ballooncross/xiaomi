@@ -19,6 +19,14 @@ Copy the returned `database_id` into both:
 - `wrangler.toml`
 - `wrangler.cron.toml`
 
+Create the Pages project before adding Pages secrets or deploying:
+
+```bash
+npx wrangler pages project create personal-radar --production-branch main
+```
+
+If this command says the project already exists, continue with the next step. If you choose a different Pages project name, update every `--project-name personal-radar` command in this document and the `deploy` script in `package.json` to use that exact name.
+
 ## 2. Apply Schema And Seed Data
 
 ```bash
