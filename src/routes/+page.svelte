@@ -132,6 +132,20 @@
     return 'Trend signal';
   }
 
+  function sourceLabel(item: RadarItem) {
+    if (!item.url) return 'Source';
+    try {
+      const host = new URL(item.url).hostname.replace(/^www\./, '');
+      if (host.includes('ticketmaster')) return 'Ticketmaster';
+      if (host.includes('livenation')) return 'Live Nation';
+      if (host.includes('songkick')) return 'Songkick';
+      if (host.includes('news.google')) return 'Google News';
+      return host;
+    } catch {
+      return item.sourceType === 'demo' ? 'Source' : item.sourceType;
+    }
+  }
+
   function imageForItem(item: RadarItem) {
     if (item.imageUrl) return item.imageUrl;
     const topicText = item.topics.join(' ').toLowerCase();
@@ -595,6 +609,9 @@
                 </button>
                 <button class="small-button" onclick={() => sendFeedback(topItem.id, 'save')}>Save</button>
                 <button class="small-button" onclick={() => sendFeedback(topItem.id, 'not_relevant')}>Not relevant</button>
+                {#if topItem.url}
+                  <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">Source · {sourceLabel(topItem)}</a>
+                {/if}
               </div>
             </div>
           </article>
@@ -613,6 +630,11 @@
                     <span class="chip">{chip}</span>
                   {/each}
                 </div>
+                {#if item.url}
+                  <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
+                    Source · {sourceLabel(item)}
+                  </a>
+                {/if}
               </div>
             </article>
           {/each}
@@ -639,6 +661,11 @@
               <div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
+                {#if item.url}
+                  <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
+                    Source · {sourceLabel(item)}
+                  </a>
+                {/if}
               </div>
             </article>
           {/each}
@@ -655,6 +682,11 @@
               <div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
+                {#if item.url}
+                  <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
+                    Source · {sourceLabel(item)}
+                  </a>
+                {/if}
               </div>
             </article>
           {:else}
@@ -1267,6 +1299,30 @@
     background: var(--jade);
     color: #fff8eb;
     border-color: var(--jade);
+  }
+
+  .source-link {
+    min-height: 31px;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--gold) 62%, var(--line));
+    border-radius: 999px;
+    padding: 0 10px;
+    background: color-mix(in srgb, var(--gold) 22%, white);
+    color: color-mix(in srgb, var(--ink) 76%, var(--jade));
+    font-size: 12px;
+    font-weight: 950;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .source-link:hover {
+    background: var(--gold);
+    color: #2a2009;
+  }
+
+  .inline-source {
+    margin-top: 12px;
   }
 
   .timeline {
