@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title">
+  <title id="title">Concert radar visual</title>
+  <rect width="640" height="420" fill="#17130f"/>
+  <path d="M0 322c126-58 255-64 388-18 86 30 170 31 252 4v112H0Z" fill="#1f6f5b"/>
+  <circle cx="494" cy="96" r="54" fill="#d9a441"/>
+  <path d="M92 289 238 62l44 227M380 289 275 80" fill="none" stroke="#fff8eb" stroke-width="18" stroke-linecap="round"/>
+  <path d="M217 221h98M148 291h292" fill="none" stroke="#b33a2b" stroke-width="18" stroke-linecap="round"/>
+  <path d="M54 78c72-42 142-48 210-18M404 55c64 18 113 53 146 104" fill="none" stroke="#8f1d4f" stroke-width="14" stroke-linecap="round"/>
+</svg>

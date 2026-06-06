@@ -1,0 +1,22 @@
+name = "personal-radar-cron"
+main = "src/worker.ts"
+compatibility_date = "2026-06-06"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "personal-radar"
+database_id = "replace-with-cloudflare-d1-id"
+
+[triggers]
+crons = [
+  "0 */6 * * *",
+  "30 0 * * *"
+]
+
+[vars]
+AI_ENABLED = "auto"
+AI_PROVIDER = "gemini"
+AI_FALLBACK_PROVIDER = "deepseek"
+AI_MAX_ITEMS_PER_DAY = "20"
+AI_MONTHLY_BUDGET_USD = "1"
+BANDSINTOWN_APP_ID = "personal-radar"

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title">
+  <title id="title">Geopolitics signal visual</title>
+  <rect width="640" height="420" fill="#1f6f5b"/>
+  <circle cx="320" cy="210" r="136" fill="#fff8eb" opacity=".94"/>
+  <path d="M184 210h272M320 74c43 42 66 87 66 136s-23 94-66 136M320 74c-43 42-66 87-66 136s23 94 66 136" fill="none" stroke="#7a4a2d" stroke-width="11" stroke-linecap="round"/>
+  <path d="M211 132c58 34 131 39 218 13M211 288c58-34 131-39 218-13" fill="none" stroke="#d9a441" stroke-width="13" stroke-linecap="round"/>
+  <path d="M84 84 179 60M462 352l94-24" fill="none" stroke="#b33a2b" stroke-width="20" stroke-linecap="round"/>
+</svg>

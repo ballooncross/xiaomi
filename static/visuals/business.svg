@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title">
+  <title id="title">Business signal visual</title>
+  <rect width="640" height="420" fill="#fff8eb"/>
+  <path d="M0 326h640v94H0Z" fill="#d7f2dc"/>
+  <path d="M92 288h92V154H92Zm142 0h92V92h-92Zm142 0h92V190h-92Z" fill="#1f6f5b"/>
+  <path d="M88 119c98 21 190 17 276-12 58-20 117-17 177 9" fill="none" stroke="#b33a2b" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="538" cy="116" r="40" fill="#d9a441"/>
+  <circle cx="504" cy="270" r="28" fill="#8f1d4f"/>
+</svg>

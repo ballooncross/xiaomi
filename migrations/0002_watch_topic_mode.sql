@@ -1,0 +1,1 @@
+ALTER TABLE watch_topics ADD COLUMN mode TEXT NOT NULL DEFAULT 'follow';

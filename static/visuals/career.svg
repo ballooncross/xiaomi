@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title">
+  <title id="title">Career trend visual</title>
+  <rect width="640" height="420" fill="#f7ead4"/>
+  <path d="M0 0h640v110H0Z" fill="#d7f2dc"/>
+  <path d="M144 296c0-91 74-165 165-165s165 74 165 165" fill="none" stroke="#1f6f5b" stroke-width="22" stroke-linecap="round"/>
+  <path d="M309 296V122" fill="none" stroke="#b33a2b" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="309" cy="296" r="42" fill="#d9a441"/>
+  <path d="M122 83h398M174 338h270" fill="none" stroke="#8f1d4f" stroke-width="16" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title">
+  <title id="title">News signal visual</title>
+  <rect width="640" height="420" fill="#fff8eb"/>
+  <path d="M94 82h452v256H94Z" fill="#d7f2dc" stroke="#2f261e" stroke-width="16"/>
+  <path d="M146 142h204M146 194h348M146 244h348M146 294h218" fill="none" stroke="#1f6f5b" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="456" cy="142" r="38" fill="#b33a2b"/>
+  <path d="M428 340c46 22 91 18 134-12" fill="none" stroke="#d9a441" stroke-width="16" stroke-linecap="round"/>
+</svg>

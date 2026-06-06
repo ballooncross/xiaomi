@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title">
+  <title id="title">Opportunity signal visual</title>
+  <rect width="640" height="420" fill="#f7d4ca"/>
+  <path d="M96 298c44-105 120-157 228-157s184 52 220 157" fill="none" stroke="#1f6f5b" stroke-width="24" stroke-linecap="round"/>
+  <path d="M321 298V98" fill="none" stroke="#8f1d4f" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="321" cy="98" r="44" fill="#d9a441"/>
+  <path d="M169 318h304" fill="none" stroke="#b33a2b" stroke-width="20" stroke-linecap="round"/>
+</svg>
