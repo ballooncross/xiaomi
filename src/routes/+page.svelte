@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { invalidateAll } from '$app/navigation';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
-  import type { DateReminder, FeedbackAction, RadarItem, WatchTopic } from '$lib/server/types';
+  import type { DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
+  import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { PageData } from './$types';
 
@@ -37,6 +39,11 @@
   let topicPending = $state<string | null>(null);
   let digestSendPending = $state(false);
   let digestSendMessage = $state('');
+  let manualJobPending = $state(false);
+  let manualJobToken = $state('');
+  let manualJobStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
+  let manualJobMessage = $state('尚未手动刷新。');
+  let manualJobLastRun = $state('');
   let addWatchError = $state('');
   let editWatchError = $state('');
   let reminderFormOpen = $state(false);
@@ -53,10 +60,14 @@
   let reminderDay30 = $state(false);
   let reminderPinned = $state(false);
 
-  $effect.pre(() => {
-    if (items.length === 0) items = data.items;
-    if (topics.length === 0) topics = data.topics;
-    if (reminders.length === 0) reminders = data.reminders;
+  onMount(() => {
+    manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
+  });
+
+  $effect(() => {
+    items = data.items;
+    topics = data.topics;
+    reminders = data.reminders;
   });
 
   const navItems: Array<{ id: View; label: string }> = [
@@ -177,6 +188,46 @@
     const result = (await response.json().catch(() => ({}))) as { error?: string };
     digestSendMessage = response.ok ? '已发送到 Telegram。' : result.error || '发送失败，请稍后再试。';
     digestSendPending = false;
+  }
+
+  async function runManualFetchJob() {
+    manualJobPending = true;
+    manualJobStatus = 'running';
+    manualJobMessage = '正在抓取演出和趋势数据...';
+    const startedAt = new Date();
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const token = manualJobToken.trim();
+    if (token) {
+      headers['x-admin-token'] = token;
+      window.localStorage.setItem('personal-radar-admin-token', token);
+    }
+
+    try {
+      const response = await fetch('/api/admin/jobs', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ job: 'all-fetch' })
+      });
+      const result = (await response.json().catch(() => ({}))) as Partial<JobResult> & { error?: string };
+      if (!response.ok) {
+        manualJobStatus = 'error';
+        manualJobMessage =
+          response.status === 401
+            ? '未授权：请填写 .env.local / Cloudflare Secret 里的 ADMIN_TOKEN。'
+            : result.error || '刷新失败，请稍后再试。';
+        return;
+      }
+
+      await invalidateAll();
+      manualJobStatus = 'success';
+      manualJobLastRun = formatJobTime(startedAt);
+      manualJobMessage = `完成：新增 ${result.inserted ?? 0} 条，更新 ${result.updated ?? 0} 条，检查 ${result.considered ?? 0} 条。`;
+    } catch {
+      manualJobStatus = 'error';
+      manualJobMessage = '刷新失败：网络或服务暂时不可用。';
+    } finally {
+      manualJobPending = false;
+    }
   }
 
   function formatDate(value: string | undefined) {
@@ -510,6 +561,16 @@
     if (reminderDay7) days.push(7);
     if (reminderDay30) days.push(30);
     return days;
+  }
+
+  function formatJobTime(value: Date) {
+    return new Intl.DateTimeFormat('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(value);
   }
 
   function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
@@ -904,6 +965,27 @@
               <p>{nextReminder ? `${nextReminder.title} · ${nextReminder.dateLabel}` : '添加生日或纪念日后会显示在这里。'}</p>
             </article>
           </div>
+
+          <section class:running={manualJobStatus === 'running'} class={`job-run-card ${manualJobStatus}`}>
+            <div class="job-run-copy">
+              <span>手动刷新</span>
+              <strong>立即抓取最新数据</strong>
+              <p>运行演出和趋势抓取任务，完成后会自动刷新当前页面数据。</p>
+            </div>
+            <div class="job-run-controls">
+              <label>
+                <span>ADMIN_TOKEN</span>
+                <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
+              </label>
+              <button class="small-button primary" type="button" disabled={manualJobPending} onclick={runManualFetchJob}>
+                {manualJobPending ? '运行中...' : '立即刷新'}
+              </button>
+            </div>
+            <div class="job-run-status" aria-live="polite">
+              <span></span>
+              <p>{manualJobMessage}{manualJobLastRun ? ` · ${manualJobLastRun}` : ''}</p>
+            </div>
+          </section>
 
           <section class="notebook-card">
             <div class="notebook-head">
@@ -2411,6 +2493,7 @@
 
   .settings-card,
   .notebook-card,
+  .job-run-card,
   .settings-grid.compact button {
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -2418,8 +2501,130 @@
   }
 
   .settings-card,
-  .notebook-card {
+  .notebook-card,
+  .job-run-card {
     padding: 16px;
+  }
+
+  .job-run-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+    gap: 14px;
+    align-items: end;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .job-run-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--line);
+  }
+
+  .job-run-card.running::before {
+    background: var(--gold);
+  }
+
+  .job-run-card.success::before {
+    background: var(--jade);
+  }
+
+  .job-run-card.error::before {
+    background: #d9634f;
+  }
+
+  .job-run-copy,
+  .job-run-controls,
+  .job-run-status {
+    position: relative;
+  }
+
+  .job-run-copy span,
+  .job-run-controls span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .job-run-copy strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 24px;
+    line-height: 1.1;
+  }
+
+  .job-run-copy p,
+  .job-run-status p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .job-run-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .job-run-controls label {
+    display: grid;
+    gap: 6px;
+  }
+
+  .job-run-controls input {
+    min-width: 0;
+    height: 42px;
+    border: 1px solid rgba(130, 111, 91, 0.22);
+    border-radius: 12px;
+    background: #fff8eb;
+    color: var(--ink);
+    padding: 0 12px;
+    font-weight: 850;
+  }
+
+  .job-run-status {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+  }
+
+  .job-run-status span {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  .job-run-card.running .job-run-status span {
+    background: var(--gold);
+    animation: pulse-dot 1s ease-in-out infinite;
+  }
+
+  .job-run-card.success .job-run-status span {
+    background: var(--jade);
+  }
+
+  .job-run-card.error .job-run-status span {
+    background: #d9634f;
+  }
+
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      transform: scale(0.8);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 1;
+    }
   }
 
   .settings-card span,
@@ -2941,6 +3146,15 @@
     .settings-grid,
     .settings-grid.compact {
       grid-template-columns: 1fr;
+    }
+
+    .job-run-card,
+    .job-run-controls {
+      grid-template-columns: 1fr;
+    }
+
+    .job-run-copy strong {
+      font-size: 21px;
     }
 
     .notebook-head {
