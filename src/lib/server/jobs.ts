@@ -74,7 +74,7 @@ export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual
 
 function appendReminderDigest(message: string, reminders: DateReminder[]): string {
   const upcoming = sortReminders(reminders)
-    .filter((reminder) => reminder.daysLeft <= 30)
+    .filter((reminder) => reminder.remindDaysBefore.includes(reminder.daysLeft))
     .slice(0, 6);
   if (upcoming.length === 0) return message;
   const lines = ['', '生日与纪念日'];

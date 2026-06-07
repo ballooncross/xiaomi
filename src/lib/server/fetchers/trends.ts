@@ -103,12 +103,12 @@ async function fetchGoogleNewsItems(topic: WatchTopic): Promise<RadarItem[]> {
   });
   const response = await fetchWithTimeout(`https://news.google.com/rss/search?${params}`);
   if (!response?.ok) return [];
-  return parseRssItems(await response.text(), {
+  return (await parseRssItems(await response.text(), {
     sourceId: 'google-news',
     sourceType: 'google_news',
     topic,
     sourceName: 'Google News'
-  }).slice(0, 4);
+  })).slice(0, 4);
 }
 
 async function fetchCuratedRssItems(topics: WatchTopic[]): Promise<RadarItem[]> {
@@ -119,43 +119,60 @@ async function fetchCuratedRssItems(topics: WatchTopic[]): Promise<RadarItem[]> 
       if (!response?.ok) return [];
       const xml = await response.text();
       const sourceTopics = topics.filter((topic) => source.categories.includes(topic.category));
-      return sourceTopics.flatMap((topic) =>
-        parseRssItems(xml, {
-          sourceId: source.id,
-          sourceType: 'rss',
-          topic,
-          sourceName: source.name
-        }).filter((item) => matchesTopic(item, topic))
+      if (sourceTopics.length === 0) return [];
+      const items = await Promise.all(
+        sourceTopics.map(async (topic) => {
+          const matchedItems = (await parseRssItems(xml, {
+            sourceId: source.id,
+            sourceType: 'rss',
+            topic,
+            sourceName: source.name
+          })).filter((item) => matchesTopic(item, topic));
+          return Promise.all(matchedItems.slice(0, 4).map(hydrateItemImage));
+        })
       );
+      const generalItems = (await parseRssItems(xml, {
+        sourceId: source.id,
+        sourceType: 'rss',
+        topic: sourceTopics[0],
+        sourceName: source.name,
+        hydrateImages: true
+      }))
+        .slice(0, 3)
+        .map((item) => ({
+          ...item,
+          topics: [source.name, source.categories[0]],
+          score: Math.max(35, item.score - 16)
+        }));
+      return [...items.flat(), ...generalItems];
     })
   );
-  return dedupeItems(responses.flat()).slice(0, 12);
+  return dedupeItems(responses.flat()).slice(0, 24);
 }
 
-function parseRssItems(
+async function parseRssItems(
   xml: string,
-  options: { sourceId: string; sourceType: string; topic: WatchTopic; sourceName: string }
-): RadarItem[] {
+  options: { sourceId: string; sourceType: string; topic: WatchTopic; sourceName: string; hydrateImages?: boolean }
+): Promise<RadarItem[]> {
   const parsed = parser.parse(xml) as {
     rss?: { channel?: { item?: unknown[] | unknown } };
     feed?: { entry?: unknown[] | unknown };
   };
   const entries = normalizeArray(parsed.rss?.channel?.item ?? parsed.feed?.entry);
-  return entries
-    .map((entry) => rssEntryToItem(entry as Record<string, unknown>, options))
-    .filter((item): item is RadarItem => Boolean(item));
+  const items = await Promise.all(entries.slice(0, 16).map((entry) => rssEntryToItem(entry as Record<string, unknown>, options)));
+  return items.filter((item): item is RadarItem => Boolean(item));
 }
 
-function rssEntryToItem(
+async function rssEntryToItem(
   entry: Record<string, unknown>,
-  options: { sourceId: string; sourceType: string; topic: WatchTopic; sourceName: string }
-): RadarItem | undefined {
+  options: { sourceId: string; sourceType: string; topic: WatchTopic; sourceName: string; hydrateImages?: boolean }
+): Promise<RadarItem | undefined> {
   const title = textValue(entry.title);
   const url = linkValue(entry.link) || textValue(entry.guid) || textValue(entry.id);
   if (!title || !url) return undefined;
 
   const description = stripHtml(textValue(entry.description) || textValue(entry.summary) || textValue(entry.content) || title);
-  const imageUrl = imageValue(entry);
+  const imageUrl = imageValue(entry) || (options.hydrateImages ? await fetchPageImage(url) : undefined);
   const publishedAt = dateValue(entry.pubDate) || dateValue(entry.published) || dateValue(entry.updated);
 
   return articleToItem(options.topic, {
@@ -265,10 +282,46 @@ function linkValue(value: unknown): string {
 }
 
 function imageValue(entry: Record<string, unknown>): string | undefined {
-  const enclosure = entry.enclosure as Record<string, unknown> | undefined;
-  const mediaContent = entry['media:content'] as Record<string, unknown> | undefined;
-  const mediaThumbnail = entry['media:thumbnail'] as Record<string, unknown> | undefined;
+  const enclosure = firstRecord(entry.enclosure);
+  const mediaContent = firstRecord(entry['media:content']);
+  const mediaThumbnail = firstRecord(entry['media:thumbnail']);
   return textValue(mediaContent?.url) || textValue(mediaThumbnail?.url) || textValue(enclosure?.url) || undefined;
+}
+
+async function hydrateItemImage(item: RadarItem): Promise<RadarItem> {
+  if (item.imageUrl || !item.url) return item;
+  const imageUrl = await fetchPageImage(item.url);
+  return imageUrl ? { ...item, imageUrl } : item;
+}
+
+function firstRecord(value: unknown): Record<string, unknown> | undefined {
+  const first = Array.isArray(value) ? value[0] : value;
+  return typeof first === 'object' && first ? (first as Record<string, unknown>) : undefined;
+}
+
+async function fetchPageImage(url: string): Promise<string | undefined> {
+  const response = await fetchWithTimeout(url);
+  const contentType = response?.headers.get('content-type') ?? '';
+  if (!response?.ok || !contentType.includes('text/html')) return undefined;
+  const html = await response.text().catch(() => '');
+  if (!html) return undefined;
+  const image =
+    metaContent(html, 'property', 'og:image') ||
+    metaContent(html, 'property', 'og:image:url') ||
+    metaContent(html, 'name', 'twitter:image') ||
+    metaContent(html, 'name', 'twitter:image:src');
+  if (!image) return undefined;
+  try {
+    return new URL(image, url).toString();
+  } catch {
+    return image;
+  }
+}
+
+function metaContent(html: string, key: 'name' | 'property', value: string): string | undefined {
+  const pattern = new RegExp(`<meta[^>]+${key}=["']${escapeRegExp(value)}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i');
+  const reversed = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${key}=["']${escapeRegExp(value)}["'][^>]*>`, 'i');
+  return html.match(pattern)?.[1] || html.match(reversed)?.[1];
 }
 
 function dateValue(value: unknown): string | undefined {
@@ -292,4 +345,8 @@ function stripHtml(value: string): string {
 function truncate(value: string, length: number): string {
   if (value.length <= length) return value;
   return `${value.slice(0, length - 3).trim()}...`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

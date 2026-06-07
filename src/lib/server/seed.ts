@@ -218,7 +218,7 @@ function lunarReminder(
     day,
     lunarIsLeapMonth: false,
     repeat: 'annual',
-    note: pinned ? '从截图导入，农历生日。' : '从截图导入，按农历每年提醒。',
+    note: '',
     pinned,
     enabled: true,
     remindDaysBefore: [0, 1, 7]

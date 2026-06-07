@@ -1,8 +1,11 @@
 <script lang="ts">
+  import DateRemindersView from '$lib/components/DateRemindersView.svelte';
   import type { DateReminder, FeedbackAction, RadarItem, WatchTopic } from '$lib/server/types';
+  import { Solar } from 'lunar-javascript';
+  import 'vanillajs-datepicker/css/datepicker.css';
   import type { PageData } from './$types';
 
-  type View = 'home' | 'concerts' | 'trends' | 'me';
+  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'me';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & { nextDate: string; daysLeft: number; dateLabel: string };
 
@@ -42,11 +45,8 @@
   let editingReminderId = $state<string | null>(null);
   let reminderTitle = $state('');
   let reminderCalendarType = $state<DateReminder['calendarType']>('lunar');
-  let reminderMonth = $state(1);
-  let reminderDay = $state(1);
-  let reminderIsLeapMonth = $state(false);
+  let reminderDate = $state(todayInputValue());
   let reminderPinned = $state(false);
-  let reminderNote = $state('');
 
   $effect.pre(() => {
     if (items.length === 0) items = data.items;
@@ -58,6 +58,7 @@
     { id: 'home', label: '首页' },
     { id: 'concerts', label: '演出' },
     { id: 'trends', label: '趋势' },
+    { id: 'dates', label: '日期' },
     { id: 'me', label: '我的' }
   ];
 
@@ -82,18 +83,25 @@
       .filter((item) => {
         if (activeView === 'concerts') return item.kind === 'concert' && item.status !== 'dismissed';
         if (activeView === 'trends') return item.kind !== 'concert' && item.status !== 'dismissed';
+        if (activeView === 'dates') return false;
         if (activeView === 'me') return item.status === 'saved' || item.status === 'tracking';
         if (activeFilter === 'for-you') return item.status !== 'dismissed';
         if (activeFilter === 'saved') return item.status === 'saved' || item.status === 'tracking';
         return item.topics.some((topic) => topic.toLowerCase().includes(activeFilter));
       })
       .filter((item) => matchesSearch(item, searchQuery))
+      .sort(sortRadarItemsForDisplay)
       .slice(0, 8)
   );
 
   const topItem = $derived(visibleItems[0]);
   const secondaryItems = $derived(visibleItems.slice(1, 3));
-  const trendItems = $derived(items.filter((item) => item.kind !== 'concert' && item.status !== 'dismissed').slice(0, 6));
+  const trendItems = $derived(
+    items
+      .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed')
+      .sort(sortRadarItemsForDisplay)
+      .slice(0, 6)
+  );
   const timelineItems = $derived(
     items
       .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed')
@@ -114,6 +122,28 @@
     if (!closest || reminder.daysLeft < closest.daysLeft) return reminder;
     return closest;
   }, undefined));
+  const upcomingReminders = $derived(reminders.filter((reminder) => reminder.daysLeft <= 30).slice(0, 4));
+
+  function datepicker(node: HTMLInputElement) {
+    let picker: { destroy: () => void } | undefined;
+    let cancelled = false;
+
+    void import('vanillajs-datepicker/Datepicker').then(({ default: Datepicker }) => {
+      if (cancelled) return;
+      picker = new Datepicker(node, {
+        autohide: true,
+        format: 'yyyy-mm-dd',
+        todayHighlight: true
+      });
+    });
+
+    return {
+      destroy() {
+        cancelled = true;
+        picker?.destroy();
+      }
+    };
+  }
 
   async function sendFeedback(itemId: string, action: FeedbackAction) {
     feedbackPending = `${itemId}:${action}`;
@@ -204,7 +234,28 @@
     return '/visuals/news.svg';
   }
 
+  function closeTransientUi() {
+    searchOpen = false;
+    digestOpen = false;
+    addWatchOpen = false;
+    editingTopicId = null;
+    reminderFormOpen = false;
+  }
+
+  function toggleSearch() {
+    const next = !searchOpen;
+    closeTransientUi();
+    searchOpen = next;
+  }
+
+  function toggleDigest() {
+    const next = !digestOpen;
+    closeTransientUi();
+    digestOpen = next;
+  }
+
   function setView(view: View) {
+    closeTransientUi();
     activeView = view;
     activeFilter = 'for-you';
   }
@@ -347,21 +398,15 @@
       editingReminderId = reminder.id;
       reminderTitle = reminder.title;
       reminderCalendarType = reminder.calendarType;
-      reminderMonth = reminder.month;
-      reminderDay = reminder.day;
-      reminderIsLeapMonth = reminder.lunarIsLeapMonth;
+      reminderDate = reminder.nextDate;
       reminderPinned = reminder.pinned;
-      reminderNote = reminder.note;
       return;
     }
     editingReminderId = null;
     reminderTitle = '';
     reminderCalendarType = 'lunar';
-    reminderMonth = 1;
-    reminderDay = 1;
-    reminderIsLeapMonth = false;
+    reminderDate = todayInputValue();
     reminderPinned = false;
-    reminderNote = '';
   }
 
   async function saveReminder() {
@@ -372,16 +417,17 @@
       return;
     }
     reminderPending = true;
+    const dateParts = reminderPayloadDate(reminderDate, reminderCalendarType);
     const payload = {
       id: editingReminderId ?? undefined,
       title,
       calendarType: reminderCalendarType,
-      month: reminderMonth,
-      day: reminderDay,
-      lunarIsLeapMonth: reminderCalendarType === 'lunar' ? reminderIsLeapMonth : false,
+      month: dateParts.month,
+      day: dateParts.day,
+      lunarIsLeapMonth: dateParts.lunarIsLeapMonth,
       repeat: 'annual',
       pinned: reminderPinned,
-      note: reminderNote,
+      note: '',
       remindDaysBefore: [0, 1, 7],
       enabled: true
     };
@@ -424,6 +470,21 @@
       .join(' ')
       .toLowerCase();
     return haystack.includes(normalized);
+  }
+
+  function sortRadarItemsForDisplay(a: RadarItem, b: RadarItem) {
+    const scoreDelta = b.score - a.score;
+    const imageDelta = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
+    if (imageDelta !== 0 && Math.abs(scoreDelta) <= 20) return imageDelta;
+    if (scoreDelta !== 0) return scoreDelta;
+    if (imageDelta !== 0) return imageDelta;
+    return itemTime(b) - itemTime(a);
+  }
+
+  function itemTime(item: RadarItem) {
+    const value = item.startsAt ?? item.publishedAt ?? '';
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? time : 0;
   }
 
   function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
@@ -521,11 +582,58 @@
         body: '保存和重点跟踪会提高类似信号的排序；标记不相关会降低类似内容。'
       };
     }
+    if (view === 'dates') {
+      return {
+        eyebrow: '日期簿 · 农历生日',
+        title: '生日和纪念日。',
+        body: '农历日期会按每年同月同日计算下一次提醒，接近日期会出现在首页和每日摘要里。'
+      };
+    }
     return {
       eyebrow: '晨间简报 · 新加坡',
       title: `${count} 条信号值得查看。`,
       body: '根据你的关注列表筛选演出开票、主题热度和商业机会。'
     };
+  }
+
+  function todayInputValue() {
+    const now = new Date();
+    return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  }
+
+  function reminderPayloadDate(value: string, calendarType: DateReminder['calendarType']) {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return { month: 1, day: 1, lunarIsLeapMonth: false };
+    }
+    if (calendarType === 'gregorian') return { month, day, lunarIsLeapMonth: false };
+    const lunar = Solar.fromYmd(year, month, day).getLunar();
+    return {
+      month: Math.abs(lunar.getMonth()),
+      day: lunar.getDay(),
+      lunarIsLeapMonth: lunar.getMonth() < 0
+    };
+  }
+
+  function selectedDateLabel(value: string, calendarType: DateReminder['calendarType']) {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '';
+    if (calendarType === 'gregorian') return `公历 ${year}-${pad2(month)}-${pad2(day)}`;
+    const lunar = Solar.fromYmd(year, month, day).getLunar();
+    const leap = lunar.getMonth() < 0 ? '闰' : '';
+    return `农历 ${leap}${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+  }
+
+  function dualDateLabel(value: string) {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '';
+    const lunar = Solar.fromYmd(year, month, day).getLunar();
+    const leap = lunar.getMonth() < 0 ? '闰' : '';
+    return `公历 ${year}-${pad2(month)}-${pad2(day)} · 农历 ${leap}${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+  }
+
+  function pad2(value: number) {
+    return String(value).padStart(2, '0');
   }
 </script>
 
@@ -556,20 +664,20 @@
       {/each}
     </div>
     <div class="top-actions">
-      <button class:active={searchOpen} class="icon-button" aria-label="搜索" onclick={() => (searchOpen = !searchOpen)}>
+      <button class:active={searchOpen} class="icon-button" aria-label="搜索" onclick={toggleSearch}>
         <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="6.2"></circle>
           <path d="m16 16 4.2 4.2"></path>
         </svg>
       </button>
-      <button class:active={digestOpen} class="button" onclick={() => (digestOpen = !digestOpen)}>摘要</button>
+      <button class:active={digestOpen} class="button" onclick={toggleDigest}>摘要</button>
       <button class="button primary" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
     </div>
   </nav>
 
   <div class="app-main">
     <section class="feed">
-      {#if searchOpen || digestOpen || addWatchOpen || editingTopicId || reminderFormOpen}
+      {#if searchOpen || digestOpen}
         <section class="action-panel">
           {#if searchOpen}
             <div class="action-card search-card">
@@ -731,27 +839,12 @@
                   <option value="lunar">农历</option>
                   <option value="gregorian">公历</option>
                 </select>
-                <select bind:value={reminderMonth} aria-label="月份">
-                  {#each Array.from({ length: 12 }, (_, index) => index + 1) as month}
-                    <option value={month}>{month} 月</option>
-                  {/each}
-                </select>
-                <select bind:value={reminderDay} aria-label="日期">
-                  {#each Array.from({ length: 31 }, (_, index) => index + 1) as day}
-                    <option value={day}>{day} 日</option>
-                  {/each}
-                </select>
+                <input use:datepicker bind:value={reminderDate} placeholder="选择目标日期" />
                 <label class="check-row">
                   <input type="checkbox" bind:checked={reminderPinned} />
                   置顶
                 </label>
-                {#if reminderCalendarType === 'lunar'}
-                  <label class="check-row">
-                    <input type="checkbox" bind:checked={reminderIsLeapMonth} />
-                    闰月
-                  </label>
-                {/if}
-                <input bind:value={reminderNote} placeholder="备注，可选" />
+                <span class="date-preview">{selectedDateLabel(reminderDate, reminderCalendarType)}</span>
                 <button class="small-button primary" disabled={reminderPending} onclick={saveReminder}>
                   {reminderPending ? '保存中...' : '保存提醒'}
                 </button>
@@ -762,6 +855,55 @@
         </section>
       {/if}
 
+      {#if activeView === 'dates'}
+        <DateRemindersView
+          {reminders}
+          {nextReminder}
+          {reminderPending}
+          onAdd={() => openReminderForm()}
+          onEdit={openReminderForm}
+          onDelete={deleteReminder}
+        />
+      {:else if activeView === 'me'}
+        <section class="me-workspace">
+          <div class="settings-grid">
+            <article class="settings-card">
+              <span>资料</span>
+              <strong>个人雷达</strong>
+              <p>Telegram {data.telegramConfigured ? '已连接' : '未配置'} · AI {data.aiEnabled ? '可用' : '关闭'} · {followedTopicCount} 个关注</p>
+            </article>
+            <article class="settings-card">
+              <span>下一条提醒</span>
+              <strong>{nextReminder ? `${nextReminder.daysLeft} 天` : '暂无'}</strong>
+              <p>{nextReminder ? `${nextReminder.title} · ${nextReminder.dateLabel}` : '添加生日或纪念日后会显示在这里。'}</p>
+            </article>
+          </div>
+
+          <section class="notebook-card">
+            <div class="notebook-head">
+              <div>
+                <h2>偏好与设置</h2>
+                <span>管理音乐人、趋势主题、来源和屏蔽规则。</span>
+              </div>
+              <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
+            </div>
+          <div class="settings-grid compact">
+            <button type="button" onclick={() => (preferenceView = 'artist')}>
+              <strong>{watchTopics.length}</strong>
+              <span>音乐人</span>
+              </button>
+              <button type="button" onclick={() => (preferenceView = 'topic')}>
+                <strong>{interestTopics.length}</strong>
+                <span>兴趣主题</span>
+              </button>
+              <button type="button" onclick={() => (preferenceView = 'blacklist')}>
+                <strong>{blacklistTopics.length}</strong>
+                <span>屏蔽规则</span>
+              </button>
+            </div>
+          </section>
+        </section>
+      {:else}
       <div class="greeting">
         <div>
           <div class="eyebrow">{greeting.eyebrow}</div>
@@ -788,77 +930,23 @@
         </aside>
       </div>
 
-      {#if activeView === 'me'}
-        <section class="me-workspace">
-          <div class="settings-grid">
-            <article class="settings-card">
-              <span>资料</span>
-              <strong>个人雷达</strong>
-              <p>Telegram {data.telegramConfigured ? '已连接' : '未配置'} · AI {data.aiEnabled ? '可用' : '关闭'} · {followedTopicCount} 个关注</p>
-            </article>
-            <article class="settings-card">
-              <span>下一条提醒</span>
-              <strong>{nextReminder ? `${nextReminder.daysLeft} 天` : '暂无'}</strong>
-              <p>{nextReminder ? `${nextReminder.title} · ${nextReminder.dateLabel}` : '添加生日或纪念日后会显示在这里。'}</p>
-            </article>
+      {#if activeView === 'home' && upcomingReminders.length > 0}
+        <section class="reminder-strip" aria-label="临近日期">
+          <div>
+            <strong>临近日期</strong>
+            <span>进入日期 tab 管理农历生日和纪念日</span>
           </div>
-
-          <section class="notebook-card">
-            <div class="notebook-head">
-              <div>
-                <h2>生日与纪念日</h2>
-                <span>默认使用农历，每天摘要可提醒临近日期。</span>
-              </div>
-              <button class="small-button primary" type="button" onclick={() => openReminderForm()}>添加生日</button>
-            </div>
-            <div class="reminder-list">
-              {#each reminders as reminder}
-                <article class:pinned={reminder.pinned} class="reminder-row">
-                  <div class="reminder-main">
-                    <strong>{reminder.title}</strong>
-                    <span>{reminder.dateLabel}</span>
-                    {#if reminder.note}<small>{reminder.note}</small>{/if}
-                  </div>
-                  <div class="reminder-days">
-                    <strong>{reminder.daysLeft}</strong>
-                    <span>天</span>
-                  </div>
-                  <div class="topic-actions reminder-actions">
-                    <button type="button" onclick={() => openReminderForm(reminder)}>编辑</button>
-                    <button type="button" disabled={reminderPending} onclick={() => deleteReminder(reminder)}>移除</button>
-                  </div>
-                </article>
-              {:else}
-                <p class="quiet-copy">暂无生日提醒。你可以添加农历生日、纪念日或待办日期。</p>
-              {/each}
-            </div>
-          </section>
-
-          <section class="notebook-card">
-            <div class="notebook-head">
-              <div>
-                <h2>偏好与设置</h2>
-                <span>管理音乐人、趋势主题、来源和屏蔽规则。</span>
-              </div>
-              <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
-            </div>
-            <div class="settings-grid compact">
-              <button type="button" onclick={() => (preferenceView = 'artist')}>
-                <strong>{watchTopics.length}</strong>
-                <span>音乐人</span>
+          <div class="reminder-strip-list">
+            {#each upcomingReminders as reminder}
+              <button type="button" onclick={() => setView('dates')}>
+                <strong>{reminder.daysLeft}</strong>
+                <span>{reminder.title}</span>
               </button>
-              <button type="button" onclick={() => (preferenceView = 'topic')}>
-                <strong>{interestTopics.length}</strong>
-                <span>兴趣主题</span>
-              </button>
-              <button type="button" onclick={() => (preferenceView = 'blacklist')}>
-                <strong>{blacklistTopics.length}</strong>
-                <span>屏蔽规则</span>
-              </button>
-            </div>
-          </section>
+            {/each}
+          </div>
         </section>
-      {:else}
+      {/if}
+
       {#if activeView === 'home'}
         <div class="tabs" aria-label="信息流筛选">
           {#each filters as filter}
@@ -1002,6 +1090,7 @@
       {/if}
     </section>
 
+    {#if activeView !== 'dates' && activeView !== 'me'}
     <aside class="side-panel">
       <section class="profile-card">
         <div class="avatar-row">
@@ -1123,9 +1212,164 @@
         </div>
       </section>
     </aside>
+    {/if}
   </div>
 
 </main>
+
+{#if addWatchOpen}
+  <div class="modal-backdrop" role="presentation" tabindex="-1" onkeydown={(event) => event.key === 'Escape' && (addWatchOpen = false)} onclick={(event) => event.target === event.currentTarget && (addWatchOpen = false)}>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-watch-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="add-watch-title">{addWatchTitle}</h2>
+          <p>{addWatchHint}</p>
+        </div>
+        <button class="close-button" type="button" aria-label="关闭添加关注" onclick={() => (addWatchOpen = false)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <div class="modal-form watch-form">
+        <input bind:value={newWatchName} placeholder={addWatchPlaceholder} />
+        <select bind:value={newWatchType} aria-label="关注类型">
+          <option value="topic">主题</option>
+          <option value="artist">音乐人</option>
+          <option value="source">来源</option>
+        </select>
+        <select bind:value={newWatchCategory} aria-label="关注分类">
+          <option value="business">商业</option>
+          <option value="career">职业</option>
+          <option value="geopolitics">地缘政治</option>
+          <option value="concerts">演出</option>
+        </select>
+        <select bind:value={newWatchPriority} aria-label="优先级">
+          <option value={1}>优先级 1</option>
+          <option value={2}>优先级 2</option>
+          <option value={3}>优先级 3</option>
+          <option value={4}>优先级 4</option>
+          <option value={5}>优先级 5</option>
+        </select>
+        <select bind:value={newWatchMode} aria-label="偏好模式">
+          <option value="follow">关注</option>
+          <option value="blacklist">屏蔽</option>
+        </select>
+      </div>
+      {#if addWatchError}<p class="form-error">{addWatchError}</p>{/if}
+      <div class="modal-actions">
+        <button class="small-button" type="button" onclick={() => (addWatchOpen = false)}>取消</button>
+        <button class="small-button primary" type="button" disabled={addWatchPending} onclick={addWatchTopic}>
+          {addWatchPending ? '添加中...' : '添加'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if editingTopicId}
+  <div class="modal-backdrop" role="presentation" tabindex="-1" onkeydown={(event) => event.key === 'Escape' && (editingTopicId = null)} onclick={(event) => event.target === event.currentTarget && (editingTopicId = null)}>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-watch-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="edit-watch-title">编辑偏好</h2>
+          <p>保存后会立即重新拉取相关数据并刷新信息流。</p>
+        </div>
+        <button class="close-button" type="button" aria-label="关闭编辑偏好" onclick={() => (editingTopicId = null)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <div class="modal-form watch-form">
+        <input bind:value={editWatchName} placeholder="偏好名称" />
+        <select bind:value={editWatchType} aria-label="关注类型">
+          <option value="topic">主题</option>
+          <option value="artist">音乐人</option>
+          <option value="source">来源</option>
+        </select>
+        <select bind:value={editWatchCategory} aria-label="关注分类">
+          <option value="business">商业</option>
+          <option value="career">职业</option>
+          <option value="geopolitics">地缘政治</option>
+          <option value="concerts">演出</option>
+        </select>
+        <select bind:value={editWatchPriority} aria-label="优先级">
+          <option value={1}>优先级 1</option>
+          <option value={2}>优先级 2</option>
+          <option value={3}>优先级 3</option>
+          <option value={4}>优先级 4</option>
+          <option value={5}>优先级 5</option>
+        </select>
+        <select bind:value={editWatchMode} aria-label="偏好模式">
+          <option value="follow">关注</option>
+          <option value="blacklist">屏蔽</option>
+        </select>
+      </div>
+      {#if editWatchError}<p class="form-error">{editWatchError}</p>{/if}
+      <div class="modal-actions">
+        <button class="small-button" type="button" onclick={() => (editingTopicId = null)}>取消</button>
+        <button class="small-button primary" type="button" disabled={topicPending === editingTopicId} onclick={saveTopicEdit}>
+          {topicPending === editingTopicId ? '保存中...' : '保存'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if reminderFormOpen}
+  <div class="modal-backdrop" role="presentation" tabindex="-1" onkeydown={(event) => event.key === 'Escape' && (reminderFormOpen = false)} onclick={(event) => event.target === event.currentTarget && (reminderFormOpen = false)}>
+    <div class="modal-card reminder-modal" role="dialog" aria-modal="true" aria-labelledby="reminder-title">
+      <div class="modal-head soft">
+        <button class="back-button" type="button" aria-label="关闭日期提醒" onclick={() => (reminderFormOpen = false)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+        </button>
+        <h2 id="reminder-title">{editingReminderId ? '编辑日期提醒' : '添加日期提醒'}</h2>
+        <button class="text-button" type="button" disabled={reminderPending} onclick={saveReminder}>
+          {reminderPending ? '保存中' : '保存'}
+        </button>
+      </div>
+
+      <div class="reminder-sheet">
+        <label class="sheet-row title-row">
+          <span>T</span>
+          <input bind:value={reminderTitle} placeholder="日期名称" />
+        </label>
+
+        <div class="sheet-group">
+          <div class="sheet-label">目标日</div>
+          <div class="date-picker-row">
+            <input use:datepicker bind:value={reminderDate} aria-label="目标日期" />
+            <select bind:value={reminderCalendarType} aria-label="日期类型">
+              <option value="lunar">农历</option>
+              <option value="gregorian">公历</option>
+            </select>
+          </div>
+          <p>
+            {dualDateLabel(reminderDate)} · 保存为{reminderCalendarType === 'lunar'
+              ? '农历每年提醒'
+              : '公历每年提醒'}
+          </p>
+        </div>
+
+        <div class="sheet-row">
+          <span>↻</span>
+          <strong>重复</strong>
+          <em>每年（相同月日）</em>
+        </div>
+
+        <div class="sheet-row">
+          <span>铃</span>
+          <strong>设置提醒</strong>
+          <em>每日摘要：当天、1 天前、7 天前</em>
+        </div>
+
+        <label class="sheet-row">
+          <span>↑</span>
+          <strong>置顶</strong>
+          <input type="checkbox" bind:checked={reminderPinned} />
+        </label>
+      </div>
+      {#if reminderError}<p class="form-error">{reminderError}</p>{/if}
+    </div>
+  </div>
+{/if}
 
 <nav class="primary-nav mobile-nav" data-active={activeView} aria-label="主导航">
   <span class="nav-indicator" aria-hidden="true"></span>
@@ -1261,7 +1505,7 @@
     left: 5px;
     top: 5px;
     bottom: 5px;
-    width: calc((100% - 10px) / 4);
+    width: calc((100% - 10px) / 5);
     border-radius: 999px;
     background: var(--jade);
     box-shadow: 0 8px 18px rgba(31, 111, 91, 0.2);
@@ -1278,8 +1522,12 @@
     transform: translateX(200%);
   }
 
-  .primary-nav[data-active='me'] .nav-indicator {
+  .primary-nav[data-active='dates'] .nav-indicator {
     transform: translateX(300%);
+  }
+
+  .primary-nav[data-active='me'] .nav-indicator {
+    transform: translateX(400%);
   }
 
   .mobile-nav {
@@ -1472,6 +1720,212 @@
     font-weight: 850;
   }
 
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(39, 31, 23, 0.28);
+    backdrop-filter: blur(10px);
+  }
+
+  .modal-card {
+    width: min(620px, 100%);
+    max-height: min(760px, calc(100vh - 36px));
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: #fffdf7;
+    box-shadow: 0 32px 90px rgba(38, 29, 20, 0.26);
+    padding: 18px;
+  }
+
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .modal-head h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 20px;
+  }
+
+  .modal-head p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .modal-form {
+    margin-top: 0;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .reminder-modal {
+    background: linear-gradient(180deg, #fbecd9, #fffdf7 150px);
+  }
+
+  .modal-head.soft {
+    align-items: center;
+  }
+
+  .modal-head.soft h2 {
+    color: #2d6382;
+    font-weight: 900;
+  }
+
+  .back-button,
+  .text-button {
+    border: 0;
+    background: transparent;
+    color: #7ea79d;
+    font-weight: 950;
+  }
+
+  .back-button {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+  }
+
+  .back-button:hover {
+    background: rgba(126, 167, 157, 0.12);
+  }
+
+  .back-button svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .reminder-sheet {
+    display: grid;
+    gap: 16px;
+    border-radius: 22px;
+    background: rgba(255, 253, 247, 0.94);
+    padding: 18px;
+  }
+
+  .sheet-row {
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    border-bottom: 1px solid rgba(130, 111, 91, 0.14);
+    color: #2d6382;
+  }
+
+  .sheet-row:last-child {
+    border-bottom: 0;
+  }
+
+  .sheet-row > span {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: rgba(126, 167, 157, 0.1);
+    color: #7ea79d;
+    font-weight: 950;
+  }
+
+  .sheet-row strong,
+  .sheet-label {
+    color: #6d9f99;
+    font-size: 18px;
+    font-weight: 950;
+  }
+
+  .sheet-row em {
+    color: var(--muted);
+    font-style: normal;
+    font-weight: 850;
+  }
+
+  .sheet-row input[type='checkbox'] {
+    width: 46px;
+    height: 26px;
+    accent-color: #7ea79d;
+  }
+
+  .title-row input {
+    grid-column: 2 / -1;
+    min-height: 44px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 22px;
+    font-weight: 900;
+  }
+
+  .sheet-group {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    border-bottom: 1px solid rgba(130, 111, 91, 0.14);
+    padding-bottom: 16px;
+  }
+
+  .sheet-label {
+    grid-column: 2;
+  }
+
+  .date-picker-row {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 110px;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .date-picker-row input,
+  .date-picker-row select {
+    min-height: 46px;
+    border: 1px solid rgba(130, 111, 91, 0.22);
+    border-radius: 12px;
+    background: #fffdf7;
+    color: var(--ink);
+    padding: 0 12px;
+    font-weight: 850;
+  }
+
+  .sheet-group p {
+    grid-column: 2;
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-weight: 850;
+  }
+
+  :global(.datepicker) {
+    border-color: var(--line);
+    border-radius: 14px;
+    box-shadow: 0 18px 48px rgba(38, 29, 20, 0.18);
+    font-family: inherit;
+  }
+
   .app-main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 330px;
@@ -1549,6 +2003,67 @@
     font-size: 11px;
     font-weight: 850;
     line-height: 1.35;
+  }
+
+  .reminder-strip {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: linear-gradient(105deg, rgba(251, 241, 228, 0.96), rgba(215, 242, 220, 0.62));
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+
+  .reminder-strip strong,
+  .reminder-strip span {
+    display: block;
+  }
+
+  .reminder-strip > div:first-child strong {
+    color: #2d6382;
+    font-size: 15px;
+  }
+
+  .reminder-strip > div:first-child span {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .reminder-strip-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    justify-content: flex-end;
+  }
+
+  .reminder-strip-list button {
+    min-width: 92px;
+    border: 1px solid rgba(126, 167, 157, 0.32);
+    border-radius: 14px;
+    background: #fffdf7;
+    color: #2d6382;
+    padding: 9px 11px;
+    text-align: left;
+  }
+
+  .reminder-strip-list button strong {
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .reminder-strip-list button span {
+    margin-top: 4px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .tabs {
@@ -1869,79 +2384,6 @@
   .notebook-head h2 {
     margin: 0 0 4px;
     font-size: 16px;
-  }
-
-  .reminder-list {
-    display: grid;
-    gap: 9px;
-  }
-
-  .reminder-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 82px auto;
-    align-items: center;
-    gap: 10px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--mint) 70%, white);
-    padding: 11px;
-  }
-
-  .reminder-row.pinned {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 36%, white), color-mix(in srgb, var(--mint) 70%, white));
-  }
-
-  .reminder-main {
-    min-width: 0;
-  }
-
-  .reminder-main strong,
-  .reminder-main span,
-  .reminder-main small {
-    display: block;
-  }
-
-  .reminder-main strong {
-    font-size: 14px;
-    line-height: 1.25;
-  }
-
-  .reminder-main span,
-  .reminder-main small {
-    margin-top: 3px;
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.35;
-  }
-
-  .reminder-days {
-    min-height: 56px;
-    display: grid;
-    grid-template-columns: 1fr 28px;
-    align-items: center;
-    overflow: hidden;
-    border-radius: 10px;
-    background: #3b9bea;
-    color: white;
-    text-align: center;
-  }
-
-  .reminder-days strong {
-    font-size: 26px;
-    line-height: 1;
-  }
-
-  .reminder-days span {
-    height: 100%;
-    display: grid;
-    place-items: center;
-    background: #2b86d6;
-    font-size: 14px;
-    font-weight: 950;
-  }
-
-  .reminder-actions {
-    justify-content: flex-end;
   }
 
   .settings-grid.compact button {
@@ -2319,6 +2761,7 @@
 
     .mobile-nav button {
       min-width: 0;
+      font-size: 12px;
     }
 
     .button {
@@ -2356,6 +2799,35 @@
       grid-template-columns: 1fr;
     }
 
+    .modal-backdrop {
+      align-items: end;
+      padding: 0;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-height: calc(100vh - 34px);
+      border-right: 0;
+      border-bottom: 0;
+      border-left: 0;
+      border-radius: 24px 24px 0 0;
+      padding: 16px;
+    }
+
+    .date-picker-row,
+    .watch-form,
+    .search-row {
+      grid-template-columns: 1fr;
+    }
+
+    .reminder-strip {
+      grid-template-columns: 1fr;
+    }
+
+    .reminder-strip-list {
+      justify-content: flex-start;
+    }
+
     h1 {
       font-size: 34px;
     }
@@ -2371,15 +2843,6 @@
 
     .notebook-head {
       align-items: flex-start;
-    }
-
-    .reminder-row {
-      grid-template-columns: minmax(0, 1fr) 82px;
-    }
-
-    .reminder-actions {
-      grid-column: 1 / -1;
-      justify-content: flex-start;
     }
 
     .story-grid {
