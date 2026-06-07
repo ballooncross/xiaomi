@@ -1,4 +1,4 @@
-import type { RadarItem, WatchTopic } from './types';
+import type { DateReminder, RadarItem, WatchTopic } from './types';
 
 export const defaultWatchTopics: WatchTopic[] = [
   topic('artist-twice', 'artist', 'TWICE', ['트와이스'], 'concerts', 5),
@@ -176,6 +176,22 @@ export const demoItems: RadarItem[] = [
   }
 ];
 
+export const defaultDateReminders: DateReminder[] = [
+  lunarReminder('birthday-erjie', '二姐生日', 5, 1),
+  lunarReminder('birthday-dajie', '大姐生日', 5, 1),
+  lunarReminder('birthday-dad', '老爸生日', 5, 28),
+  lunarReminder('birthday-laoge', '老哥生日', 6, 8),
+  lunarReminder('birthday-junjun-1', '君君生日1', 11, 10),
+  lunarReminder('birthday-mom', '老妈生日', 11, 14),
+  lunarReminder('birthday-sanjie-me', '三姐和我生日', 11, 18),
+  lunarReminder('birthday-muchen', '沐辰生日', 11, 19),
+  lunarReminder('birthday-junjun-lunar', '君君农历生日', 12, 18, true),
+  lunarReminder('birthday-qianqian', '倩倩生日', 12, 29),
+  lunarReminder('birthday-yihang', '屹杭生日', 1, 28),
+  lunarReminder('birthday-chunnv', '春女生日', 2, 7),
+  lunarReminder('birthday-zoe', 'zoe生日', 3, 22)
+];
+
 function topic(
   id: string,
   type: WatchTopic['type'],
@@ -185,4 +201,26 @@ function topic(
   priority: number
 ): WatchTopic {
   return { id, type, name, aliases, category, priority, mode: 'follow', enabled: true };
+}
+
+function lunarReminder(
+  id: string,
+  title: string,
+  month: number,
+  day: number,
+  pinned = false
+): DateReminder {
+  return {
+    id,
+    title,
+    calendarType: 'lunar',
+    month,
+    day,
+    lunarIsLeapMonth: false,
+    repeat: 'annual',
+    note: pinned ? '从截图导入，农历生日。' : '从截图导入，按农历每年提醒。',
+    pinned,
+    enabled: true,
+    remindDaysBefore: [0, 1, 7]
+  };
 }

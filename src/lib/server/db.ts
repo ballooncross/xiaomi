@@ -1,5 +1,5 @@
-import { demoItems, defaultWatchTopics } from './seed';
-import type { Env, FeedbackAction, RadarItem, WatchTopic } from './types';
+import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
+import type { DateReminder, Env, FeedbackAction, RadarItem, WatchTopic } from './types';
 
 type ItemRow = {
   id: string;
@@ -37,9 +37,27 @@ type TopicRow = {
   updated_at: string;
 };
 
+type ReminderRow = {
+  id: string;
+  title: string;
+  calendar_type: DateReminder['calendarType'];
+  year: number | null;
+  month: number;
+  day: number;
+  lunar_is_leap_month: number;
+  repeat: DateReminder['repeat'];
+  note: string;
+  pinned: number;
+  enabled: number;
+  remind_days_before: string;
+  created_at: string;
+  updated_at: string;
+};
+
 const memory = {
   topics: [...defaultWatchTopics],
   items: [...demoItems],
+  reminders: [...defaultDateReminders],
   feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string }>
 };
 
@@ -54,6 +72,9 @@ export abstract class RadarDb {
   abstract deleteTopic(topicId: string): Promise<void>;
   abstract listItems(limit?: number): Promise<RadarItem[]>;
   abstract upsertItem(item: RadarItem): Promise<'inserted' | 'updated'>;
+  abstract listReminders(): Promise<DateReminder[]>;
+  abstract upsertReminder(reminder: DateReminder): Promise<void>;
+  abstract deleteReminder(reminderId: string): Promise<void>;
   abstract recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void>;
   abstract updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void>;
   abstract logNotification(input: { itemId?: string; channel: string; type: string; status: string; message: string }): Promise<void>;
@@ -90,6 +111,21 @@ class MemoryRadarDb extends RadarDb {
     }
     memory.items.push(item);
     return 'inserted';
+  }
+
+  async listReminders(): Promise<DateReminder[]> {
+    return memory.reminders.filter((reminder) => reminder.enabled);
+  }
+
+  async upsertReminder(reminder: DateReminder): Promise<void> {
+    const index = memory.reminders.findIndex((existing) => existing.id === reminder.id);
+    if (index >= 0) memory.reminders[index] = { ...reminder, updatedAt: new Date().toISOString() };
+    else memory.reminders.push(reminder);
+  }
+
+  async deleteReminder(reminderId: string): Promise<void> {
+    const index = memory.reminders.findIndex((reminder) => reminder.id === reminderId);
+    if (index >= 0) memory.reminders[index] = { ...memory.reminders[index], enabled: false, updatedAt: new Date().toISOString() };
   }
 
   async recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void> {
@@ -246,6 +282,74 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async listReminders(): Promise<DateReminder[]> {
+    try {
+      const { results } = await this.db
+        .prepare('SELECT * FROM date_reminders WHERE enabled = 1 ORDER BY pinned DESC, title ASC')
+        .all<ReminderRow>();
+      return results.map(reminderFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return defaultDateReminders;
+      throw error;
+    }
+  }
+
+  async upsertReminder(reminder: DateReminder): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO date_reminders (
+            id, title, calendar_type, year, month, day, lunar_is_leap_month, repeat, note,
+            pinned, enabled, remind_days_before, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            calendar_type = excluded.calendar_type,
+            year = excluded.year,
+            month = excluded.month,
+            day = excluded.day,
+            lunar_is_leap_month = excluded.lunar_is_leap_month,
+            repeat = excluded.repeat,
+            note = excluded.note,
+            pinned = excluded.pinned,
+            enabled = excluded.enabled,
+            remind_days_before = excluded.remind_days_before,
+            updated_at = CURRENT_TIMESTAMP`
+        )
+        .bind(
+          reminder.id,
+          reminder.title,
+          reminder.calendarType,
+          reminder.year ?? null,
+          reminder.month,
+          reminder.day,
+          reminder.lunarIsLeapMonth ? 1 : 0,
+          reminder.repeat,
+          reminder.note,
+          reminder.pinned ? 1 : 0,
+          reminder.enabled ? 1 : 0,
+          JSON.stringify(reminder.remindDaysBefore)
+        )
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().upsertReminder(reminder);
+      throw error;
+    }
+  }
+
+  async deleteReminder(reminderId: string): Promise<void> {
+    try {
+      await this.db
+        .prepare('UPDATE date_reminders SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(reminderId)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().deleteReminder(reminderId);
+      throw error;
+    }
+  }
+
   async recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void> {
     try {
       await this.db
@@ -334,6 +438,25 @@ function topicFromRow(row: TopicRow): WatchTopic {
     priority: row.priority,
     mode: row.mode ?? 'follow',
     enabled: row.enabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function reminderFromRow(row: ReminderRow): DateReminder {
+  return {
+    id: row.id,
+    title: row.title,
+    calendarType: row.calendar_type,
+    year: row.year ?? undefined,
+    month: row.month,
+    day: row.day,
+    lunarIsLeapMonth: row.lunar_is_leap_month === 1,
+    repeat: row.repeat,
+    note: row.note,
+    pinned: row.pinned === 1,
+    enabled: row.enabled === 1,
+    remindDaysBefore: parseJson<number[]>(row.remind_days_before, [0, 1, 7]),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

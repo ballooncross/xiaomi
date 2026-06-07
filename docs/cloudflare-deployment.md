@@ -79,7 +79,7 @@ The Pages app serves the UI and API routes. The separate cron Worker runs schedu
 
 `wrangler.cron.toml` currently configures:
 
-- every 6 hours: fetch concerts and trend placeholders
+- every 6 hours: fetch concerts and trend/news items
 - `00:30 UTC`: send daily digest, which is `08:30 Asia/Singapore`
 
 ## Security

@@ -6,6 +6,7 @@ The MVP is program-first and AI-assisted:
 
 - deterministic source fetching, matching, scoring, dedupe, and Telegram notifications
 - broad Singapore concert discovery, with manual follow and blacklist preferences
+- lunar birthday and notebook reminders imported from Days Matter-style lists
 - optional AI summaries via Gemini first and DeepSeek fallback
 - rule-based fallback when AI keys are missing, rate-limited, or disabled
 - feedback buttons to learn what is useful over time
@@ -46,6 +47,8 @@ npm run db:seed:local       # seed local D1
 npm run deploy              # deploy Pages app
 npm run deploy:cron         # deploy scheduled worker
 ```
+
+Run `npm run db:migrate:local` after pulling schema changes. The birthday notebook uses the `date_reminders` D1 table and stores lunar dates for annual reminders.
 
 ## Docs
 

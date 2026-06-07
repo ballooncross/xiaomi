@@ -19,3 +19,20 @@ INSERT OR IGNORE INTO sources (id, type, name, config_json, frequency_minutes) V
   ('ticketmaster-sg-popular', 'ticketmaster', 'Ticketmaster Singapore popular music discovery', '{"countryCode":"SG","classificationName":"music","mode":"popular"}', 360),
   ('bandsintown-artists', 'bandsintown', 'Bandsintown artist watches', '{}', 360),
   ('manual-trends', 'manual', 'Manual trend seed', '{}', 720);
+
+INSERT OR IGNORE INTO date_reminders (
+  id, title, calendar_type, month, day, lunar_is_leap_month, repeat, note, pinned, enabled, remind_days_before
+) VALUES
+  ('birthday-erjie', '二姐生日', 'lunar', 5, 1, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-dajie', '大姐生日', 'lunar', 5, 1, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-dad', '老爸生日', 'lunar', 5, 28, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-laoge', '老哥生日', 'lunar', 6, 8, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-junjun-1', '君君生日1', 'lunar', 11, 10, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-mom', '老妈生日', 'lunar', 11, 14, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-sanjie-me', '三姐和我生日', 'lunar', 11, 18, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-muchen', '沐辰生日', 'lunar', 11, 19, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-junjun-lunar', '君君农历生日', 'lunar', 12, 18, 0, 'annual', '从截图导入，农历生日。', 1, 1, '[0,1,7]'),
+  ('birthday-qianqian', '倩倩生日', 'lunar', 12, 29, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-yihang', '屹杭生日', 'lunar', 1, 28, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-chunnv', '春女生日', 'lunar', 2, 7, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]'),
+  ('birthday-zoe', 'zoe生日', 'lunar', 3, 22, 0, 'annual', '从截图导入，按农历每年提醒。', 0, 1, '[0,1,7]');

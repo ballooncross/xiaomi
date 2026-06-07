@@ -3,6 +3,8 @@ export type WatchMode = 'follow' | 'blacklist';
 export type ItemKind = 'concert' | 'trend' | 'news' | 'opportunity';
 export type ItemStatus = 'new' | 'saved' | 'tracking' | 'dismissed';
 export type FeedbackAction = 'save' | 'track' | 'not_relevant' | 'more_like_this' | 'less_like_this';
+export type CalendarType = 'gregorian' | 'lunar';
+export type ReminderRepeat = 'none' | 'annual';
 
 export type WatchTopic = {
   id: string;
@@ -36,6 +38,23 @@ export type RadarItem = {
   raw: unknown;
   score: number;
   status: ItemStatus;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type DateReminder = {
+  id: string;
+  title: string;
+  calendarType: CalendarType;
+  year?: number;
+  month: number;
+  day: number;
+  lunarIsLeapMonth: boolean;
+  repeat: ReminderRepeat;
+  note: string;
+  pinned: boolean;
+  enabled: boolean;
+  remindDaysBefore: number[];
   createdAt?: string;
   updatedAt?: string;
 };

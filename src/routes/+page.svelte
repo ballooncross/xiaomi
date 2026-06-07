@@ -1,13 +1,15 @@
 <script lang="ts">
-  import type { FeedbackAction, RadarItem, WatchTopic } from '$lib/server/types';
+  import type { DateReminder, FeedbackAction, RadarItem, WatchTopic } from '$lib/server/types';
   import type { PageData } from './$types';
 
   type View = 'home' | 'concerts' | 'trends' | 'me';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
+  type ReminderView = DateReminder & { nextDate: string; daysLeft: number; dateLabel: string };
 
   let { data }: { data: PageData } = $props();
   let items = $state<RadarItem[]>([]);
   let topics = $state<WatchTopic[]>([]);
+  let reminders = $state<ReminderView[]>([]);
   let activeView = $state<View>('home');
   let activeFilter = $state('for-you');
   let searchQuery = $state('');
@@ -34,10 +36,22 @@
   let digestSendMessage = $state('');
   let addWatchError = $state('');
   let editWatchError = $state('');
+  let reminderFormOpen = $state(false);
+  let reminderPending = $state(false);
+  let reminderError = $state('');
+  let editingReminderId = $state<string | null>(null);
+  let reminderTitle = $state('');
+  let reminderCalendarType = $state<DateReminder['calendarType']>('lunar');
+  let reminderMonth = $state(1);
+  let reminderDay = $state(1);
+  let reminderIsLeapMonth = $state(false);
+  let reminderPinned = $state(false);
+  let reminderNote = $state('');
 
   $effect.pre(() => {
     if (items.length === 0) items = data.items;
     if (topics.length === 0) topics = data.topics;
+    if (reminders.length === 0) reminders = data.reminders;
   });
 
   const navItems: Array<{ id: View; label: string }> = [
@@ -96,6 +110,10 @@
   const addWatchTitle = $derived(getAddWatchTitle(newWatchType, newWatchMode));
   const addWatchHint = $derived(getAddWatchHint(newWatchType, newWatchCategory, newWatchMode));
   const addWatchPlaceholder = $derived(getAddWatchPlaceholder(newWatchType, newWatchCategory, newWatchMode));
+  const nextReminder = $derived(reminders.reduce<ReminderView | undefined>((closest, reminder) => {
+    if (!closest || reminder.daysLeft < closest.daysLeft) return reminder;
+    return closest;
+  }, undefined));
 
   async function sendFeedback(itemId: string, action: FeedbackAction) {
     feedbackPending = `${itemId}:${action}`;
@@ -151,6 +169,8 @@
       if (host.includes('livenation')) return 'Live Nation';
       if (host.includes('songkick')) return 'Songkick';
       if (host.includes('news.google')) return 'Google 新闻';
+      if (item.sourceType === 'gdelt') return `GDELT · ${host}`;
+      if (item.sourceType === 'rss') return host;
       return host;
     } catch {
       return item.sourceType === 'demo' ? '来源' : item.sourceType;
@@ -229,8 +249,9 @@
     });
 
     if (response.ok) {
-      const result = (await response.json()) as { topic: WatchTopic };
-      topics = [result.topic, ...topics.filter((topic) => topic.id !== result.topic.id)];
+      const result = (await response.json()) as { topic: WatchTopic; topics?: WatchTopic[]; items?: RadarItem[] };
+      topics = result.topics ?? [result.topic, ...topics.filter((topic) => topic.id !== result.topic.id)];
+      if (result.items) items = result.items;
       newWatchName = '';
       addWatchOpen = false;
     } else {
@@ -276,8 +297,9 @@
     });
 
     if (response.ok) {
-      const result = (await response.json()) as { topic: WatchTopic };
-      topics = topics.map((topic) => (topic.id === result.topic.id ? result.topic : topic));
+      const result = (await response.json()) as { topic: WatchTopic; topics?: WatchTopic[]; items?: RadarItem[] };
+      topics = result.topics ?? topics.map((topic) => (topic.id === result.topic.id ? result.topic : topic));
+      if (result.items) items = result.items;
       editingTopicId = null;
     } else {
       editWatchError = '无法保存这个偏好，请重试。';
@@ -307,10 +329,91 @@
       body: JSON.stringify({ id: topic.id })
     });
     if (response.ok) {
-      topics = topics.filter((candidate) => candidate.id !== topic.id);
+      const result = (await response.json().catch(() => ({}))) as { topics?: WatchTopic[]; items?: RadarItem[] };
+      topics = result.topics ?? topics.filter((candidate) => candidate.id !== topic.id);
+      if (result.items) items = result.items;
       if (editingTopicId === topic.id) editingTopicId = null;
     }
     topicPending = null;
+  }
+
+  function openReminderForm(reminder?: ReminderView) {
+    reminderError = '';
+    reminderFormOpen = true;
+    addWatchOpen = false;
+    searchOpen = false;
+    digestOpen = false;
+    if (reminder) {
+      editingReminderId = reminder.id;
+      reminderTitle = reminder.title;
+      reminderCalendarType = reminder.calendarType;
+      reminderMonth = reminder.month;
+      reminderDay = reminder.day;
+      reminderIsLeapMonth = reminder.lunarIsLeapMonth;
+      reminderPinned = reminder.pinned;
+      reminderNote = reminder.note;
+      return;
+    }
+    editingReminderId = null;
+    reminderTitle = '';
+    reminderCalendarType = 'lunar';
+    reminderMonth = 1;
+    reminderDay = 1;
+    reminderIsLeapMonth = false;
+    reminderPinned = false;
+    reminderNote = '';
+  }
+
+  async function saveReminder() {
+    reminderError = '';
+    const title = reminderTitle.trim();
+    if (!title) {
+      reminderError = '请先输入提醒名称。';
+      return;
+    }
+    reminderPending = true;
+    const payload = {
+      id: editingReminderId ?? undefined,
+      title,
+      calendarType: reminderCalendarType,
+      month: reminderMonth,
+      day: reminderDay,
+      lunarIsLeapMonth: reminderCalendarType === 'lunar' ? reminderIsLeapMonth : false,
+      repeat: 'annual',
+      pinned: reminderPinned,
+      note: reminderNote,
+      remindDaysBefore: [0, 1, 7],
+      enabled: true
+    };
+    const response = await fetch('/api/reminders', {
+      method: editingReminderId ? 'PATCH' : 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (response.ok) {
+      const result = (await response.json()) as { reminders: ReminderView[] };
+      reminders = result.reminders;
+      reminderFormOpen = false;
+      editingReminderId = null;
+    } else {
+      reminderError = '无法保存这个提醒，请重试。';
+    }
+    reminderPending = false;
+  }
+
+  async function deleteReminder(reminder: ReminderView) {
+    reminderPending = true;
+    const response = await fetch('/api/reminders', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: reminder.id })
+    });
+    if (response.ok) {
+      const result = (await response.json()) as { reminders: ReminderView[] };
+      reminders = result.reminders;
+      if (editingReminderId === reminder.id) editingReminderId = null;
+    }
+    reminderPending = false;
   }
 
   function matchesSearch(item: RadarItem, query: string) {
@@ -466,7 +569,7 @@
 
   <div class="app-main">
     <section class="feed">
-      {#if searchOpen || digestOpen || addWatchOpen || editingTopicId}
+      {#if searchOpen || digestOpen || addWatchOpen || editingTopicId || reminderFormOpen}
         <section class="action-panel">
           {#if searchOpen}
             <div class="action-card search-card">
@@ -608,6 +711,54 @@
               {#if editWatchError}<p class="form-error">{editWatchError}</p>{/if}
             </div>
           {/if}
+
+          {#if reminderFormOpen}
+            <div class="action-card">
+              <div class="action-card-head">
+                <div>
+                  <strong>{editingReminderId ? '编辑生日提醒' : '添加生日提醒'}</strong>
+                  <span>默认按农历每年提醒，适合生日和重要纪念日</span>
+                </div>
+                <button class="close-button" type="button" aria-label="关闭生日提醒" onclick={() => (reminderFormOpen = false)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="watch-form reminder-form">
+                <input bind:value={reminderTitle} placeholder="例如：老妈生日、纪念日" />
+                <select bind:value={reminderCalendarType} aria-label="日期类型">
+                  <option value="lunar">农历</option>
+                  <option value="gregorian">公历</option>
+                </select>
+                <select bind:value={reminderMonth} aria-label="月份">
+                  {#each Array.from({ length: 12 }, (_, index) => index + 1) as month}
+                    <option value={month}>{month} 月</option>
+                  {/each}
+                </select>
+                <select bind:value={reminderDay} aria-label="日期">
+                  {#each Array.from({ length: 31 }, (_, index) => index + 1) as day}
+                    <option value={day}>{day} 日</option>
+                  {/each}
+                </select>
+                <label class="check-row">
+                  <input type="checkbox" bind:checked={reminderPinned} />
+                  置顶
+                </label>
+                {#if reminderCalendarType === 'lunar'}
+                  <label class="check-row">
+                    <input type="checkbox" bind:checked={reminderIsLeapMonth} />
+                    闰月
+                  </label>
+                {/if}
+                <input bind:value={reminderNote} placeholder="备注，可选" />
+                <button class="small-button primary" disabled={reminderPending} onclick={saveReminder}>
+                  {reminderPending ? '保存中...' : '保存提醒'}
+                </button>
+              </div>
+              {#if reminderError}<p class="form-error">{reminderError}</p>{/if}
+            </div>
+          {/if}
         </section>
       {/if}
 
@@ -637,6 +788,77 @@
         </aside>
       </div>
 
+      {#if activeView === 'me'}
+        <section class="me-workspace">
+          <div class="settings-grid">
+            <article class="settings-card">
+              <span>资料</span>
+              <strong>个人雷达</strong>
+              <p>Telegram {data.telegramConfigured ? '已连接' : '未配置'} · AI {data.aiEnabled ? '可用' : '关闭'} · {followedTopicCount} 个关注</p>
+            </article>
+            <article class="settings-card">
+              <span>下一条提醒</span>
+              <strong>{nextReminder ? `${nextReminder.daysLeft} 天` : '暂无'}</strong>
+              <p>{nextReminder ? `${nextReminder.title} · ${nextReminder.dateLabel}` : '添加生日或纪念日后会显示在这里。'}</p>
+            </article>
+          </div>
+
+          <section class="notebook-card">
+            <div class="notebook-head">
+              <div>
+                <h2>生日与纪念日</h2>
+                <span>默认使用农历，每天摘要可提醒临近日期。</span>
+              </div>
+              <button class="small-button primary" type="button" onclick={() => openReminderForm()}>添加生日</button>
+            </div>
+            <div class="reminder-list">
+              {#each reminders as reminder}
+                <article class:pinned={reminder.pinned} class="reminder-row">
+                  <div class="reminder-main">
+                    <strong>{reminder.title}</strong>
+                    <span>{reminder.dateLabel}</span>
+                    {#if reminder.note}<small>{reminder.note}</small>{/if}
+                  </div>
+                  <div class="reminder-days">
+                    <strong>{reminder.daysLeft}</strong>
+                    <span>天</span>
+                  </div>
+                  <div class="topic-actions reminder-actions">
+                    <button type="button" onclick={() => openReminderForm(reminder)}>编辑</button>
+                    <button type="button" disabled={reminderPending} onclick={() => deleteReminder(reminder)}>移除</button>
+                  </div>
+                </article>
+              {:else}
+                <p class="quiet-copy">暂无生日提醒。你可以添加农历生日、纪念日或待办日期。</p>
+              {/each}
+            </div>
+          </section>
+
+          <section class="notebook-card">
+            <div class="notebook-head">
+              <div>
+                <h2>偏好与设置</h2>
+                <span>管理音乐人、趋势主题、来源和屏蔽规则。</span>
+              </div>
+              <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
+            </div>
+            <div class="settings-grid compact">
+              <button type="button" onclick={() => (preferenceView = 'artist')}>
+                <strong>{watchTopics.length}</strong>
+                <span>音乐人</span>
+              </button>
+              <button type="button" onclick={() => (preferenceView = 'topic')}>
+                <strong>{interestTopics.length}</strong>
+                <span>兴趣主题</span>
+              </button>
+              <button type="button" onclick={() => (preferenceView = 'blacklist')}>
+                <strong>{blacklistTopics.length}</strong>
+                <span>屏蔽规则</span>
+              </button>
+            </div>
+          </section>
+        </section>
+      {:else}
       {#if activeView === 'home'}
         <div class="tabs" aria-label="信息流筛选">
           {#each filters as filter}
@@ -653,8 +875,8 @@
       {/if}
 
       <div class="section-title">
-        <h2>{activeView === 'trends' ? '趋势流' : activeView === 'concerts' ? '演出流' : activeView === 'me' ? '已保存与重点跟踪' : '重点推荐'}</h2>
-        <span>{activeView === 'me' ? '你的反馈资料' : '用反馈调校排序'}</span>
+        <h2>{activeView === 'trends' ? '趋势流' : activeView === 'concerts' ? '演出流' : '重点推荐'}</h2>
+        <span>用反馈调校排序</span>
       </div>
 
       {#if topItem}
@@ -776,6 +998,7 @@
             </article>
           {/each}
         </section>
+      {/if}
       {/if}
     </section>
 
@@ -1217,6 +1440,20 @@
     min-height: 38px;
   }
 
+  .check-row {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff8eb;
+    color: var(--muted);
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
   .search-row input,
   .watch-form input,
   .watch-form select {
@@ -1569,6 +1806,161 @@
   .empty-state p {
     margin: 0;
     color: var(--muted);
+  }
+
+  .me-workspace {
+    display: grid;
+    gap: 14px;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .settings-grid.compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settings-card,
+  .notebook-card,
+  .settings-grid.compact button {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fffdf7;
+  }
+
+  .settings-card,
+  .notebook-card {
+    padding: 16px;
+  }
+
+  .settings-card span,
+  .notebook-head span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .settings-card strong {
+    display: block;
+    margin-top: 7px;
+    font-family: Newsreader, Georgia, serif;
+    font-size: 28px;
+    line-height: 1.05;
+  }
+
+  .settings-card p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .notebook-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .notebook-head h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+  }
+
+  .reminder-list {
+    display: grid;
+    gap: 9px;
+  }
+
+  .reminder-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 82px auto;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--mint) 70%, white);
+    padding: 11px;
+  }
+
+  .reminder-row.pinned {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 36%, white), color-mix(in srgb, var(--mint) 70%, white));
+  }
+
+  .reminder-main {
+    min-width: 0;
+  }
+
+  .reminder-main strong,
+  .reminder-main span,
+  .reminder-main small {
+    display: block;
+  }
+
+  .reminder-main strong {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .reminder-main span,
+  .reminder-main small {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .reminder-days {
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 1fr 28px;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #3b9bea;
+    color: white;
+    text-align: center;
+  }
+
+  .reminder-days strong {
+    font-size: 26px;
+    line-height: 1;
+  }
+
+  .reminder-days span {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    background: #2b86d6;
+    font-size: 14px;
+    font-weight: 950;
+  }
+
+  .reminder-actions {
+    justify-content: flex-end;
+  }
+
+  .settings-grid.compact button {
+    padding: 12px;
+    text-align: left;
+    color: var(--ink);
+  }
+
+  .settings-grid.compact strong {
+    display: block;
+    font-size: 22px;
+  }
+
+  .settings-grid.compact span {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
   }
 
   .side-panel {
@@ -1933,6 +2325,11 @@
       display: none;
     }
 
+    .top-actions .button.primary {
+      display: inline-flex;
+      align-items: center;
+    }
+
     .watch-form,
     .search-row {
       grid-template-columns: 1fr;
@@ -1965,6 +2362,24 @@
 
     .daily-card {
       width: auto;
+    }
+
+    .settings-grid,
+    .settings-grid.compact {
+      grid-template-columns: 1fr;
+    }
+
+    .notebook-head {
+      align-items: flex-start;
+    }
+
+    .reminder-row {
+      grid-template-columns: minmax(0, 1fr) 82px;
+    }
+
+    .reminder-actions {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
     }
 
     .story-grid {

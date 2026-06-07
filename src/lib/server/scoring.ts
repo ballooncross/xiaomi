@@ -3,6 +3,8 @@ import type { FeedbackAction, RadarItem, WatchTopic } from './types';
 const sourceWeight: Record<string, number> = {
   ticketmaster: 24,
   bandsintown: 20,
+  gdelt: 18,
+  google_news: 16,
   rss: 10,
   demo: 0,
   manual: 8
