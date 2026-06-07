@@ -182,8 +182,8 @@
     position: relative;
     overflow: hidden;
     border-radius: 24px;
-    padding: 30px;
-    min-height: 310px;
+    padding: 22px 24px;
+    min-height: 210px;
     background:
       linear-gradient(rgba(251, 241, 228, 0.65), rgba(251, 241, 228, 0.84)),
       url('/visuals/reminder-paper.svg'),
@@ -202,12 +202,12 @@
     align-items: baseline;
     justify-content: center;
     gap: 14px;
-    margin: 34px 0 18px;
+    margin: 18px 0 12px;
     color: #2d6382;
   }
 
   .feature-count strong {
-    font-size: clamp(84px, 16vw, 168px);
+    font-size: clamp(72px, 11vw, 124px);
     line-height: 0.82;
   }
 
@@ -312,7 +312,7 @@
 
   @media (max-width: 760px) {
     .dates-hero {
-      min-height: 176px;
+      min-height: 152px;
       grid-template-columns: auto minmax(0, 1fr);
       padding: 20px;
     }
@@ -324,6 +324,30 @@
 
     .dates-hero > div:first-child strong {
       font-size: 78px;
+    }
+
+    .date-feature {
+      border-radius: 18px;
+      min-height: 128px;
+      padding: 16px;
+    }
+
+    .date-feature h1 {
+      margin-top: 6px;
+      font-size: 22px;
+    }
+
+    .feature-count {
+      justify-content: flex-start;
+      margin: 12px 0 8px;
+    }
+
+    .feature-count strong {
+      font-size: 58px;
+    }
+
+    .feature-count em {
+      font-size: 20px;
     }
 
     .date-row {

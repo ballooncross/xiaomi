@@ -26,6 +26,14 @@ export const defaultWatchTopics: WatchTopic[] = [
     ['BYD', 'electric vehicles', 'EV market', 'Chinese EV', 'EV price war', 'battery market'],
     'business',
     5
+  ),
+  topic(
+    'topic-social-commerce-cn',
+    'topic',
+    '小红书、TikTok 与社交电商',
+    ['Xiaohongshu', 'RedNote', '小红书', 'TikTok', 'Douyin', '抖音', 'TikTok Shop', 'social commerce China'],
+    'business',
+    4
   )
 ];
 

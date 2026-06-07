@@ -43,6 +43,18 @@ const rssSources: RssSource[] = [
     name: 'CNA',
     url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml',
     categories: ['business', 'career', 'geopolitics']
+  },
+  {
+    id: 'pandaily',
+    name: 'Pandaily',
+    url: 'https://pandaily.com/feed/',
+    categories: ['business', 'career']
+  },
+  {
+    id: 'rest-of-world',
+    name: 'Rest of World',
+    url: 'https://restofworld.org/feed/latest/',
+    categories: ['business', 'career', 'geopolitics']
   }
 ];
 
@@ -204,15 +216,18 @@ function articleToItem(
     raw: unknown;
   }
 ): RadarItem {
+  const title = decodeHtmlEntities(input.title);
+  const summary = decodeHtmlEntities(input.summary);
+  const description = decodeHtmlEntities(input.description);
   return {
     id: crypto.randomUUID(),
     sourceId: input.sourceId,
     sourceType: input.sourceType,
     externalId: input.externalId,
     kind: topic.category === 'business' ? 'opportunity' : topic.category === 'geopolitics' ? 'news' : 'trend',
-    title: input.title,
-    summary: truncate(input.summary, 220),
-    description: input.description,
+    title,
+    summary: truncate(summary, 220),
+    description,
     url: input.url,
     imageUrl: input.imageUrl,
     publishedAt: input.publishedAt,
@@ -349,4 +364,16 @@ function truncate(value: string, length: number): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;|&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
 }

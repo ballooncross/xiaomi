@@ -85,3 +85,45 @@ The Pages app serves the UI and API routes. The separate cron Worker runs schedu
 ## Security
 
 Set `ADMIN_TOKEN` before deploying. The current MVP uses a simple private admin token for job endpoints. The UI itself should eventually sit behind Cloudflare Access or another auth layer before sharing the URL.
+
+## Protect The UI With Cloudflare Access
+
+The deployed site contains birthday and preference data, so protect the public UI before sharing the URL.
+
+Wrangler can deploy Pages and Workers for this project, but Cloudflare Access is account-level Zero Trust configuration. The current local Wrangler login has Pages/D1/Workers permissions, not `Access: Organizations, Identity Providers, and Groups Write`, so configure Access in the Cloudflare dashboard unless you create a separate API token with Access write permissions.
+
+### Recommended Setup For `personal-radar.pages.dev`
+
+1. Open Cloudflare Dashboard > Workers & Pages > `personal-radar`.
+2. Go to Settings > General.
+3. Select Enable access policy.
+4. This initially protects preview deployments only. To protect `personal-radar.pages.dev` too:
+   - Go to Zero Trust > Access controls > Applications.
+   - Open the Access application created for the Pages project.
+   - Select Configure.
+   - Under Public hostname, delete the wildcard `*` subdomain so the app matches `personal-radar.pages.dev`.
+   - Save.
+5. Add a policy:
+   - Action: Allow.
+   - Include: Emails.
+   - Value: your Google email address, for example `ballooncross@gmail.com`.
+6. Login method:
+   - Fastest: use Cloudflare One-time PIN for the allowed email.
+   - Google login: Zero Trust > Integrations > Identity providers > Add new identity provider > Google, then select that provider on the Access application.
+
+Cloudflare documents this `pages.dev` behavior in Pages preview deployment and known-issues docs:
+
+- https://developers.cloudflare.com/pages/configuration/preview-deployments/
+- https://developers.cloudflare.com/pages/platform/known-issues/
+
+### Custom Domain Option
+
+For a cleaner long-term setup, attach a custom domain such as `radar.yourdomain.com` to the Pages project, then create a normal Access self-hosted application for that hostname:
+
+1. Workers & Pages > `personal-radar` > Custom domains.
+2. Add the custom hostname.
+3. Zero Trust > Access controls > Applications > Add an application > Self-hosted.
+4. Public hostname: the custom hostname.
+5. Policy: allow only your email or Google identity.
+
+Cloudflare Access self-hosted applications require a hostname Cloudflare can proxy and validate before requests reach the origin.

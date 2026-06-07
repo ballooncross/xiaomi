@@ -46,6 +46,11 @@
   let reminderTitle = $state('');
   let reminderCalendarType = $state<DateReminder['calendarType']>('lunar');
   let reminderDate = $state(todayInputValue());
+  let reminderRepeat = $state<DateReminder['repeat']>('annual');
+  let reminderDay0 = $state(true);
+  let reminderDay1 = $state(true);
+  let reminderDay7 = $state(true);
+  let reminderDay30 = $state(false);
   let reminderPinned = $state(false);
 
   $effect.pre(() => {
@@ -399,6 +404,11 @@
       reminderTitle = reminder.title;
       reminderCalendarType = reminder.calendarType;
       reminderDate = reminder.nextDate;
+      reminderRepeat = reminder.repeat;
+      reminderDay0 = reminder.remindDaysBefore.includes(0);
+      reminderDay1 = reminder.remindDaysBefore.includes(1);
+      reminderDay7 = reminder.remindDaysBefore.includes(7);
+      reminderDay30 = reminder.remindDaysBefore.includes(30);
       reminderPinned = reminder.pinned;
       return;
     }
@@ -406,6 +416,11 @@
     reminderTitle = '';
     reminderCalendarType = 'lunar';
     reminderDate = todayInputValue();
+    reminderRepeat = 'annual';
+    reminderDay0 = true;
+    reminderDay1 = true;
+    reminderDay7 = true;
+    reminderDay30 = false;
     reminderPinned = false;
   }
 
@@ -422,13 +437,14 @@
       id: editingReminderId ?? undefined,
       title,
       calendarType: reminderCalendarType,
+      year: reminderRepeat === 'none' ? dateParts.year : undefined,
       month: dateParts.month,
       day: dateParts.day,
       lunarIsLeapMonth: dateParts.lunarIsLeapMonth,
-      repeat: 'annual',
+      repeat: reminderRepeat,
       pinned: reminderPinned,
       note: '',
-      remindDaysBefore: [0, 1, 7],
+      remindDaysBefore: selectedReminderDays(),
       enabled: true
     };
     const response = await fetch('/api/reminders', {
@@ -485,6 +501,15 @@
     const value = item.startsAt ?? item.publishedAt ?? '';
     const time = Date.parse(value);
     return Number.isFinite(time) ? time : 0;
+  }
+
+  function selectedReminderDays() {
+    const days: number[] = [];
+    if (reminderDay0) days.push(0);
+    if (reminderDay1) days.push(1);
+    if (reminderDay7) days.push(7);
+    if (reminderDay30) days.push(30);
+    return days;
   }
 
   function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
@@ -579,7 +604,7 @@
       return {
         eyebrow: '我的资料 · 偏好',
         title: '调校你的个人雷达。',
-        body: '保存和重点跟踪会提高类似信号的排序；标记不相关会降低类似内容。'
+        body: '反馈会保存到记录里，并立即更新当前卡片状态；后续可以接入排序学习。'
       };
     }
     if (view === 'dates') {
@@ -604,11 +629,12 @@
   function reminderPayloadDate(value: string, calendarType: DateReminder['calendarType']) {
     const [year, month, day] = value.split('-').map(Number);
     if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-      return { month: 1, day: 1, lunarIsLeapMonth: false };
+      return { year: new Date().getFullYear(), month: 1, day: 1, lunarIsLeapMonth: false };
     }
-    if (calendarType === 'gregorian') return { month, day, lunarIsLeapMonth: false };
+    if (calendarType === 'gregorian') return { year, month, day, lunarIsLeapMonth: false };
     const lunar = Solar.fromYmd(year, month, day).getLunar();
     return {
+      year,
       month: Math.abs(lunar.getMonth()),
       day: lunar.getDay(),
       lunarIsLeapMonth: lunar.getMonth() < 0
@@ -648,13 +674,13 @@
 
 <main class="app-shell">
   <nav class="topbar">
-    <div class="brand">
+    <button class="brand" type="button" aria-label="回到首页" onclick={() => setView('home')}>
       <img class="logo" src="/brand/personal-radar-logo.svg" alt="" />
       <div>
         <strong>个人雷达</strong>
         <span>凡人咖啡馆</span>
       </div>
-    </div>
+    </button>
     <div class="primary-nav desktop-nav" data-active={activeView} aria-label="主导航">
       <span class="nav-indicator" aria-hidden="true"></span>
       {#each navItems as item}
@@ -916,7 +942,7 @@
         <aside class="daily-card">
           <strong>每日摘要已就绪</strong>
           <span>
-            Telegram {data.telegramConfigured ? '已启用' : '未配置'} · 你的反馈会影响后续排序。
+            Telegram {data.telegramConfigured ? '已启用' : '未配置'} · 反馈会记录为后续排序优化数据。
           </span>
           <button
             class="small-button primary"
@@ -964,7 +990,7 @@
 
       <div class="section-title">
         <h2>{activeView === 'trends' ? '趋势流' : activeView === 'concerts' ? '演出流' : '重点推荐'}</h2>
-        <span>用反馈调校排序</span>
+        <span>记录反馈状态</span>
       </div>
 
       {#if topItem}
@@ -1348,16 +1374,24 @@
           </p>
         </div>
 
-        <div class="sheet-row">
+        <div class="sheet-row sheet-control-row">
           <span>↻</span>
           <strong>重复</strong>
-          <em>每年（相同月日）</em>
+          <select bind:value={reminderRepeat} aria-label="重复方式">
+            <option value="annual">每年（相同月日）</option>
+            <option value="none">仅提醒一次</option>
+          </select>
         </div>
 
-        <div class="sheet-row">
+        <div class="sheet-row sheet-control-row reminder-days-row">
           <span>铃</span>
           <strong>设置提醒</strong>
-          <em>每日摘要：当天、1 天前、7 天前</em>
+          <div class="reminder-days" aria-label="提醒时间">
+            <label><input type="checkbox" bind:checked={reminderDay0} />当天</label>
+            <label><input type="checkbox" bind:checked={reminderDay1} />1 天前</label>
+            <label><input type="checkbox" bind:checked={reminderDay7} />7 天前</label>
+            <label><input type="checkbox" bind:checked={reminderDay30} />30 天前</label>
+          </div>
         </div>
 
         <label class="sheet-row">
@@ -1428,6 +1462,11 @@
 
   .brand {
     gap: 12px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    text-align: left;
   }
 
   .logo,
@@ -1857,10 +1896,40 @@
     font-weight: 950;
   }
 
-  .sheet-row em {
-    color: var(--muted);
-    font-style: normal;
+  .sheet-control-row select {
+    min-height: 42px;
+    border: 1px solid rgba(130, 111, 91, 0.22);
+    border-radius: 12px;
+    background: #fffdf7;
+    color: var(--ink);
+    padding: 0 12px;
     font-weight: 850;
+  }
+
+  .reminder-days {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .reminder-days label {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(130, 111, 91, 0.18);
+    border-radius: 999px;
+    padding: 0 10px;
+    background: #fff8eb;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .reminder-days input {
+    accent-color: #7ea79d;
   }
 
   .sheet-row input[type='checkbox'] {
@@ -1956,7 +2025,6 @@
   h1 {
     margin: 0;
     max-width: 660px;
-    font-family: Fraunces, Newsreader, serif;
     font-size: 42px;
     line-height: 1.02;
     letter-spacing: 0;
@@ -1979,7 +2047,6 @@
 
   .daily-card strong {
     display: block;
-    font-family: Newsreader, Georgia, serif;
     font-size: 21px;
     line-height: 1.08;
   }
@@ -2361,7 +2428,6 @@
   .settings-card strong {
     display: block;
     margin-top: 7px;
-    font-family: Newsreader, Georgia, serif;
     font-size: 28px;
     line-height: 1.05;
   }
@@ -2818,6 +2884,38 @@
     .watch-form,
     .search-row {
       grid-template-columns: 1fr;
+    }
+
+    .sheet-row {
+      grid-template-columns: 36px minmax(72px, 0.65fr) minmax(0, 1.35fr);
+      gap: 10px;
+    }
+
+    .sheet-row strong,
+    .sheet-label {
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .sheet-control-row select,
+    .sheet-group p {
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .sheet-row > span {
+      width: 34px;
+      height: 34px;
+    }
+
+    .reminder-days {
+      justify-content: flex-start;
+    }
+
+    .reminder-days label {
+      min-height: 30px;
+      padding: 0 8px;
+      font-size: 12px;
     }
 
     .reminder-strip {
