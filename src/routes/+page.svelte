@@ -1007,7 +1007,11 @@
                 {#each [...topItem.artists, ...topItem.topics].slice(0, 4) as chip}
                   <span class="chip">{chip}</span>
                 {/each}
-                <span class="chip hot">{topItem.status === 'tracking' ? '重点跟踪' : '确认后提醒'}</span>
+                {#if topItem.status === 'tracking'}
+                  <span class="chip hot">重点跟踪</span>
+                {:else if topItem.status === 'saved'}
+                  <span class="chip hot">已保存</span>
+                {/if}
               </div>
               <div class="story-actions">
                 <button
