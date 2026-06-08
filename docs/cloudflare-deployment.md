@@ -66,7 +66,33 @@ Only set AI keys if you want AI enabled. The app falls back to rules when keys a
 
 For Ticketmaster, register on the Ticketmaster Developer Portal. The default application has a `Consumer Key`; use that value as `TICKETMASTER_API_KEY`.
 
-## 4. Deploy
+## 4. GitHub Actions Deployment
+
+The repository includes `.github/workflows/deploy.yml`. It runs when `main` receives a new commit and can also be started manually from GitHub Actions > Deploy > Run workflow.
+
+The workflow does the production path end to end:
+
+1. Install dependencies with `npm ci`.
+2. Run `npm run check`.
+3. Run `npm test`.
+4. Run `npm run build`.
+5. Apply remote D1 migrations.
+6. Deploy Cloudflare Pages.
+7. Deploy the cron Worker.
+
+Add these repository secrets in GitHub > repository Settings > Secrets and variables > Actions:
+
+- `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID. You can get it from `npx wrangler whoami`.
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token allowed to deploy Pages, deploy Workers, and apply D1 migrations for this account.
+
+Recommended Cloudflare token permissions:
+
+- Account > Cloudflare Pages > Edit
+- Account > Workers Scripts > Edit
+- Account > D1 > Edit
+- Account > Account Settings > Read
+
+Keep local deploy commands as a fallback only:
 
 ```bash
 npm run deploy
