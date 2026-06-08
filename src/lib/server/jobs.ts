@@ -4,9 +4,10 @@ import { getDb } from './db';
 import { fetchBandsintownConcerts } from './fetchers/bandsintown';
 import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
 import { buildTrendSearchItems } from './fetchers/trends';
+import { sortReminders } from './lunar';
 import { scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
-import type { Env, JobResult, RadarItem } from './types';
+import type { DateReminder, Env, JobResult, RadarItem } from './types';
 
 export async function runConcertFetchJob(env: Env): Promise<JobResult> {
   const db = getDb(env);
@@ -51,20 +52,37 @@ export async function runTrendFetchJob(env: Env): Promise<JobResult> {
   return { inserted, updated, considered: fetched.length, notified: 0, detail };
 }
 
-export async function runDailyDigestJob(env: Env): Promise<JobResult> {
+export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual_digest' = 'daily_digest'): Promise<JobResult> {
   const db = getDb(env);
-  const items = await db.listItems(12);
+  const [items, reminders] = await Promise.all([db.listItems(12), db.listReminders()]);
   const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
-  const message = renderTelegramDigest(digest);
+  const message = appendReminderDigest(renderTelegramDigest(digest), reminders);
   const telegram = await sendTelegramMessage(env, message);
   await db.logNotification({
     channel: 'telegram',
-    type: 'daily_digest',
+    type,
     status: telegram.ok ? 'sent' : 'skipped',
     message
   });
-  await db.logJob({ jobName: 'daily-digest', status: telegram.ok ? 'ok' : 'skipped', detail: telegram.detail });
+  await db.logJob({
+    jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
+    status: telegram.ok ? 'ok' : 'skipped',
+    detail: telegram.detail
+  });
   return { inserted: 0, updated: 0, considered: items.length, notified: telegram.ok ? 1 : 0, detail: telegram.detail };
+}
+
+function appendReminderDigest(message: string, reminders: DateReminder[]): string {
+  const upcoming = sortReminders(reminders)
+    .filter((reminder) => reminder.remindDaysBefore.includes(reminder.daysLeft))
+    .slice(0, 6);
+  if (upcoming.length === 0) return message;
+  const lines = ['', '生日与纪念日'];
+  for (const reminder of upcoming) {
+    const dayText = reminder.daysLeft === 0 ? '今天' : `${reminder.daysLeft} 天后`;
+    lines.push(`${reminder.title} · ${dayText} · ${reminder.dateLabel}`);
+  }
+  return `${message}\n${lines.join('\n')}`;
 }
 
 export async function runAllFetchJobs(env: Env): Promise<JobResult> {

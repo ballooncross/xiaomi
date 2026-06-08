@@ -1,4 +1,4 @@
-import type { RadarItem, WatchTopic } from './types';
+import type { DateReminder, RadarItem, WatchTopic } from './types';
 
 export const defaultWatchTopics: WatchTopic[] = [
   topic('artist-twice', 'artist', 'TWICE', ['트와이스'], 'concerts', 5),
@@ -8,13 +8,13 @@ export const defaultWatchTopics: WatchTopic[] = [
   topic('artist-jj-lin', 'artist', 'JJ Lin', ['林俊杰', '林俊傑'], 'concerts', 4),
   topic('artist-jay-chou', 'artist', 'Jay Chou', ['周杰伦', '周杰倫'], 'concerts', 4),
   topic('artist-mayday', 'artist', 'Mayday', ['五月天'], 'concerts', 4),
-  topic('topic-ai-product-sg', 'topic', 'AI product roles Singapore', ['AI PM Singapore'], 'career', 5),
-  topic('topic-sea-funding', 'topic', 'SEA startup funding', ['Southeast Asia startup funding'], 'business', 4),
-  topic('topic-us-china-ai', 'topic', 'US-China AI policy', ['AI chip export controls'], 'geopolitics', 4),
+  topic('topic-ai-product-sg', 'topic', '新加坡 AI 产品岗位', ['AI product roles Singapore', 'AI PM Singapore'], 'career', 5),
+  topic('topic-sea-funding', 'topic', '东南亚创业融资', ['SEA startup funding', 'Southeast Asia startup funding'], 'business', 4),
+  topic('topic-us-china-ai', 'topic', '中美 AI 政策', ['US-China AI policy', 'AI chip export controls'], 'geopolitics', 4),
   topic(
     'topic-hot-company-risk',
     'topic',
-    'Hot product/company risk signals',
+    '热门产品与公司风险信号',
     ['Dreame', '追觅', 'consumer hardware unicorn', 'company financial issue', 'organization issue'],
     'business',
     5
@@ -22,7 +22,7 @@ export const defaultWatchTopics: WatchTopic[] = [
   topic(
     'topic-byd-ev-market',
     'topic',
-    'BYD and EV cars market',
+    '比亚迪与电动车市场',
     ['BYD', 'electric vehicles', 'EV market', 'Chinese EV', 'EV price war', 'battery market'],
     'business',
     5
@@ -36,15 +36,15 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-concert-watch-status',
     kind: 'concert',
-    title: 'No confirmed upcoming Singapore date for top watched artists',
-    summary: 'The current watch scan should stay quiet until an official Singapore ticketing page appears.',
+    title: '重点关注音乐人暂无确认的新加坡未来场次',
+    summary: '当前扫描会保持安静，直到官方新加坡票务页或可信来源出现。',
     description:
-      'For artists like TWICE and G.E.M., past Singapore dates should be treated as history, not upcoming alerts.',
+      'TWICE 和 G.E.M. 这类音乐人的新加坡历史场次只作为上下文，不会作为未来提醒。',
     url: 'https://www.ticketmaster.sg/',
     imageUrl: '/visuals/concert.svg',
     location: 'Singapore',
     artists: ['TWICE', 'G.E.M. 邓紫棋', 'Coldplay', 'Eason Chan'],
-    topics: ['Singapore concerts', 'official source required'],
+    topics: ['新加坡演出', '需要官方来源'],
     raw: {},
     score: 68,
     status: 'new'
@@ -55,15 +55,15 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-twice-past-singapore',
     kind: 'concert',
-    title: 'TWICE Singapore stop was already in 2025',
-    summary: 'The This Is For World Tour Singapore shows were listed for 11-12 Oct 2025, so this is not upcoming.',
-    description: 'Past concert history is kept for context and should not trigger prominent alerts.',
+    title: 'TWICE 新加坡场已在 2025 年结束',
+    summary: 'This Is For World Tour 新加坡场列于 2025 年 10 月 11-12 日，因此不是未来演出。',
+    description: '历史演出会保留作上下文，但不会触发顶部提醒。',
     url: 'https://www.livenation.sg/',
     imageUrl: '/visuals/concert.svg',
     location: 'Singapore',
     startsAt: '2025-10-11T09:00:00.000Z',
     artists: ['TWICE'],
-    topics: ['Singapore concerts', 'past event'],
+    topics: ['新加坡演出', '历史场次'],
     raw: { sourceNote: 'Live Nation listed Singapore for 11-12 Oct 2025.' },
     score: 22,
     status: 'dismissed'
@@ -74,15 +74,15 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-gem-past-singapore',
     kind: 'concert',
-    title: 'G.E.M. 邓紫棋 Singapore concert already passed',
-    summary: 'The Singapore concert was listed for 23 May 2026, so it should not sit at the top now.',
-    description: 'This is useful as historical context, not as an actionable upcoming event.',
+    title: 'G.E.M. 邓紫棋新加坡演唱会已结束',
+    summary: '新加坡场列于 2026 年 5 月 23 日，因此现在不应出现在顶部。',
+    description: '这条信息只适合作为历史上下文，不是可行动的未来活动。',
     url: 'https://www.songkick.com/concerts/43081560-gem-deng-zi-qi-at-national-stadium',
     imageUrl: '/visuals/concert.svg',
     location: 'Singapore',
     startsAt: '2026-05-23T11:30:00.000Z',
     artists: ['G.E.M. 邓紫棋'],
-    topics: ['Mandopop', 'Singapore concerts', 'past event'],
+    topics: ['华语流行', '新加坡演出', '历史场次'],
     raw: { sourceNote: 'Songkick and other listings show Singapore National Stadium on 23 May 2026.' },
     score: 18,
     status: 'dismissed'
@@ -93,12 +93,12 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-ai-product-roles',
     kind: 'trend',
-    title: 'AI product roles rising in Singapore',
-    summary: 'Hiring posts cluster around agent workflow, finance automation, and internal tools.',
-    description: 'A career-relevant trend matched your AI product and Singapore watch topics.',
+    title: '新加坡 AI 产品岗位热度上升',
+    summary: '招聘信号集中在 Agent 工作流、金融自动化和内部工具方向。',
+    description: '这条职业趋势匹配了你对 AI 产品和新加坡岗位市场的关注。',
     url: 'https://news.google.com/search?q=AI%20product%20roles%20Singapore',
     imageUrl: '/visuals/career.svg',
-    topics: ['AI product roles Singapore', 'job market', 'career'],
+    topics: ['新加坡 AI 产品岗位', '岗位市场', '职业'],
     artists: [],
     raw: {},
     score: 78,
@@ -110,12 +110,12 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-us-china-policy',
     kind: 'news',
-    title: 'US-China tech policy update',
-    summary: 'Export-control updates may affect AI hardware availability and regional startup costs.',
-    description: 'A geopolitics item matched your US-China AI policy watch topic.',
+    title: '中美科技政策更新',
+    summary: '出口管制变化可能影响 AI 硬件供给和区域创业成本。',
+    description: '这条地缘政治信号匹配了你对中美 AI 政策的关注。',
     url: 'https://news.google.com/search?q=US%20China%20AI%20chip%20export%20controls',
     imageUrl: '/visuals/geopolitics.svg',
-    topics: ['US-China AI policy', 'AI infrastructure', 'geopolitics'],
+    topics: ['中美 AI 政策', 'AI 基础设施', '地缘政治'],
     artists: [],
     raw: {},
     score: 74,
@@ -127,12 +127,12 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-sea-funding',
     kind: 'opportunity',
-    title: 'SEA workflow automation funding cluster',
-    summary: 'Funding and product launches around workflow automation are worth watching for business ideas.',
-    description: 'A business-relevant trend matched your SEA startup funding and AI automation interests.',
+    title: '东南亚工作流自动化融资信号',
+    summary: '围绕工作流自动化的融资和产品发布，值得作为商业机会观察。',
+    description: '这条商业趋势匹配了你对东南亚创业融资和 AI 自动化的兴趣。',
     url: 'https://news.google.com/search?q=SEA%20startup%20funding%20workflow%20automation',
     imageUrl: '/visuals/business.svg',
-    topics: ['SEA startup funding', 'workflow automation', 'business'],
+    topics: ['东南亚创业融资', '工作流自动化', '商业'],
     artists: [],
     raw: {},
     score: 76,
@@ -144,13 +144,13 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-dreame-company-risk',
     kind: 'opportunity',
-    title: 'Dreame-style company risk signal worth watching',
-    summary: 'Hot consumer product companies can be strong business signals when growth, funding, org, or governance questions surface.',
+    title: '追觅这类热门公司风险信号值得跟踪',
+    summary: '热门消费产品公司出现增长、融资、组织或治理问题时，可能是重要商业信号。',
     description:
-      'Track leading product companies with fast growth, public controversy, financing pressure, org churn, or governance risk.',
+      '持续关注高速增长、舆论争议、融资压力、组织震荡或治理风险的头部产品公司。',
     url: 'https://news.google.com/search?q=Dreame%20Technology%20financial%20organization%20issue',
     imageUrl: '/visuals/opportunity.svg',
-    topics: ['Hot product/company risk signals', 'Dreame', 'consumer hardware', 'business'],
+    topics: ['热门产品与公司风险信号', 'Dreame', '追觅', '消费硬件', '商业'],
     artists: [],
     raw: {},
     score: 82,
@@ -162,18 +162,34 @@ export const demoItems: RadarItem[] = [
     sourceType: 'demo',
     externalId: 'demo-byd-ev-market',
     kind: 'opportunity',
-    title: 'BYD and EV market moves worth tracking',
-    summary: 'EV pricing, battery supply, exports, and Chinese carmaker competition can reveal product and market opportunities early.',
+    title: '比亚迪与电动车市场变化值得跟踪',
+    summary: '电动车定价、电池供应、出口和中国车企竞争，可能提前暴露产品与市场机会。',
     description:
-      'Track BYD, Chinese EV exports, battery cost changes, price pressure, dealer expansion, and Singapore/SEA EV adoption signals.',
+      '跟踪比亚迪、中国电动车出口、电池成本、价格压力、渠道扩张，以及新加坡/东南亚电动车采用信号。',
     url: 'https://news.google.com/search?q=BYD%20EV%20market%20price%20war%20battery%20exports',
     imageUrl: '/visuals/ev.svg',
-    topics: ['BYD and EV cars market', 'BYD', 'EV market', 'business'],
+    topics: ['比亚迪与电动车市场', 'BYD', 'EV 市场', '商业'],
     artists: [],
     raw: {},
     score: 81,
     status: 'new'
   }
+];
+
+export const defaultDateReminders: DateReminder[] = [
+  lunarReminder('birthday-erjie', '二姐生日', 5, 1),
+  lunarReminder('birthday-dajie', '大姐生日', 5, 1),
+  lunarReminder('birthday-dad', '老爸生日', 5, 28),
+  lunarReminder('birthday-laoge', '老哥生日', 6, 8),
+  lunarReminder('birthday-junjun-1', '君君生日1', 11, 10),
+  lunarReminder('birthday-mom', '老妈生日', 11, 14),
+  lunarReminder('birthday-sanjie-me', '三姐和我生日', 11, 18),
+  lunarReminder('birthday-muchen', '沐辰生日', 11, 19),
+  lunarReminder('birthday-junjun-lunar', '君君农历生日', 12, 18, true),
+  lunarReminder('birthday-qianqian', '倩倩生日', 12, 29),
+  lunarReminder('birthday-yihang', '屹杭生日', 1, 28),
+  lunarReminder('birthday-chunnv', '春女生日', 2, 7),
+  lunarReminder('birthday-zoe', 'zoe生日', 3, 22)
 ];
 
 function topic(
@@ -185,4 +201,26 @@ function topic(
   priority: number
 ): WatchTopic {
   return { id, type, name, aliases, category, priority, mode: 'follow', enabled: true };
+}
+
+function lunarReminder(
+  id: string,
+  title: string,
+  month: number,
+  day: number,
+  pinned = false
+): DateReminder {
+  return {
+    id,
+    title,
+    calendarType: 'lunar',
+    month,
+    day,
+    lunarIsLeapMonth: false,
+    repeat: 'annual',
+    note: '',
+    pinned,
+    enabled: true,
+    remindDaysBefore: [0, 1, 7]
+  };
 }

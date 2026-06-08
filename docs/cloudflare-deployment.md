@@ -66,7 +66,33 @@ Only set AI keys if you want AI enabled. The app falls back to rules when keys a
 
 For Ticketmaster, register on the Ticketmaster Developer Portal. The default application has a `Consumer Key`; use that value as `TICKETMASTER_API_KEY`.
 
-## 4. Deploy
+## 4. GitHub Actions Deployment
+
+The repository includes `.github/workflows/deploy.yml`. It runs when `main` receives a new commit and can also be started manually from GitHub Actions > Deploy > Run workflow.
+
+The workflow does the production path end to end:
+
+1. Install dependencies with `npm ci`.
+2. Run `npm run check`.
+3. Run `npm test`.
+4. Run `npm run build`.
+5. Apply remote D1 migrations.
+6. Deploy Cloudflare Pages.
+7. Deploy the cron Worker.
+
+Add these repository secrets in GitHub > repository Settings > Secrets and variables > Actions:
+
+- `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID. You can get it from `npx wrangler whoami`.
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token allowed to deploy Pages, deploy Workers, and apply D1 migrations for this account.
+
+Recommended Cloudflare token permissions:
+
+- Account > Cloudflare Pages > Edit
+- Account > Workers Scripts > Edit
+- Account > D1 > Edit
+- Account > Account Settings > Read
+
+Keep local deploy commands as a fallback only:
 
 ```bash
 npm run deploy
@@ -79,9 +105,51 @@ The Pages app serves the UI and API routes. The separate cron Worker runs schedu
 
 `wrangler.cron.toml` currently configures:
 
-- every 6 hours: fetch concerts and trend placeholders
+- every 6 hours: fetch concerts and trend/news items
 - `00:30 UTC`: send daily digest, which is `08:30 Asia/Singapore`
 
 ## Security
 
 Set `ADMIN_TOKEN` before deploying. The current MVP uses a simple private admin token for job endpoints. The UI itself should eventually sit behind Cloudflare Access or another auth layer before sharing the URL.
+
+## Protect The UI With Cloudflare Access
+
+The deployed site contains birthday and preference data, so protect the public UI before sharing the URL.
+
+Wrangler can deploy Pages and Workers for this project, but Cloudflare Access is account-level Zero Trust configuration. The current local Wrangler login has Pages/D1/Workers permissions, not `Access: Organizations, Identity Providers, and Groups Write`, so configure Access in the Cloudflare dashboard unless you create a separate API token with Access write permissions.
+
+### Recommended Setup For `personal-radar.pages.dev`
+
+1. Open Cloudflare Dashboard > Workers & Pages > `personal-radar`.
+2. Go to Settings > General.
+3. Select Enable access policy.
+4. This initially protects preview deployments only. To protect `personal-radar.pages.dev` too:
+   - Go to Zero Trust > Access controls > Applications.
+   - Open the Access application created for the Pages project.
+   - Select Configure.
+   - Under Public hostname, delete the wildcard `*` subdomain so the app matches `personal-radar.pages.dev`.
+   - Save.
+5. Add a policy:
+   - Action: Allow.
+   - Include: Emails.
+   - Value: your Google email address, for example `ballooncross@gmail.com`.
+6. Login method:
+   - Fastest: use Cloudflare One-time PIN for the allowed email.
+   - Google login: Zero Trust > Integrations > Identity providers > Add new identity provider > Google, then select that provider on the Access application.
+
+Cloudflare documents this `pages.dev` behavior in Pages preview deployment and known-issues docs:
+
+- https://developers.cloudflare.com/pages/configuration/preview-deployments/
+- https://developers.cloudflare.com/pages/platform/known-issues/
+
+### Custom Domain Option
+
+For a cleaner long-term setup, attach a custom domain such as `radar.yourdomain.com` to the Pages project, then create a normal Access self-hosted application for that hostname:
+
+1. Workers & Pages > `personal-radar` > Custom domains.
+2. Add the custom hostname.
+3. Zero Trust > Access controls > Applications > Add an application > Self-hosted.
+4. Public hostname: the custom hostname.
+5. Policy: allow only your email or Google identity.
+
+Cloudflare Access self-hosted applications require a hostname Cloudflare can proxy and validate before requests reach the origin.

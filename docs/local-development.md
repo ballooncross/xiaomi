@@ -21,6 +21,8 @@ npm run db:seed:local
 
 The normal `npm run dev` loop intentionally uses in-memory demo data when no Cloudflare D1 binding exists. That is best for fast UI work, but watchlist edits disappear when the dev process restarts.
 
+Run migrations before seeding after schema changes. The birthday notebook uses `date_reminders`, and the seed data includes the imported lunar birthdays from the screenshot.
+
 For Cloudflare-like runtime testing:
 
 ```bash
@@ -47,16 +49,19 @@ Supported jobs:
 - `daily-digest`
 - `all-fetch`
 
-The concert job has two lanes:
+The fetch jobs have several lanes:
 
 - broad Ticketmaster Singapore music discovery, so popular concerts can appear without manual artist setup
 - followed-artist searches on Ticketmaster and Bandsintown
+- trend discovery from GDELT, Google News RSS, and curated RSS feeds such as TechCrunch, The Verge, CNBC, and CNA
 
 Manual preferences are used as follows:
 
 - `Follow` increases priority for matching concerts or topics
 - `Blacklist` suppresses matching concerts, topics, or sources from broad discovery
 - `Priority 1-5` controls how much a matching follow preference boosts ranking
+
+Adding or editing a follow topic calls the related fetcher immediately and returns updated items to the UI. Scheduled jobs still refresh the same data in the background.
 
 If `ADMIN_TOKEN` is not configured in the local environment, the endpoint allows calls for development convenience.
 

@@ -7,14 +7,14 @@ export function buildTemplateDigest(items: RadarItem[]): Digest {
   const trends = activeItems.filter((item) => item.kind !== 'concert').slice(0, 4);
 
   return {
-    title: 'Personal Radar · Daily Brew',
+    title: '个人雷达 · 每日摘要',
     sections: [
       {
-        title: 'Concerts & events',
+        title: '演出与活动',
         items: concerts.map(digestItem)
       },
       {
-        title: 'Trends & opportunities',
+        title: '趋势与机会',
         items: trends.map(digestItem)
       }
     ].filter((section) => section.items.length > 0)
@@ -33,7 +33,7 @@ export function renderTelegramDigest(digest: Digest): string {
     });
     lines.push('');
   }
-  lines.push('Open the app to save, track closely, or mark not relevant.');
+  lines.push('打开应用可保存、重点跟踪或标记不相关。');
   return lines.join('\n').trim();
 }
 

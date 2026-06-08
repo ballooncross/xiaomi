@@ -3,6 +3,8 @@ import type { FeedbackAction, RadarItem, WatchTopic } from './types';
 const sourceWeight: Record<string, number> = {
   ticketmaster: 24,
   bandsintown: 20,
+  gdelt: 18,
+  google_news: 16,
   rss: 10,
   demo: 0,
   manual: 8
@@ -58,8 +60,8 @@ export function fallbackSummary(item: RadarItem): string {
 
 export function reasonForItem(item: RadarItem): string {
   if (item.kind === 'concert' && item.artists.length > 0) {
-    return `Matched your ${item.artists[0]} watch and ${item.location ?? 'event'} signal.`;
+    return `匹配你对 ${item.artists[0]} 的关注，以及 ${item.location ?? '活动'} 信号。`;
   }
-  if (item.topics.length > 0) return `Matched ${item.topics.slice(0, 2).join(', ')}.`;
-  return 'Matched your watch settings.';
+  if (item.topics.length > 0) return `匹配主题：${item.topics.slice(0, 2).join('、')}。`;
+  return '匹配你的关注设置。';
 }

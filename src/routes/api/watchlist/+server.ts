@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
+import { runConcertFetchJob, runTrendFetchJob } from '$lib/server/jobs';
 import type { Env, WatchTopic } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -16,9 +17,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
   const topic = topicFromBody(body);
 
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
+  const db = getDb(env);
   await db.upsertTopic(topic);
-  return json({ topic });
+  await fetchForTopic(env, topic);
+  return json({ topic, items: await db.listItems(24), topics: await db.listTopics() });
 };
 
 export const PATCH: RequestHandler = async ({ request, platform }) => {
@@ -28,9 +31,11 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
   }
 
   const topic = topicFromBody(body);
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
+  const db = getDb(env);
   await db.upsertTopic(topic);
-  return json({ topic });
+  await fetchForTopic(env, topic);
+  return json({ topic, items: await db.listItems(24), topics: await db.listTopics() });
 };
 
 export const DELETE: RequestHandler = async ({ request, platform }) => {
@@ -39,8 +44,17 @@ export const DELETE: RequestHandler = async ({ request, platform }) => {
 
   const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
   await db.deleteTopic(body.id);
-  return json({ ok: true });
+  return json({ ok: true, items: await db.listItems(24), topics: await db.listTopics() });
 };
+
+async function fetchForTopic(env: Env, topic: WatchTopic): Promise<void> {
+  if (topic.mode === 'blacklist') return;
+  if (topic.type === 'artist' || topic.category === 'concerts') {
+    await runConcertFetchJob(env);
+    return;
+  }
+  await runTrendFetchJob(env);
+}
 
 function topicFromBody(body: Partial<WatchTopic>): WatchTopic {
   const name = body.name?.trim() ?? '';
