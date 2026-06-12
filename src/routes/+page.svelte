@@ -10,6 +10,7 @@
   type View = 'home' | 'concerts' | 'trends' | 'dates' | 'me';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & { nextDate: string; daysLeft: number; dateLabel: string };
+  type IcaToolStatus = PageData['icaTool'];
 
   let { data }: { data: PageData } = $props();
   let items = $state<RadarItem[]>([]);
@@ -44,6 +45,14 @@
   let manualJobStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
   let manualJobMessage = $state('尚未手动刷新。');
   let manualJobLastRun = $state('');
+  let icaTool = $state<IcaToolStatus>({
+    enabled: false,
+    targetBefore: '2026-07-01',
+    checkerUrlConfigured: false
+  });
+  let icaJobPending = $state(false);
+  let icaJobStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
+  let icaJobMessage = $state('尚未手动检查。');
   let addWatchError = $state('');
   let editWatchError = $state('');
   let reminderFormOpen = $state(false);
@@ -68,6 +77,7 @@
     items = data.items;
     topics = data.topics;
     reminders = data.reminders;
+    icaTool = data.icaTool;
   });
 
   const navItems: Array<{ id: View; label: string }> = [
@@ -227,6 +237,45 @@
       manualJobMessage = '刷新失败：网络或服务暂时不可用。';
     } finally {
       manualJobPending = false;
+    }
+  }
+
+  async function triggerIcaCheck() {
+    icaJobPending = true;
+    icaJobStatus = 'running';
+    icaJobMessage = '正在启动 ICA 预约检查...';
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const token = manualJobToken.trim();
+    if (token) {
+      headers['x-admin-token'] = token;
+      window.localStorage.setItem('personal-radar-admin-token', token);
+    }
+
+    try {
+      const response = await fetch('/api/tools/ica', { method: 'POST', headers });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        result?: Partial<JobResult>;
+        status?: IcaToolStatus;
+      };
+      if (!response.ok) {
+        icaJobStatus = 'error';
+        icaJobMessage =
+          response.status === 401
+            ? '未授权：请填写 ADMIN_TOKEN。'
+            : result.error || 'ICA 检查失败，请稍后再试。';
+        return;
+      }
+
+      if (result.status) icaTool = result.status;
+      icaJobStatus = 'success';
+      icaJobMessage = result.result?.detail || result.status?.lastJob?.detail || 'ICA 检查已完成。';
+      await invalidateAll();
+    } catch {
+      icaJobStatus = 'error';
+      icaJobMessage = 'ICA 检查失败：网络或服务暂时不可用。';
+    } finally {
+      icaJobPending = false;
     }
   }
 
@@ -571,6 +620,24 @@
       minute: '2-digit',
       hour12: false
     }).format(value);
+  }
+
+  function formatStatusTime(value: string | undefined) {
+    if (!value) return '暂无记录';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return formatJobTime(date);
+  }
+
+  function icaStatusLabel(status: string | undefined) {
+    const labels: Record<string, string> = {
+      ok: '暂无更早日期',
+      found_earlier: '发现更早日期',
+      blocked: '被验证拦截',
+      not_configured: '配置未完成',
+      error: '检查失败'
+    };
+    return labels[status ?? ''] ?? '尚未运行';
   }
 
   function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
@@ -966,25 +1033,84 @@
             </article>
           </div>
 
-          <section class:running={manualJobStatus === 'running'} class={`job-run-card ${manualJobStatus}`}>
-            <div class="job-run-copy">
-              <span>手动刷新</span>
-              <strong>立即抓取最新数据</strong>
-              <p>运行演出和趋势抓取任务，完成后会自动刷新当前页面数据。</p>
+          <section class="tools-panel">
+            <div class="notebook-head">
+              <div>
+                <h2>工具</h2>
+                <span>手动运行后台任务，查看预约检查状态。</span>
+              </div>
             </div>
-            <div class="job-run-controls">
-              <label>
-                <span>ADMIN_TOKEN</span>
-                <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
-              </label>
-              <button class="small-button primary" type="button" disabled={manualJobPending} onclick={runManualFetchJob}>
-                {manualJobPending ? '运行中...' : '立即刷新'}
-              </button>
-            </div>
-            <div class="job-run-status" aria-live="polite">
-              <span></span>
-              <p>{manualJobMessage}{manualJobLastRun ? ` · ${manualJobLastRun}` : ''}</p>
-            </div>
+
+            <section class:running={icaJobStatus === 'running'} class={`job-run-card ica-tool-card ${icaJobStatus}`}>
+              <div class="job-run-copy">
+                <span>ICA 预约检查</span>
+                <strong>{icaStatusLabel(icaTool.lastJob?.status)}</strong>
+                <p>
+                  目标：寻找 {icaTool.targetBefore} 之前的可选日期。定时检查为每天 08:00、11:00、14:00、17:00、19:00。
+                </p>
+              </div>
+              <div class="job-run-controls">
+                <label>
+                  <span>ADMIN_TOKEN</span>
+                  <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
+                </label>
+                <button
+                  class="small-button primary"
+                  type="button"
+                  disabled={icaJobPending || !icaTool.checkerUrlConfigured}
+                  onclick={triggerIcaCheck}
+                >
+                  {icaJobPending ? '检查中...' : '立即检查'}
+                </button>
+              </div>
+              <div class="tool-status-grid">
+                <div>
+                  <span>远程触发</span>
+                  <strong>{icaTool.checkerUrlConfigured ? '已配置' : '未配置'}</strong>
+                </div>
+                <div>
+                  <span>上次运行</span>
+                  <strong>{formatStatusTime(icaTool.lastJob?.finishedAt ?? icaTool.lastJob?.startedAt)}</strong>
+                </div>
+                <div>
+                  <span>最近结果</span>
+                  <strong>{icaTool.lastItem?.startsAt ?? icaTool.lastItem?.summary ?? '暂无'}</strong>
+                </div>
+              </div>
+              <div class="job-run-status" aria-live="polite">
+                <span></span>
+                <p>
+                  {icaJobMessage}
+                  {#if icaTool.lastJob?.detail}
+                    · {icaTool.lastJob.detail}
+                  {/if}
+                  {#if !icaTool.checkerUrlConfigured}
+                    · 需要配置 CRON_WORKER 服务绑定或 ICA_CHECKER_URL 后才能从网页手动触发。
+                  {/if}
+                </p>
+              </div>
+            </section>
+
+            <section class:running={manualJobStatus === 'running'} class={`job-run-card ${manualJobStatus}`}>
+              <div class="job-run-copy">
+                <span>手动刷新</span>
+                <strong>立即抓取最新数据</strong>
+                <p>运行演出和趋势抓取任务，完成后会自动刷新当前页面数据。</p>
+              </div>
+              <div class="job-run-controls">
+                <label>
+                  <span>ADMIN_TOKEN</span>
+                  <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
+                </label>
+                <button class="small-button primary" type="button" disabled={manualJobPending} onclick={runManualFetchJob}>
+                  {manualJobPending ? '运行中...' : '立即刷新'}
+                </button>
+              </div>
+              <div class="job-run-status" aria-live="polite">
+                <span></span>
+                <p>{manualJobMessage}{manualJobLastRun ? ` · ${manualJobLastRun}` : ''}</p>
+              </div>
+            </section>
           </section>
 
           <section class="notebook-card">
@@ -2506,6 +2632,11 @@
     padding: 16px;
   }
 
+  .tools-panel {
+    display: grid;
+    gap: 12px;
+  }
+
   .job-run-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
@@ -2533,6 +2664,42 @@
 
   .job-run-card.error::before {
     background: #d9634f;
+  }
+
+  .ica-tool-card {
+    grid-template-rows: auto auto;
+  }
+
+  .tool-status-grid {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    position: relative;
+  }
+
+  .tool-status-grid div {
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--mint) 56%, white);
+    padding: 10px;
+  }
+
+  .tool-status-grid span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .tool-status-grid strong {
+    display: block;
+    margin-top: 5px;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.25;
   }
 
   .job-run-copy,
@@ -3150,6 +3317,10 @@
 
     .job-run-card,
     .job-run-controls {
+      grid-template-columns: 1fr;
+    }
+
+    .tool-status-grid {
       grid-template-columns: 1fr;
     }
 

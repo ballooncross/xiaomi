@@ -111,14 +111,16 @@ npm run deploy:cron
 
 The app never auto-books or updates the appointment. It only checks availability and sends Telegram when a selectable ICA appointment date before `ICA_TARGET_BEFORE` appears. To pause the checker, set `ICA_CHECK_ENABLED = "false"` in `wrangler.cron.toml` and redeploy the cron Worker.
 
-After the cron Worker is deployed and `ADMIN_TOKEN`, `ICA_APPLICATION_ID`, and `ICA_CHECK_ENABLED` are configured, run a one-off remote check without waiting for the next cron time:
+The web app also exposes the checker under 我的 > 工具. The `立即检查` button calls the cron Worker through the `CRON_WORKER` service binding in `wrangler.toml`, so no public Worker URL is required in production. It still requires `ADMIN_TOKEN` in the browser field because the Pages API verifies the request before forwarding it.
+
+After the cron Worker is deployed and `ADMIN_TOKEN`, `ICA_APPLICATION_ID`, and `ICA_CHECK_ENABLED` are configured, you can also run a one-off remote check without waiting for the next cron time:
 
 ```bash
 curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ica-check \
   -H 'x-admin-token: YOUR_ADMIN_TOKEN'
 ```
 
-Use `npx wrangler deployments status --config wrangler.cron.toml` or the Cloudflare Workers dashboard to find the deployed Worker route if your account uses a custom workers.dev subdomain. This manual route runs the same checker as the cron schedule and still never updates or books an appointment.
+Use the Cloudflare Workers dashboard to find the deployed Worker route if your account exposes a workers.dev subdomain. This manual route runs the same checker as the cron schedule and still never updates or books an appointment.
 
 ## Cron Schedule
 

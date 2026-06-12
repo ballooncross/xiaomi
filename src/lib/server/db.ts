@@ -1,5 +1,5 @@
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
-import type { DateReminder, Env, FeedbackAction, RadarItem, WatchTopic } from './types';
+import type { DateReminder, Env, FeedbackAction, JobRun, RadarItem, WatchTopic } from './types';
 
 type ItemRow = {
   id: string;
@@ -54,11 +54,21 @@ type ReminderRow = {
   updated_at: string;
 };
 
+type JobRunRow = {
+  id: string;
+  job_name: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  detail: string;
+};
+
 const memory = {
   topics: [...defaultWatchTopics],
   items: [...demoItems],
   reminders: [...defaultDateReminders],
-  feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string }>
+  feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string }>,
+  jobs: [] as JobRun[]
 };
 
 export function getDb(env?: Env): RadarDb {
@@ -79,6 +89,7 @@ export abstract class RadarDb {
   abstract updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void>;
   abstract logNotification(input: { itemId?: string; channel: string; type: string; status: string; message: string }): Promise<void>;
   abstract logJob(input: { jobName: string; status: string; detail: string }): Promise<void>;
+  abstract listJobRuns(jobName: string, limit?: number): Promise<JobRun[]>;
 }
 
 class MemoryRadarDb extends RadarDb {
@@ -144,8 +155,20 @@ class MemoryRadarDb extends RadarDb {
     return;
   }
 
-  async logJob(): Promise<void> {
-    return;
+  async logJob(input: { jobName: string; status: string; detail: string }): Promise<void> {
+    const now = new Date().toISOString();
+    memory.jobs.unshift({
+      id: crypto.randomUUID(),
+      jobName: input.jobName,
+      status: input.status,
+      startedAt: now,
+      finishedAt: now,
+      detail: input.detail
+    });
+  }
+
+  async listJobRuns(jobName: string, limit = 5): Promise<JobRun[]> {
+    return memory.jobs.filter((job) => job.jobName === jobName).slice(0, limit);
   }
 }
 
@@ -401,6 +424,19 @@ class D1RadarDb extends RadarDb {
       throw error;
     }
   }
+
+  async listJobRuns(jobName: string, limit = 5): Promise<JobRun[]> {
+    try {
+      const { results } = await this.db
+        .prepare('SELECT * FROM job_runs WHERE job_name = ? ORDER BY COALESCE(finished_at, started_at) DESC LIMIT ?')
+        .bind(jobName, limit)
+        .all<JobRunRow>();
+      return results.map(jobRunFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
 }
 
 function itemFromRow(row: ItemRow): RadarItem {
@@ -459,6 +495,17 @@ function reminderFromRow(row: ReminderRow): DateReminder {
     remindDaysBefore: parseJson<number[]>(row.remind_days_before, [0, 1, 7]),
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function jobRunFromRow(row: JobRunRow): JobRun {
+  return {
+    id: row.id,
+    jobName: row.job_name,
+    status: row.status,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at ?? undefined,
+    detail: row.detail
   };
 }
 
