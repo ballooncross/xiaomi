@@ -16,7 +16,31 @@ Do not use it for the whole Personal Radar app unless Cloudflare itself becomes 
 
 GCP Free Tier can cover a small Compute Engine VM if you stay inside current limits. Use an `e2-micro`, a small standard persistent disk, no GPU/TPU, and low outbound traffic. Confirm the current free-tier regions and limits in Google Cloud docs before relying on it for zero cost.
 
-## Create The VM
+## What Can Be Automated
+
+The repository includes an automated setup/deploy script:
+
+```bash
+ICA_APPLICATION_ID="ISC..." npm run gcp:runner:setup
+```
+
+This script can create or update the VM, install Node and Playwright, copy the runner, create a systemd service, open the protected runner port, and print the two Cloudflare secrets needed by the cron Worker.
+
+It cannot create your Google account, enable billing, or complete Google identity prompts for you. Do those once in Google Cloud Console or with `gcloud init`, then run the script from this project folder.
+
+Optional overrides:
+
+```bash
+GCP_PROJECT_ID=your-project-id \
+GCP_ZONE=us-west1-a \
+ICA_APPLICATION_ID="ISC..." \
+ICA_TARGET_BEFORE=2026-07-01 \
+npm run gcp:runner:setup
+```
+
+If you do not set `ICA_FALLBACK_TRIGGER_TOKEN`, the script generates one and prints it at the end.
+
+## Create The VM Manually
 
 In Google Cloud Console:
 
@@ -34,6 +58,8 @@ Connect with the SSH button in the VM instances page, or from Cloud Shell:
 ```bash
 gcloud compute ssh personal-radar-runner --zone=YOUR_ZONE
 ```
+
+The manual steps below are kept for debugging and for users who do not want to use the setup script.
 
 ## Install Node And Playwright
 
@@ -80,57 +106,15 @@ TELEGRAM_CHAT_ID=123456789
 
 Keep this file off GitHub. It lives only on the VM.
 
-## Runner Script Shape
+## Runner Script
 
-Create:
+The implemented runner lives in:
 
-```bash
-nano ~/personal-radar-runner/ica-check.mjs
+```text
+runners/gcp-playwright/
 ```
 
-The script should:
-
-- load `.env`
-- open ICA with Chromium
-- select `Completion of Formalities`
-- input `ICA_APPLICATION_ID`
-- click `Proceed`
-- inspect selectable calendar dates
-- compare against `TARGET_BEFORE`
-- send Telegram only when an earlier date appears
-- print useful logs to stdout/stderr
-
-Minimal skeleton:
-
-```js
-import 'dotenv/config';
-import { chromium } from 'playwright';
-
-const ICA_URL = 'https://eservices.ica.gov.sg/eappt/serviceselection';
-const targetBefore = process.env.TARGET_BEFORE ?? '2026-07-01';
-
-async function main() {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-
-  try {
-    await page.goto(ICA_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await page.locator('ng-select, input[role="combobox"], [role="combobox"]').first().click();
-
-    // Continue with service selection, application ID input, calendar extraction,
-    // and Telegram notification. Keep booking/update buttons untouched.
-
-    console.log(`ICA check completed. targetBefore=${targetBefore}`);
-  } finally {
-    await browser.close();
-  }
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
-```
+It exposes `POST /ica-check`, protected by `ICA_FALLBACK_TRIGGER_TOKEN`, and returns the same result shape expected by the Cloudflare cron Worker. The runner does not send Telegram directly; Cloudflare records and notifies once after receiving the fallback result.
 
 ## Manual Test
 
@@ -138,7 +122,7 @@ Run:
 
 ```bash
 cd ~/personal-radar-runner
-node ica-check.mjs
+npm run check:ica
 ```
 
 For debugging only, you can run headed if you connect with a desktop environment, but the normal VPS path should be headless.
@@ -155,83 +139,82 @@ timedatectl
 Create a systemd service:
 
 ```bash
-sudo nano /etc/systemd/system/ica-check.service
+sudo nano /etc/systemd/system/personal-radar-runner.service
 ```
 
 Replace `YOUR_USER` with the Linux username shown by `whoami`.
 
 ```ini
 [Unit]
-Description=ICA appointment checker
+Description=Personal Radar GCP Playwright fallback runner
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
+User=YOUR_USER
 WorkingDirectory=/home/YOUR_USER/personal-radar-runner
-ExecStart=/usr/bin/node /home/YOUR_USER/personal-radar-runner/ica-check.mjs
+ExecStart=/usr/bin/node /home/YOUR_USER/personal-radar-runner/server.mjs
+Restart=on-failure
+RestartSec=10
 Environment=NODE_ENV=production
-```
-
-Create a timer:
-
-```bash
-sudo nano /etc/systemd/system/ica-check.timer
-```
-
-```ini
-[Unit]
-Description=Run ICA checker five times daily
-
-[Timer]
-OnCalendar=*-*-* 08,11,14,17,19:00:00
-Persistent=false
-Unit=ica-check.service
 
 [Install]
-WantedBy=timers.target
+WantedBy=multi-user.target
 ```
 
 Enable it:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now ica-check.timer
-systemctl list-timers | grep ica
+sudo systemctl enable --now personal-radar-runner.service
+systemctl status personal-radar-runner.service --no-pager
 ```
+
+Do not create a separate timer when using automatic Cloudflare fallback. Cloudflare is the scheduler; the VM waits for a protected fallback request only after Cloudflare Browser Run fails.
 
 ## Logs
 
 Check the last run:
 
 ```bash
-journalctl -u ica-check.service -n 100 --no-pager
+journalctl -u personal-radar-runner.service -n 100 --no-pager
 ```
 
 Follow live logs:
 
 ```bash
-journalctl -u ica-check.service -f
+journalctl -u personal-radar-runner.service -f
 ```
 
 Trigger immediately:
 
 ```bash
-sudo systemctl start ica-check.service
+curl -X POST http://RUNNER_EXTERNAL_IP:8788/ica-check \
+  -H "content-type: application/json" \
+  -H "x-runner-token: YOUR_FALLBACK_TRIGGER_TOKEN" \
+  -d '{"targetBefore":"2026-07-01"}'
 ```
 
-## Optional: Send Results Back To Personal Radar
+## Wire It To Cloudflare
 
-The simplest MVP path is Telegram-only notification from the VM.
+After the setup script prints the runner URL and token, set them on the cron Worker:
 
-Later, add a private Personal Radar API endpoint such as `/api/tools/ica/result`, protected by `ADMIN_TOKEN`, and make the VM POST structured results back to Cloudflare D1. That would let the website show the GCP runner status next to the Cloudflare runner status.
+```bash
+npx wrangler secret put ICA_FALLBACK_CHECK_URL --config wrangler.cron.toml
+npx wrangler secret put ICA_FALLBACK_TRIGGER_TOKEN --config wrangler.cron.toml
+npm run deploy:cron
+```
+
+The 我的 > 工具 screen shows `失败备用: 自动` when both values are configured.
 
 ## Operations Notes
 
-- Do not expose HTTP ports on the VM unless needed.
+- The runner port is protected by `ICA_FALLBACK_TRIGGER_TOKEN`, but it is still an exposed HTTP endpoint. Use a strong generated token.
 - Keep the VM patched: `sudo apt update && sudo apt upgrade`.
 - Keep the `.env` file permissions at `600`.
-- If the VM is used only as fallback, leave the timer disabled until needed:
+- If the VM is not needed, stop the service:
 
 ```bash
-sudo systemctl disable --now ica-check.timer
+sudo systemctl disable --now personal-radar-runner.service
 ```
-

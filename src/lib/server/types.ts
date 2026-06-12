@@ -110,6 +110,8 @@ export type Env = {
   ICA_CHECK_ENABLED?: string;
   ICA_APPLICATION_ID?: string;
   ICA_TARGET_BEFORE?: string;
+  ICA_FALLBACK_CHECK_URL?: string;
+  ICA_FALLBACK_TRIGGER_TOKEN?: string;
   GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
   DEEPSEEK_API_KEY?: string;

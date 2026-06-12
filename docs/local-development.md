@@ -112,6 +112,23 @@ curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ic
 
 For a normal Linux Playwright fallback, see [GCP Playwright Runner](./gcp-playwright-runner.md).
 
+To run the fallback runner locally:
+
+```bash
+cd runners/gcp-playwright
+npm install
+npx playwright install chromium
+cp .env.example .env
+npm start
+```
+
+Then configure the cron Worker or `.env.local` values that should call it:
+
+```env
+ICA_FALLBACK_CHECK_URL=http://localhost:8788
+ICA_FALLBACK_TRIGGER_TOKEN=same-token-as-runner-env
+```
+
 For Wrangler local development:
 
 ```bash

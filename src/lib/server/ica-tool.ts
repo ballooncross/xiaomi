@@ -8,6 +8,7 @@ export type IcaToolStatus = {
   enabled: boolean;
   targetBefore: string;
   checkerUrlConfigured: boolean;
+  fallbackConfigured: boolean;
   lastJob?: JobRun;
   lastItem?: RadarItem;
 };
@@ -19,6 +20,7 @@ export async function getIcaToolStatus(env: Env): Promise<IcaToolStatus> {
     enabled: env.ICA_CHECK_ENABLED === 'true',
     targetBefore: env.ICA_TARGET_BEFORE || '2026-07-01',
     checkerUrlConfigured: Boolean(env.CRON_WORKER || normalizedCheckerUrl(env)),
+    fallbackConfigured: Boolean((env.ICA_FALLBACK_CHECK_URL ?? '').trim() && env.ICA_FALLBACK_TRIGGER_TOKEN),
     lastJob: jobs[0],
     lastItem: items.find((item) => item.sourceType === 'ica' && item.externalId === ICA_ITEM_EXTERNAL_ID)
   };

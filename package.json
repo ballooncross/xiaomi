@@ -10,6 +10,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "telegram:test": "node scripts/telegram-test.mjs",
+    "gcp:runner:setup": "bash scripts/setup-gcp-runner.sh",
     "db:migrate:local": "wrangler d1 migrations apply personal-radar --local",
     "db:migrate:remote": "wrangler d1 migrations apply personal-radar --remote",
     "db:seed:local": "wrangler d1 execute personal-radar --local --file ./scripts/seed.sql",

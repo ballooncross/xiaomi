@@ -10,9 +10,9 @@ const PAGE_TIMEOUT_MS = 45_000;
 const SHORT_TIMEOUT_MS = 20_000;
 const SERVICE_SELECTOR = 'input[role="combobox"], ng-select, .ng-select-container, [role="combobox"]';
 
-type IcaCheckStatus = 'ok' | 'found_earlier' | 'blocked' | 'not_configured' | 'error';
+export type IcaCheckStatus = 'ok' | 'found_earlier' | 'blocked' | 'not_configured' | 'error';
 
-type IcaCheckResult = {
+export type IcaCheckResult = {
   status: IcaCheckStatus;
   currentAppointment?: string;
   targetBefore: string;
@@ -20,6 +20,7 @@ type IcaCheckResult = {
   earlierDates: string[];
   checkedAt: string;
   detail: string;
+  runner?: 'cloudflare-browser-run' | 'external-fallback';
 };
 
 type CalendarDate = {
@@ -36,18 +37,22 @@ export async function runIcaAppointmentCheckJob(env: Env): Promise<JobResult> {
       targetBefore: targetBefore(env),
       earlierDates: [],
       checkedAt: new Date().toISOString(),
-      detail: 'ICA checker is disabled'
+      detail: 'ICA checker is disabled',
+      runner: 'cloudflare-browser-run'
     });
   }
 
   if (!env.ICA_APPLICATION_ID || !env.BROWSER) {
-    return recordSkipped(env, {
+    const skipped = {
       status: 'not_configured',
       targetBefore: targetBefore(env),
       earlierDates: [],
       checkedAt: new Date().toISOString(),
-      detail: 'ICA_APPLICATION_ID or Browser Run binding is missing'
-    });
+      detail: 'ICA_APPLICATION_ID or Browser Run binding is missing',
+      runner: 'cloudflare-browser-run'
+    } satisfies IcaCheckResult;
+    const fallback = await runIcaFallbackIfConfigured(env, skipped);
+    return fallback ? recordResult(env, fallback) : recordSkipped(env, skipped);
   }
 
   let result: IcaCheckResult;
@@ -59,10 +64,13 @@ export async function runIcaAppointmentCheckJob(env: Env): Promise<JobResult> {
       targetBefore: targetBefore(env),
       earlierDates: [],
       checkedAt: new Date().toISOString(),
-      detail: error instanceof Error ? error.message : 'ICA checker failed'
+      detail: error instanceof Error ? error.message : 'ICA checker failed',
+      runner: 'cloudflare-browser-run'
     };
   }
 
+  const fallback = await runIcaFallbackIfConfigured(env, result);
+  if (fallback) return recordResult(env, fallback);
   return recordResult(env, result);
 }
 
@@ -108,6 +116,7 @@ async function checkIcaAppointment(env: Env): Promise<IcaCheckResult> {
       earliestDate,
       earlierDates,
       checkedAt: new Date().toISOString(),
+      runner: 'cloudflare-browser-run',
       detail:
         earlierDates.length > 0
           ? `Found earlier ICA date ${earlierDates[0]}`
@@ -166,19 +175,20 @@ async function selectCompletionFormalitiesService(page: BrowserPage) {
 }
 
 async function clickFirstVisible(page: BrowserPage, selector: string) {
-  const clicked = await page.evaluate((selectorText) => {
+  const box = await page.evaluate((selectorText) => {
     const element = Array.from(document.querySelectorAll<HTMLElement>(selectorText)).find((candidate) => {
-      const box = candidate.getBoundingClientRect();
-      return box.width > 0 && box.height > 0;
+      const rect = candidate.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
     });
-    if (!element) return false;
-    element.click();
-    element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-    element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-    return true;
+    if (!element) return undefined;
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
   }, selector);
-  if (!clicked) throw new Error(`ICA service selector not clickable. ${await pageDiagnostic(page)}`);
+  if (!box) throw new Error(`ICA service selector not clickable. ${await pageDiagnostic(page)}`);
+  await page.mouse.click(box.x, box.y);
 }
 
 async function typeApplicationId(page: BrowserPage, applicationId: string) {
@@ -304,6 +314,73 @@ async function recordResult(env: Env, result: IcaCheckResult): Promise<JobResult
   };
 }
 
+async function runIcaFallbackIfConfigured(env: Env, primary: IcaCheckResult): Promise<IcaCheckResult | undefined> {
+  if (!shouldTriggerIcaFallback(env, primary.status)) return undefined;
+
+  try {
+    const response = await fetch(`${normalizeIcaFallbackUrl(env)}/ica-check`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-runner-token': env.ICA_FALLBACK_TRIGGER_TOKEN ?? ''
+      },
+      body: JSON.stringify({
+        targetBefore: primary.targetBefore,
+        primaryStatus: primary.status,
+        primaryDetail: primary.detail,
+        requestedAt: new Date().toISOString()
+      })
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as Partial<IcaCheckResult> & { error?: string };
+    if (!response.ok) {
+      primary.detail = `${primary.detail}; fallback HTTP ${response.status}: ${payload.error ?? 'runner failed'}`;
+      return undefined;
+    }
+
+    return normalizeFallbackResult(primary, payload);
+  } catch (error) {
+    primary.detail = `${primary.detail}; fallback failed: ${error instanceof Error ? error.message : 'unknown error'}`;
+    return undefined;
+  }
+}
+
+export function shouldTriggerIcaFallback(env: Env, status: IcaCheckStatus): boolean {
+  return (
+    (status === 'blocked' || status === 'error' || status === 'not_configured') &&
+    Boolean(normalizeIcaFallbackUrl(env)) &&
+    Boolean(env.ICA_FALLBACK_TRIGGER_TOKEN)
+  );
+}
+
+export function normalizeIcaFallbackUrl(env: Pick<Env, 'ICA_FALLBACK_CHECK_URL'>): string {
+  return (env.ICA_FALLBACK_CHECK_URL ?? '').trim().replace(/\/+$/, '');
+}
+
+export function mergeIcaFallbackDetail(primary: Pick<IcaCheckResult, 'status' | 'detail'>, fallbackDetail: string): string {
+  return `External fallback after Cloudflare ${primary.status}: ${fallbackDetail || 'completed'}. Primary detail: ${primary.detail}`;
+}
+
+function normalizeFallbackResult(primary: IcaCheckResult, payload: Partial<IcaCheckResult>): IcaCheckResult {
+  const status = payload.status;
+  if (!isIcaCheckStatus(status)) {
+    throw new Error(`Fallback returned invalid status: ${String(status)}`);
+  }
+
+  return {
+    status,
+    currentAppointment: typeof payload.currentAppointment === 'string' ? payload.currentAppointment : undefined,
+    targetBefore: typeof payload.targetBefore === 'string' ? payload.targetBefore : primary.targetBefore,
+    earliestDate: typeof payload.earliestDate === 'string' ? payload.earliestDate : undefined,
+    earlierDates: Array.isArray(payload.earlierDates)
+      ? payload.earlierDates.filter((date): date is string => typeof date === 'string')
+      : [],
+    checkedAt: typeof payload.checkedAt === 'string' ? payload.checkedAt : new Date().toISOString(),
+    detail: mergeIcaFallbackDetail(primary, typeof payload.detail === 'string' ? payload.detail : ''),
+    runner: 'external-fallback'
+  };
+}
+
 async function recordSkipped(env: Env, result: IcaCheckResult): Promise<JobResult> {
   await getDb(env).logJob({ jobName: 'ica-appointment-check', status: result.status, detail: result.detail });
   return {
@@ -345,7 +422,8 @@ function buildRadarItem(result: IcaCheckResult): RadarItem {
       targetBefore: result.targetBefore,
       earliestDate: result.earliestDate,
       earliestEarlierDate: result.earlierDates[0],
-      checkedAt: result.checkedAt
+      checkedAt: result.checkedAt,
+      runner: result.runner ?? 'cloudflare-browser-run'
     },
     score: found ? 100 : result.status === 'ok' ? 74 : 45,
     status: 'tracking'
@@ -367,6 +445,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isVerificationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /captcha|verification|timeout|application error|access denied|forbidden|blocked/i.test(message);
+}
+
+function isIcaCheckStatus(value: unknown): value is IcaCheckStatus {
+  return value === 'ok' || value === 'found_earlier' || value === 'blocked' || value === 'not_configured' || value === 'error';
 }
 
 function redactApplicationId(value: string | undefined): string {

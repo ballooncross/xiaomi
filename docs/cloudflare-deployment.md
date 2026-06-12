@@ -65,6 +65,15 @@ npx wrangler secret put ICA_APPLICATION_ID --config wrangler.cron.toml
 
 Only set AI keys if you want AI enabled. The app falls back to rules when keys are missing.
 
+Optional ICA browser fallback:
+
+```bash
+npx wrangler secret put ICA_FALLBACK_CHECK_URL --config wrangler.cron.toml
+npx wrangler secret put ICA_FALLBACK_TRIGGER_TOKEN --config wrangler.cron.toml
+```
+
+Set these only after the GCP Playwright runner is deployed. The cron Worker automatically calls the fallback runner when Cloudflare Browser Run returns `blocked`, `error`, or is missing its Browser Run binding. It does not call the fallback after normal `ok` or `found_earlier` results.
+
 For Ticketmaster, register on the Ticketmaster Developer Portal. The default application has a `Consumer Key`; use that value as `TICKETMASTER_API_KEY`.
 
 ## 4. GitHub Actions Deployment
@@ -123,6 +132,13 @@ curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ic
 Use the Cloudflare Workers dashboard to find the deployed Worker route if your account exposes a workers.dev subdomain. This manual route runs the same checker as the cron schedule and still never updates or books an appointment.
 
 If Cloudflare Browser Run is blocked by the target site or remains unreliable, use the GCP Playwright fallback runner in [GCP Playwright Runner](./gcp-playwright-runner.md). Keep the main app on Cloudflare and move only the browser automation job to the VM.
+
+After the fallback is configured, both scheduled ICA checks and the 我的 > 工具 > 立即检查 button use the same behavior:
+
+1. Try Cloudflare Browser Run first.
+2. If Cloudflare fails with `blocked`, `error`, or missing Browser Run config, POST to `ICA_FALLBACK_CHECK_URL`.
+3. Record the fallback result in D1.
+4. Send Telegram only from the Cloudflare app if an earlier date is newly found.
 
 ## Cron Schedule
 

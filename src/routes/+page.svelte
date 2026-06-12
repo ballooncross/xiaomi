@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { invalidateAll } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { page } from '$app/state';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
   import type { DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
@@ -11,6 +12,14 @@
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & { nextDate: string; daysLeft: number; dateLabel: string };
   type IcaToolStatus = PageData['icaTool'];
+
+  const viewPaths: Record<View, string> = {
+    home: '/',
+    concerts: '/concerts',
+    trends: '/trends',
+    dates: '/dates',
+    me: '/me'
+  };
 
   let { data }: { data: PageData } = $props();
   let items = $state<RadarItem[]>([]);
@@ -48,7 +57,8 @@
   let icaTool = $state<IcaToolStatus>({
     enabled: false,
     targetBefore: '2026-07-01',
-    checkerUrlConfigured: false
+    checkerUrlConfigured: false,
+    fallbackConfigured: false
   });
   let icaJobPending = $state(false);
   let icaJobStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -68,6 +78,10 @@
   let reminderDay7 = $state(true);
   let reminderDay30 = $state(false);
   let reminderPinned = $state(false);
+
+  $effect(() => {
+    activeView = viewFromPath(page.url.pathname);
+  });
 
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
@@ -359,10 +373,18 @@
     digestOpen = next;
   }
 
-  function setView(view: View) {
+  async function setView(view: View) {
     closeTransientUi();
     activeView = view;
     activeFilter = 'for-you';
+    await syncViewPath(view);
+  }
+
+  async function syncViewPath(view: View) {
+    const nextPath = viewPaths[view];
+    if (page.url.pathname !== nextPath) {
+      await goto(nextPath, { keepFocus: true, noScroll: true });
+    }
   }
 
   function openAddWatch(type: WatchTopic['type'], category: string) {
@@ -375,7 +397,9 @@
     editingTopicId = null;
     searchOpen = false;
     digestOpen = false;
-    activeView = type === 'artist' ? 'concerts' : 'trends';
+    const targetView = type === 'artist' ? 'concerts' : 'trends';
+    activeView = targetView;
+    void syncViewPath(targetView);
   }
 
   function openAddBlacklist() {
@@ -634,6 +658,7 @@
       ok: '暂无更早日期',
       found_earlier: '发现更早日期',
       blocked: '被验证拦截',
+      fallback_triggered: '已触发备用检查',
       not_configured: '配置未完成',
       error: '检查失败'
     };
@@ -789,6 +814,12 @@
   function pad2(value: number) {
     return String(value).padStart(2, '0');
   }
+
+  function viewFromPath(pathname: string): View {
+    const normalized = pathname.replace(/\/+$/, '') || '/';
+    const match = Object.entries(viewPaths).find(([, path]) => path === normalized);
+    return match?.[0] as View | undefined ?? 'home';
+  }
 </script>
 
 <svelte:head>
@@ -829,7 +860,7 @@
     </div>
   </nav>
 
-  <div class="app-main">
+  <div class:no-side-panel={activeView === 'dates' || activeView === 'me'} class="app-main">
     <section class="feed">
       {#if searchOpen || digestOpen}
         <section class="action-panel">
@@ -1067,6 +1098,10 @@
                 <div>
                   <span>远程触发</span>
                   <strong>{icaTool.checkerUrlConfigured ? '已配置' : '未配置'}</strong>
+                </div>
+                <div>
+                  <span>失败备用</span>
+                  <strong>{icaTool.fallbackConfigured ? '自动' : '未配置'}</strong>
                 </div>
                 <div>
                   <span>上次运行</span>
@@ -2212,10 +2247,18 @@
     grid-template-columns: minmax(0, 1fr) 330px;
   }
 
+  .app-main.no-side-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .feed {
     padding: 28px;
     border-right: 1px solid var(--line);
     min-width: 0;
+  }
+
+  .app-main.no-side-panel .feed {
+    border-right: 0;
   }
 
   .greeting {
@@ -2673,7 +2716,7 @@
   .tool-status-grid {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
     position: relative;
   }

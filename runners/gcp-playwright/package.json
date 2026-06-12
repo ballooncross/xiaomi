@@ -1,0 +1,14 @@
+{
+  "name": "personal-radar-gcp-playwright-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check:ica": "node cli.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "playwright": "^1.54.2"
+  }
+}
