@@ -95,6 +95,21 @@ DEEPSEEK_API_KEY=...
 
 The default base config lives in `src/lib/server/config.ts`. Empty env values do not override those defaults. Restart `npm run dev` after changing env files.
 
+The ICA appointment checker runs only in the cron Worker because it needs Cloudflare Browser Run. It is disabled by default:
+
+```env
+ICA_CHECK_ENABLED=false
+ICA_APPLICATION_ID=ISC...
+ICA_TARGET_BEFORE=2026-07-01
+```
+
+Plain `npm run dev` cannot launch Cloudflare Browser Run locally. Deploy the cron Worker, then use the protected Worker route to test the real browser path:
+
+```bash
+curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ica-check \
+  -H 'x-admin-token: YOUR_ADMIN_TOKEN'
+```
+
 For Wrangler local development:
 
 ```bash
