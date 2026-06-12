@@ -89,7 +89,7 @@
             <input data-isw-app-id type="text" placeholder="ISC2509SFXXXXXX" value="">
           </label>
           <label class="isw-label">
-            Before date (target)
+            Before date
             <input data-isw-target type="date" value="${state.targetBefore}">
           </label>
           <label class="isw-label">
@@ -100,14 +100,16 @@
             Interval seconds
             <input data-isw-interval type="number" min="10" step="5" value="${state.intervalSeconds}">
           </label>
-          <label class="isw-label">
-            Session refresh minutes
-            <input data-isw-refresh-minutes type="number" min="5" step="1" value="${state.refreshMinutes}">
-          </label>
           <label class="isw-check">
             <input data-isw-auto-refresh type="checkbox">
-            Periodic session refresh (every N min)
+            Periodic session refresh
           </label>
+          <div class="isw-refresh-opts" data-isw-refresh-opts>
+            <label class="isw-label">
+              Refresh every (minutes)
+              <input data-isw-refresh-minutes type="number" min="5" step="1" value="${state.refreshMinutes}">
+            </label>
+          </div>
           <label class="isw-check">
             <input data-isw-no-slots type="checkbox">
             Notify when checked but no earlier slot
@@ -202,8 +204,16 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        margin: 8px 0 12px;
+        margin: 8px 0 4px;
         font-size: 12px;
+      }
+      #ica-slot-watcher .isw-refresh-opts {
+        margin: 0 0 12px;
+        padding-left: 4px;
+        display: none;
+      }
+      #ica-slot-watcher .isw-refresh-opts.isw-visible {
+        display: block;
       }
       #ica-slot-watcher .isw-actions {
         display: grid;
@@ -297,6 +307,7 @@
     state.intervalSeconds = Math.max(10, Number(root.querySelector("[data-isw-interval]").value || 10));
     state.refreshMinutes = Math.max(5, Number(root.querySelector("[data-isw-refresh-minutes]").value || 13));
     state.autoRefreshSession = root.querySelector("[data-isw-auto-refresh]").checked;
+    root.querySelector("[data-isw-refresh-opts]").classList.toggle("isw-visible", state.autoRefreshSession);
     state.notifyWhenNoSlots = root.querySelector("[data-isw-no-slots]").checked;
     state.telegramNotifyEnabled = root.querySelector("[data-isw-telegram-enabled]").checked;
     state.radarNotifyUrl = root.querySelector("[data-isw-radar-url]").value || DEFAULTS.radarNotifyUrl;
@@ -326,6 +337,7 @@
     root.querySelector("[data-isw-interval]").value = state.intervalSeconds;
     root.querySelector("[data-isw-refresh-minutes]").value = state.refreshMinutes;
     root.querySelector("[data-isw-auto-refresh]").checked = state.autoRefreshSession;
+    root.querySelector("[data-isw-refresh-opts]").classList.toggle("isw-visible", state.autoRefreshSession);
     root.querySelector("[data-isw-no-slots]").checked = state.notifyWhenNoSlots;
     root.querySelector("[data-isw-telegram-enabled]").checked = state.telegramNotifyEnabled;
     root.querySelector("[data-isw-radar-url]").value = state.radarNotifyUrl;
