@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "ICA Slot Watcher",
+  "version": "0.1.0",
+  "description": "Watches ICA appointment slots from an already-authenticated ICA tab.",
+  "permissions": ["notifications", "storage"],
+  "host_permissions": ["https://eservices.ica.gov.sg/eappt/*", "https://personal-radar.pages.dev/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://eservices.ica.gov.sg/eappt/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page-bridge.js"],
+      "matches": ["https://eservices.ica.gov.sg/*"]
+    }
+  ]
+}

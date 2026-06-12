@@ -8,6 +8,7 @@ export const defaultEnv: Env = {
   PUBLIC_APP_NAME: 'Personal Radar',
   TELEGRAM_BOT_TOKEN: '',
   TELEGRAM_CHAT_ID: '',
+  EXTENSION_NOTIFY_TOKEN: '',
   TICKETMASTER_API_KEY: '',
   BANDSINTOWN_APP_ID: 'personal-radar',
   AI_ENABLED: 'auto',
