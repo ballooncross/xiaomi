@@ -8,6 +8,7 @@ const ICA_ITEM_EXTERNAL_ID = 'ica-completion-formalities-earlier-slot';
 const ICA_ITEM_ID = 'ica-appointment-earlier-slot';
 const PAGE_TIMEOUT_MS = 45_000;
 const SHORT_TIMEOUT_MS = 20_000;
+const SERVICE_SELECTOR = 'input[role="combobox"], ng-select, .ng-select-container, [role="combobox"]';
 
 type IcaCheckStatus = 'ok' | 'found_earlier' | 'blocked' | 'not_configured' | 'error';
 
@@ -76,7 +77,8 @@ async function checkIcaAppointment(env: Env): Promise<IcaCheckResult> {
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36'
     );
     await page.setViewport({ width: 1365, height: 900 });
-    await page.goto(ICA_URL, { waitUntil: 'networkidle2', timeout: PAGE_TIMEOUT_MS });
+    await page.goto(ICA_URL, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
+    await waitForIcaServicePage(page);
 
     await selectCompletionFormalitiesService(page);
     await typeApplicationId(page, env.ICA_APPLICATION_ID ?? '');
@@ -118,9 +120,32 @@ async function checkIcaAppointment(env: Env): Promise<IcaCheckResult> {
   }
 }
 
+async function waitForIcaServicePage(page: BrowserPage) {
+  try {
+    await page.waitForFunction(
+      (selector) => {
+        const text = document.body?.innerText ?? '';
+        return (
+          Boolean(document.querySelector(selector)) ||
+          /captcha|verification|access denied|forbidden|service unavailable|temporarily unavailable|blocked/i.test(text)
+        );
+      },
+      { timeout: PAGE_TIMEOUT_MS },
+      SERVICE_SELECTOR
+    );
+  } catch {
+    throw new Error(`ICA service page did not expose the service selector. ${await pageDiagnostic(page)}`);
+  }
+
+  const blocked = await page.evaluate(() => {
+    const text = document.body?.innerText ?? '';
+    return /captcha|verification|access denied|forbidden|service unavailable|temporarily unavailable|blocked/i.test(text);
+  });
+  if (blocked) throw new Error(`ICA page appears blocked or unavailable. ${await pageDiagnostic(page)}`);
+}
+
 async function selectCompletionFormalitiesService(page: BrowserPage) {
-  await page.waitForSelector('input[role="combobox"]', { visible: true });
-  await page.click('input[role="combobox"]');
+  await clickFirstVisible(page, SERVICE_SELECTOR);
   await sleep(500);
 
   const selectedByText = await page.evaluate(() => {
@@ -138,6 +163,22 @@ async function selectCompletionFormalitiesService(page: BrowserPage) {
   }
 
   await page.waitForFunction(() => document.body.innerText.includes('Group Application ID'), { timeout: SHORT_TIMEOUT_MS });
+}
+
+async function clickFirstVisible(page: BrowserPage, selector: string) {
+  const clicked = await page.evaluate((selectorText) => {
+    const element = Array.from(document.querySelectorAll<HTMLElement>(selectorText)).find((candidate) => {
+      const box = candidate.getBoundingClientRect();
+      return box.width > 0 && box.height > 0;
+    });
+    if (!element) return false;
+    element.click();
+    element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    return true;
+  }, selector);
+  if (!clicked) throw new Error(`ICA service selector not clickable. ${await pageDiagnostic(page)}`);
 }
 
 async function typeApplicationId(page: BrowserPage, applicationId: string) {
@@ -325,7 +366,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isVerificationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /captcha|verification|timeout|application error/i.test(message);
+  return /captcha|verification|timeout|application error|access denied|forbidden|blocked/i.test(message);
 }
 
 function redactApplicationId(value: string | undefined): string {
@@ -335,4 +376,17 @@ function redactApplicationId(value: string | undefined): string {
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function pageDiagnostic(page: BrowserPage): Promise<string> {
+  return page.evaluate(() => {
+    const text = (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, 420);
+    const selectors = {
+      inputCombobox: document.querySelectorAll('input[role="combobox"]').length,
+      roleCombobox: document.querySelectorAll('[role="combobox"]').length,
+      ngSelect: document.querySelectorAll('ng-select, .ng-select-container').length,
+      buttons: document.querySelectorAll('button').length
+    };
+    return `title="${document.title}", url="${location.href}", selectors=${JSON.stringify(selectors)}, text="${text}"`;
+  });
 }
