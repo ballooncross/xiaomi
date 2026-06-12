@@ -122,6 +122,8 @@ curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ic
 
 Use the Cloudflare Workers dashboard to find the deployed Worker route if your account exposes a workers.dev subdomain. This manual route runs the same checker as the cron schedule and still never updates or books an appointment.
 
+If Cloudflare Browser Run is blocked by the target site or remains unreliable, use the GCP Playwright fallback runner in [GCP Playwright Runner](./gcp-playwright-runner.md). Keep the main app on Cloudflare and move only the browser automation job to the VM.
+
 ## Cron Schedule
 
 `wrangler.cron.toml` currently configures:

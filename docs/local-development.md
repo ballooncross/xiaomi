@@ -110,6 +110,8 @@ curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ic
   -H 'x-admin-token: YOUR_ADMIN_TOKEN'
 ```
 
+For a normal Linux Playwright fallback, see [GCP Playwright Runner](./gcp-playwright-runner.md).
+
 For Wrangler local development:
 
 ```bash
