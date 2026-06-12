@@ -58,6 +58,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 function readToken(request: Request): string {
   const auth = request.headers.get('authorization') ?? '';
   if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
+  if (auth && !auth.toLowerCase().startsWith('basic ')) return auth.trim();
   return request.headers.get('x-radar-token')?.trim() ?? '';
 }
 

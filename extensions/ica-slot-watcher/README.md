@@ -42,7 +42,7 @@ Example notification API call:
 ```bash
 curl -X POST 'https://personal-radar.pages.dev/api/extension-notify' \
   -H 'content-type: application/json' \
-  -H 'authorization: Bearer YOUR_EXTENSION_NOTIFY_TOKEN' \
+  -H 'x-radar-token: YOUR_EXTENSION_NOTIFY_TOKEN' \
   --data '{
     "type": "ica_slot_found",
     "summary": "Earlier ICA slot found before 2026-07-01: 2026-06-23",
