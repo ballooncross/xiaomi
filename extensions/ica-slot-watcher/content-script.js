@@ -2,12 +2,16 @@
   if (window.__icaSlotWatcherContentInstalled) return;
   window.__icaSlotWatcherContentInstalled = true;
 
+  const SERVICE_SELECTION_URL = "https://eservices.ica.gov.sg/eappt/serviceselection";
+
   const DEFAULTS = {
     enabled: false,
     intervalSeconds: 10,
     autoRefreshSession: true,
     refreshMinutes: 13,
     targetBefore: "2026-07-01",
+    searchToDate: "2026-06-19",
+    applicationId: "",
     notifyWhenNoSlots: false,
     telegramNotifyEnabled: true,
     radarNotifyUrl: "https://personal-radar.pages.dev/api/extension-notify",
@@ -17,6 +21,8 @@
   const state = {
     ...DEFAULTS,
     running: false,
+    setupInProgress: false,
+    bridgeReady: false,
     timer: null,
     refreshTimer: null,
     lastRunAt: null,
@@ -24,6 +30,7 @@
     lastSlots: null,
     lastError: null,
     waitingForSlotsResolve: null,
+    waitingForActionResolve: null,
     lastRadarNotifications: new Map()
   };
 
@@ -41,6 +48,7 @@
     if (!detail) return;
 
     if (detail.type === "bridge-ready") {
+      state.bridgeReady = true;
       setStatus("Ready on ICA page");
       return;
     }
@@ -48,6 +56,11 @@
     if (detail.type === "slots-response" && state.waitingForSlotsResolve) {
       state.waitingForSlotsResolve(detail);
       state.waitingForSlotsResolve = null;
+    }
+
+    if (detail.type === "action-result" && state.waitingForActionResolve) {
+      state.waitingForActionResolve(detail);
+      state.waitingForActionResolve = null;
     }
   });
 
@@ -66,14 +79,22 @@
         <div class="isw-header">
           <div>
             <div class="isw-title">ICA Slot Watcher</div>
-            <div class="isw-subtitle">Uses this tab's current ICA session</div>
+            <div class="isw-subtitle">Auto-navigates from service selection</div>
           </div>
           <button class="isw-icon" data-isw-collapse title="Collapse">-</button>
         </div>
         <div class="isw-body">
           <label class="isw-label">
-            Before date
+            Application ID
+            <input data-isw-app-id type="text" placeholder="ISC2509SFXXXXXX" value="">
+          </label>
+          <label class="isw-label">
+            Before date (target)
             <input data-isw-target type="date" value="${state.targetBefore}">
+          </label>
+          <label class="isw-label">
+            Search to date
+            <input data-isw-search-to type="date" value="${state.searchToDate}">
           </label>
           <label class="isw-label">
             Interval seconds
@@ -85,7 +106,7 @@
           </label>
           <label class="isw-check">
             <input data-isw-auto-refresh type="checkbox" checked>
-            Refresh page before ICA session expires
+            Auto-renew session (navigate from start)
           </label>
           <label class="isw-check">
             <input data-isw-no-slots type="checkbox">
@@ -130,6 +151,8 @@
         background: #fffdf8;
         box-shadow: 0 18px 48px rgba(10, 28, 52, 0.2);
         overflow: hidden;
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
       }
       #ica-slot-watcher .isw-header {
         display: flex;
@@ -162,7 +185,10 @@
         font-weight: 700;
       }
       #ica-slot-watcher input[type="date"],
-      #ica-slot-watcher input[type="number"] {
+      #ica-slot-watcher input[type="number"],
+      #ica-slot-watcher input[type="text"],
+      #ica-slot-watcher input[type="url"],
+      #ica-slot-watcher input[type="password"] {
         width: 100%;
         border: 1px solid rgba(10, 28, 52, 0.18);
         border-radius: 9px;
@@ -170,6 +196,7 @@
         font-size: 13px;
         color: #16213b;
         background: white;
+        box-sizing: border-box;
       }
       #ica-slot-watcher .isw-check {
         display: flex;
@@ -221,12 +248,20 @@
 
     document.documentElement.append(style, root);
 
-    root.querySelector("[data-isw-run]").addEventListener("click", () => runCheck("manual"));
+    root.querySelector("[data-isw-run]").addEventListener("click", () => {
+      if (needsSetupNavigation()) {
+        runSetupThenAction("manual-check");
+      } else {
+        runCheck("manual");
+      }
+    });
     root.querySelector("[data-isw-toggle]").addEventListener("click", toggle);
     root.querySelector("[data-isw-collapse]").addEventListener("click", () => {
       root.classList.toggle("isw-collapsed");
     });
+    root.querySelector("[data-isw-app-id]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-target]").addEventListener("change", saveSettingsFromUi);
+    root.querySelector("[data-isw-search-to]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-interval]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-refresh-minutes]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-auto-refresh]").addEventListener("change", saveSettingsFromUi);
@@ -237,16 +272,28 @@
   }
 
   function loadSettings() {
-    chrome.storage.local.get(DEFAULTS, (saved) => {
+    chrome.storage.local.get({ ...DEFAULTS, pendingNavigationSetup: false }, (saved) => {
       Object.assign(state, saved);
       updateUiFromState();
-      if (state.enabled) startTimers();
+
+      if (saved.pendingNavigationSetup && state.applicationId &&
+          location.href.includes("/eappt/serviceselection")) {
+        runFullSetupFlow("session-renew");
+      } else if (saved.pendingNavigationSetup && state.applicationId &&
+          location.href.includes("/eappt/")) {
+        chrome.storage.local.set({ pendingNavigationSetup: false });
+        if (state.enabled) startTimers();
+      } else if (state.enabled) {
+        startTimers();
+      }
     });
   }
 
   function saveSettingsFromUi() {
     const root = document.getElementById("ica-slot-watcher");
+    state.applicationId = root.querySelector("[data-isw-app-id]").value.trim();
     state.targetBefore = root.querySelector("[data-isw-target]").value || DEFAULTS.targetBefore;
+    state.searchToDate = root.querySelector("[data-isw-search-to]").value || DEFAULTS.searchToDate;
     state.intervalSeconds = Math.max(10, Number(root.querySelector("[data-isw-interval]").value || 10));
     state.refreshMinutes = Math.max(5, Number(root.querySelector("[data-isw-refresh-minutes]").value || 13));
     state.autoRefreshSession = root.querySelector("[data-isw-auto-refresh]").checked;
@@ -256,10 +303,12 @@
     state.radarNotifyToken = root.querySelector("[data-isw-radar-token]").value;
     chrome.storage.local.set({
       enabled: state.enabled,
+      applicationId: state.applicationId,
       intervalSeconds: state.intervalSeconds,
       autoRefreshSession: state.autoRefreshSession,
       refreshMinutes: state.refreshMinutes,
       targetBefore: state.targetBefore,
+      searchToDate: state.searchToDate,
       notifyWhenNoSlots: state.notifyWhenNoSlots,
       telegramNotifyEnabled: state.telegramNotifyEnabled,
       radarNotifyUrl: state.radarNotifyUrl,
@@ -271,7 +320,9 @@
   function updateUiFromState() {
     const root = document.getElementById("ica-slot-watcher");
     if (!root) return;
+    root.querySelector("[data-isw-app-id]").value = state.applicationId;
     root.querySelector("[data-isw-target]").value = state.targetBefore;
+    root.querySelector("[data-isw-search-to]").value = state.searchToDate;
     root.querySelector("[data-isw-interval]").value = state.intervalSeconds;
     root.querySelector("[data-isw-refresh-minutes]").value = state.refreshMinutes;
     root.querySelector("[data-isw-auto-refresh]").checked = state.autoRefreshSession;
@@ -289,13 +340,21 @@
     state.enabled = !state.enabled;
     chrome.storage.local.set({ enabled: state.enabled });
     if (state.enabled) {
-      startTimers();
-      runCheck("start");
+      if (needsSetupNavigation()) {
+        runSetupThenAction("start");
+      } else {
+        startTimers();
+        runCheck("start");
+      }
     } else {
       stopTimers();
       setStatus("Stopped");
     }
     updateUiFromState();
+  }
+
+  function needsSetupNavigation() {
+    return !location.href.includes("/eappt/locationselection");
   }
 
   function startTimers() {
@@ -312,32 +371,145 @@
   }
 
   function restartTimersIfNeeded() {
-    if (state.enabled) startTimers();
+    if (state.enabled && !state.setupInProgress) startTimers();
   }
 
   function scheduleSessionRefresh() {
     if (!state.enabled || !state.autoRefreshSession) return;
-
-    state.refreshTimer = window.setTimeout(refreshSessionPage, state.refreshMinutes * 60 * 1000);
+    state.refreshTimer = window.setTimeout(renewSession, state.refreshMinutes * 60 * 1000);
   }
 
-  function refreshSessionPage() {
+  function renewSession() {
     if (!state.enabled || !state.autoRefreshSession) return;
 
-    if (state.running) {
-      state.refreshTimer = window.setTimeout(refreshSessionPage, 30 * 1000);
+    if (state.running || state.setupInProgress) {
+      state.refreshTimer = window.setTimeout(renewSession, 30 * 1000);
       return;
     }
 
+    if (!state.applicationId) {
+      setStatus("Cannot renew session: Application ID not set. Falling back to page reload.");
+      chrome.storage.local.set({ lastRefreshAt: new Date().toISOString() });
+      window.setTimeout(() => window.location.reload(), 500);
+      return;
+    }
+
+    stopTimers();
+    setStatus("Renewing ICA session via full navigation...");
     chrome.storage.local.set({
+      pendingNavigationSetup: true,
       lastRefreshAt: new Date().toISOString()
     });
-    setStatus(`Refreshing page to keep ICA session alive (${state.refreshMinutes} min)`);
-    window.setTimeout(() => window.location.reload(), 500);
+    window.setTimeout(() => {
+      window.location.href = SERVICE_SELECTION_URL;
+    }, 500);
   }
 
+  async function runSetupThenAction(afterAction) {
+    if (!state.applicationId) {
+      setStatus("Please enter Application ID first.");
+      return;
+    }
+
+    if (location.href.includes("/eappt/serviceselection")) {
+      await runFullSetupFlow(afterAction);
+    } else {
+      setStatus("Navigating to service selection...");
+      chrome.storage.local.set({ pendingNavigationSetup: true });
+      window.location.href = SERVICE_SELECTION_URL;
+    }
+  }
+
+  async function runFullSetupFlow(afterAction) {
+    state.setupInProgress = true;
+    state.running = true;
+    chrome.storage.local.set({ pendingNavigationSetup: false });
+
+    try {
+      setStatus("Waiting for page to load...");
+      await sleep(2000);
+
+      if (!state.bridgeReady) {
+        setStatus("Waiting for page bridge...");
+        await waitForBridgeReady(15000);
+      }
+
+      // Step 1: Select service
+      setStatus("Step 1/6: Selecting service...");
+      await sendPageAction("select-service", {});
+      await sleep(1000);
+
+      // Step 2: Fill application ID
+      setStatus("Step 2/6: Entering application ID...");
+      await sendPageAction("fill-application-id", { id: state.applicationId });
+      await sleep(500);
+
+      // Step 3: Click Proceed
+      setStatus("Step 3/6: Clicking Proceed...");
+      const proceedBtn = findButton("Proceed") || document.querySelector(".btnProceed");
+      if (!proceedBtn) throw new Error("Proceed button not found on service selection page");
+      proceedBtn.click();
+
+      // Step 4: Wait for appointment page
+      setStatus("Step 4/6: Waiting for appointment page...");
+      await waitForTextInPage(["Update Appointment", "Error Message", "Something went wrong"], 25000);
+
+      const bodyText = document.body.innerText;
+      if (bodyText.includes("Something went wrong") || bodyText.includes("Error Message")) {
+        throw new Error("ICA returned an error after Proceed. Check application ID.");
+      }
+
+      await sleep(800);
+      const updateBtn = findButton("Update Appointment");
+      if (!updateBtn) throw new Error("Update Appointment button not found");
+      updateBtn.click();
+
+      // Step 5: Wait for location selection with appointment details
+      setStatus("Step 5/6: Waiting for appointment details...");
+      await waitForTextInPage(["Appointment Details"], 25000);
+      await sleep(800);
+
+      // Click Advanced Search tab
+      const adsTab = document.querySelector("#adsTab");
+      if (adsTab && !adsTab.classList.contains("btn-primary")) {
+        adsTab.click();
+        await sleep(500);
+      }
+
+      // Step 6: Fill date range
+      setStatus("Step 6/6: Setting date range...");
+      const fromDate = formatDateForIca(new Date());
+      const toDate = formatDateForIca(parseIsoDate(state.searchToDate));
+      await sendPageAction("set-dates", { fromDate, toDate });
+      await sleep(500);
+
+      setStatus("Session ready. On advanced search page.");
+
+      if (afterAction === "start" || afterAction === "session-renew") {
+        if (state.enabled) {
+          startTimers();
+          runCheck("after-setup");
+        }
+      } else if (afterAction === "manual-check") {
+        runCheck("manual");
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setStatus("Setup failed: " + msg);
+      await notifyRadarOnce("ica_session_expired", {
+        summary: "ICA session setup failed: " + msg,
+        dates: []
+      });
+    } finally {
+      state.setupInProgress = false;
+      state.running = false;
+    }
+  }
+
+  // --- Slot checking flow (existing, from advanced search page) ---
+
   async function runCheck(reason) {
-    if (state.running) {
+    if (state.running || state.setupInProgress) {
       setStatus("Previous check still running");
       return;
     }
@@ -345,7 +517,7 @@
     state.running = true;
     state.lastRunAt = new Date();
     state.lastError = null;
-    setStatus(`Checking (${reason}) at ${formatTime(state.lastRunAt)}...`);
+    setStatus("Checking (" + reason + ") at " + formatTime(state.lastRunAt) + "...");
 
     try {
       ensureAdvancedSearchPage();
@@ -367,15 +539,20 @@
       await clickBack();
     } catch (error) {
       state.lastError = error instanceof Error ? error.message : String(error);
-      state.lastResult = `Error: ${state.lastError}`;
+      state.lastResult = "Error: " + state.lastError;
       setStatus(state.lastResult);
       showResult({ summary: state.lastResult, dates: [] });
       if (isLikelySessionExpired(state.lastError)) {
-        await alertUser("ICA page session may have expired. Please refresh or reopen ICA manually.", true);
+        await alertUser("ICA session may have expired. Will auto-renew if enabled.", true);
         await notifyRadarOnce("ica_session_expired", {
-          summary: `ICA page session may have expired: ${state.lastError}`,
+          summary: "ICA session expired: " + state.lastError,
           dates: []
         });
+        if (state.enabled && state.autoRefreshSession && state.applicationId) {
+          stopTimers();
+          await sleep(2000);
+          renewSession();
+        }
       } else {
         await notifyRadarOnce("ica_check_error", {
           summary: state.lastResult,
@@ -390,7 +567,7 @@
 
   function ensureAdvancedSearchPage() {
     if (!location.href.includes("/eappt/locationselection")) {
-      throw new Error("Open the ICA location selection / advanced search page first.");
+      throw new Error("Not on ICA location selection page. Setup navigation needed.");
     }
     const adsTab = document.querySelector("#adsTab");
     if (adsTab && !adsTab.classList.contains("btn-primary")) adsTab.click();
@@ -417,7 +594,8 @@
     await sleep(700);
   }
 
-  async function clickBack(options = {}) {
+  async function clickBack(options) {
+    options = options || {};
     await sleep(700);
     const button = findButton("Back");
     if (!button) {
@@ -429,24 +607,24 @@
   }
 
   function findButton(text) {
-    return Array.from(document.querySelectorAll("button")).find((button) =>
-      (button.textContent || "").trim().toLowerCase() === text.toLowerCase()
-    );
+    return Array.from(document.querySelectorAll("button")).find(function (button) {
+      return (button.textContent || "").trim().toLowerCase() === text.toLowerCase();
+    });
   }
 
   function evaluateSlots(slotsDetail) {
-    const dates = extractDates(slotsDetail.body)
-      .filter((date) => date < state.targetBefore)
+    var dates = extractDates(slotsDetail.body)
+      .filter(function (date) { return date < state.targetBefore; })
       .sort();
-    const uniqueDates = Array.from(new Set(dates));
-    const earliest = uniqueDates[0] || "";
-    const checkedAt = formatTime(new Date());
+    var uniqueDates = Array.from(new Set(dates));
+    var earliest = uniqueDates[0] || "";
+    var checkedAt = formatTime(new Date());
 
     if (!slotsDetail.ok) {
       return {
         hasEarlierDate: false,
         dates: [],
-        summary: `Checked ${checkedAt}. ICA /Slots returned HTTP ${slotsDetail.status}.`
+        summary: "Checked " + checkedAt + ". ICA /Slots returned HTTP " + slotsDetail.status + "."
       };
     }
 
@@ -455,7 +633,7 @@
         hasEarlierDate: true,
         dates: uniqueDates,
         earliestDate: earliest,
-        summary: `Earlier ICA slot found before ${state.targetBefore}: ${earliest}\n${uniqueDates.join(", ")}`
+        summary: "Earlier ICA slot found before " + state.targetBefore + ": " + earliest + "\n" + uniqueDates.join(", ")
       };
     }
 
@@ -463,13 +641,13 @@
       hasEarlierDate: false,
       dates: [],
       earliestDate: "",
-      summary: `Checked ${checkedAt}. No slot before ${state.targetBefore}.`
+      summary: "Checked " + checkedAt + ". No slot before " + state.targetBefore + "."
     };
   }
 
   function extractDates(value) {
-    const dates = [];
-    const seen = new Set();
+    var dates = [];
+    var seen = new Set();
 
     function add(date) {
       if (!seen.has(date)) {
@@ -480,39 +658,32 @@
 
     function normalize(raw) {
       if (typeof raw !== "string") return null;
-
-      const iso = raw.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
-      if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-
-      const slash = raw.match(/\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b/);
-      if (slash) {
-        return `${slash[3]}-${slash[2].padStart(2, "0")}-${slash[1].padStart(2, "0")}`;
-      }
-
+      var iso = raw.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+      if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+      var slash = raw.match(/\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b/);
+      if (slash) return slash[3] + "-" + slash[2].padStart(2, "0") + "-" + slash[1].padStart(2, "0");
       return null;
     }
 
-    function walk(node, key = "") {
+    function walk(node, key) {
+      key = key || "";
       if (node == null) return;
-
       if (typeof node === "string") {
-        const normalized = normalize(node);
+        var normalized = normalize(node);
         if (normalized) add(normalized);
         return;
       }
-
       if (typeof node === "number" || typeof node === "boolean") return;
-
       if (Array.isArray(node)) {
-        node.forEach((item) => walk(item, key));
+        node.forEach(function (item) { walk(item, key); });
         return;
       }
-
       if (typeof node === "object") {
-        Object.entries(node).forEach(([childKey, childValue]) => {
+        Object.entries(node).forEach(function (entry) {
+          var childKey = entry[0], childValue = entry[1];
           if (/date|day|slot|appointment/i.test(childKey)) {
-            const normalized = normalize(String(childValue));
-            if (normalized) add(normalized);
+            var n = normalize(String(childValue));
+            if (n) add(n);
           }
           walk(childValue, childKey);
         });
@@ -520,9 +691,9 @@
     }
 
     if (typeof value === "string") {
-      const matches = value.match(/\b20\d{2}-\d{2}-\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/g) || [];
-      matches.forEach((item) => {
-        const normalized = normalize(item);
+      var matches = value.match(/\b20\d{2}-\d{2}-\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/g) || [];
+      matches.forEach(function (item) {
+        var normalized = normalize(item);
         if (normalized) add(normalized);
       });
     } else {
@@ -532,14 +703,71 @@
     return dates;
   }
 
+  // --- Page-bridge communication helpers ---
+
+  function sendPageAction(action, data) {
+    return new Promise(function (resolve, reject) {
+      var timeoutId = window.setTimeout(function () {
+        state.waitingForActionResolve = null;
+        reject(new Error("Timed out waiting for page action: " + action));
+      }, 20000);
+
+      state.waitingForActionResolve = function (result) {
+        window.clearTimeout(timeoutId);
+        if (result.success) resolve(result);
+        else reject(new Error(result.error || "Action failed: " + action));
+      };
+
+      window.postMessage({
+        source: "ica-slot-watcher-content",
+        action: action,
+        data: data || {}
+      }, window.location.origin);
+    });
+  }
+
+  function waitForBridgeReady(timeoutMs) {
+    if (state.bridgeReady) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      var elapsed = 0;
+      var check = function () {
+        if (state.bridgeReady) return resolve();
+        elapsed += 300;
+        if (elapsed >= timeoutMs) return reject(new Error("Page bridge did not become ready"));
+        window.setTimeout(check, 300);
+      };
+      window.setTimeout(check, 300);
+    });
+  }
+
+  function waitForTextInPage(texts, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var elapsed = 0;
+      var check = function () {
+        var bodyText = document.body.innerText || "";
+        for (var i = 0; i < texts.length; i++) {
+          if (bodyText.includes(texts[i])) return resolve(texts[i]);
+        }
+        elapsed += 500;
+        if (elapsed >= timeoutMs) {
+          return reject(new Error("Timed out waiting for page text: " + texts.join(" / ")));
+        }
+        window.setTimeout(check, 500);
+      };
+      window.setTimeout(check, 500);
+    });
+  }
+
+  // --- UI helpers ---
+
   function showResult(result) {
     setStatus(result.summary.split("\n")[0]);
-    const root = document.getElementById("ica-slot-watcher");
+    var root = document.getElementById("ica-slot-watcher");
     root.querySelector("[data-isw-result]").textContent = result.summary;
   }
 
   function setStatus(text) {
-    const root = document.getElementById("ica-slot-watcher");
+    var root = document.getElementById("ica-slot-watcher");
     if (!root) return;
     root.querySelector("[data-isw-status]").textContent = text;
   }
@@ -548,7 +776,7 @@
     playSound(urgent);
 
     if ("Notification" in window) {
-      let permission = Notification.permission;
+      var permission = Notification.permission;
       if (permission === "default") {
         permission = await Notification.requestPermission();
       }
@@ -567,20 +795,20 @@
   async function notifyRadarOnce(type, result) {
     if (!state.telegramNotifyEnabled || !state.radarNotifyUrl || !state.radarNotifyToken) return;
 
-    const signature = `${type}:${result.earliestDate || ""}:${result.summary}`;
-    const lastAt = state.lastRadarNotifications.get(signature) || 0;
+    var signature = type + ":" + (result.earliestDate || "") + ":" + result.summary;
+    var lastAt = state.lastRadarNotifications.get(signature) || 0;
     if (Date.now() - lastAt < radarNotifyCooldownMs) return;
     state.lastRadarNotifications.set(signature, Date.now());
 
     try {
-      const response = await fetch(state.radarNotifyUrl, {
+      var response = await fetch(state.radarNotifyUrl, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "authorization": `Bearer ${state.radarNotifyToken}`
+          "authorization": "Bearer " + state.radarNotifyToken
         },
         body: JSON.stringify({
-          type,
+          type: type,
           summary: result.summary,
           earliestDate: result.earliestDate || "",
           earlierDates: result.dates || [],
@@ -591,30 +819,30 @@
       });
 
       if (!response.ok) {
-        const detail = await response.text();
-        setStatus(`Telegram API failed: HTTP ${response.status} ${detail.slice(0, 100)}`);
+        var detail = await response.text();
+        setStatus("Telegram API failed: HTTP " + response.status + " " + detail.slice(0, 100));
       }
     } catch (error) {
-      setStatus(`Telegram API failed: ${error instanceof Error ? error.message : String(error)}`);
+      setStatus("Telegram API failed: " + (error instanceof Error ? error.message : String(error)));
     }
   }
 
   function isLikelySessionExpired(errorMessage) {
-    const text = (document.body?.innerText || "").replace(/\s+/g, " ");
+    var text = (document.body ? document.body.innerText : "").replace(/\s+/g, " ");
     return (
-      /session|expired|timed out|please log in|login again|something went wrong/i.test(`${errorMessage} ${text}`) ||
-      !location.href.includes("/eappt/locationselection") ||
-      !document.querySelector(".btnProceed")
+      /session|expired|timed out|please log in|login again|something went wrong/i.test(errorMessage + " " + text) ||
+      (!location.href.includes("/eappt/locationselection") && !location.href.includes("/eappt/serviceselection")) ||
+      (!document.querySelector(".btnProceed") && !document.querySelector("ng-select"))
     );
   }
 
   function playSound(urgent) {
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      const context = new AudioContext();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var context = new AudioCtx();
+      var oscillator = context.createOscillator();
+      var gain = context.createGain();
       oscillator.type = "sine";
       oscillator.frequency.value = urgent ? 880 : 440;
       gain.gain.value = urgent ? 0.18 : 0.08;
@@ -622,16 +850,28 @@
       gain.connect(context.destination);
       oscillator.start();
       oscillator.stop(context.currentTime + (urgent ? 0.45 : 0.18));
-    } catch {
-      // Browser audio can be blocked until the user interacts with the page.
-    }
+    } catch (_) {}
   }
+
+  // --- Utility ---
 
   function formatTime(date) {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 
+  function formatDateForIca(date) {
+    var dd = String(date.getDate()).padStart(2, "0");
+    var mm = String(date.getMonth() + 1).padStart(2, "0");
+    var yyyy = date.getFullYear();
+    return dd + "/" + mm + "/" + yyyy;
+  }
+
+  function parseIsoDate(isoStr) {
+    var parts = isoStr.split("-");
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
   function sleep(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
+    return new Promise(function (resolve) { window.setTimeout(resolve, ms); });
   }
 })();

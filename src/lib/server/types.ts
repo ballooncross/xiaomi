@@ -117,6 +117,10 @@ export type Env = {
   GEMINI_MODEL?: string;
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  SESSION_SECRET?: string;
+  ALLOWED_EMAILS?: string;
 };
 
 export type JobResult = {
