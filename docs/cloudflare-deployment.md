@@ -60,6 +60,7 @@ npx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
 npx wrangler secret put TICKETMASTER_API_KEY --config wrangler.cron.toml
 npx wrangler secret put GEMINI_API_KEY --config wrangler.cron.toml
 npx wrangler secret put DEEPSEEK_API_KEY --config wrangler.cron.toml
+npx wrangler secret put ICA_APPLICATION_ID --config wrangler.cron.toml
 ```
 
 Only set AI keys if you want AI enabled. The app falls back to rules when keys are missing.
@@ -101,11 +102,30 @@ npm run deploy:cron
 
 The Pages app serves the UI and API routes. The separate cron Worker runs scheduled fetch and digest jobs against the same D1 database.
 
+The production cron config has `ICA_CHECK_ENABLED = "true"` so it starts checking after the app ID secret exists. Add the secret, then deploy the cron Worker:
+
+```bash
+npx wrangler secret put ICA_APPLICATION_ID --config wrangler.cron.toml
+npm run deploy:cron
+```
+
+The app never auto-books or updates the appointment. It only checks availability and sends Telegram when a selectable ICA appointment date before `ICA_TARGET_BEFORE` appears. To pause the checker, set `ICA_CHECK_ENABLED = "false"` in `wrangler.cron.toml` and redeploy the cron Worker.
+
+After the cron Worker is deployed and `ADMIN_TOKEN`, `ICA_APPLICATION_ID`, and `ICA_CHECK_ENABLED` are configured, run a one-off remote check without waiting for the next cron time:
+
+```bash
+curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ica-check \
+  -H 'x-admin-token: YOUR_ADMIN_TOKEN'
+```
+
+Use `npx wrangler deployments status --config wrangler.cron.toml` or the Cloudflare Workers dashboard to find the deployed Worker route if your account uses a custom workers.dev subdomain. This manual route runs the same checker as the cron schedule and still never updates or books an appointment.
+
 ## Cron Schedule
 
 `wrangler.cron.toml` currently configures:
 
 - every 6 hours: fetch concerts and trend/news items
+- `00:00`, `03:00`, `06:00`, `09:00`, `11:00 UTC`: check ICA appointment availability, which is `08:00`, `11:00`, `14:00`, `17:00`, `19:00 Asia/Singapore`
 - `00:30 UTC`: send daily digest, which is `08:30 Asia/Singapore`
 
 ## Security

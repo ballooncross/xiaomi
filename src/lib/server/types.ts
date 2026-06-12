@@ -102,6 +102,10 @@ export type Env = {
   AI_FALLBACK_PROVIDER?: string;
   AI_MAX_ITEMS_PER_DAY?: string;
   AI_MONTHLY_BUDGET_USD?: string;
+  BROWSER?: unknown;
+  ICA_CHECK_ENABLED?: string;
+  ICA_APPLICATION_ID?: string;
+  ICA_TARGET_BEFORE?: string;
   GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
   DEEPSEEK_API_KEY?: string;
