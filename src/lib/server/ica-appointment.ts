@@ -91,13 +91,20 @@ async function checkIcaAppointment(env: Env): Promise<IcaCheckResult> {
     await selectCompletionFormalitiesService(page);
     await typeApplicationId(page, env.ICA_APPLICATION_ID ?? '');
     await clickButtonByText(page, 'Proceed');
-    await page.waitForFunction(
-      () => document.body.innerText.includes('Update Appointment') || document.body.innerText.includes('Error in application'),
-      { timeout: PAGE_TIMEOUT_MS }
-    );
-
+    await waitForPostProceedResult(page);
     const bodyText = await page.evaluate(() => document.body.innerText);
-    if (bodyText.includes('Error in application')) throw new Error('ICA returned application error after authentication');
+    const postProceedError = extractPostProceedError(bodyText);
+    if (postProceedError) {
+      return {
+        status: 'error',
+        targetBefore: target,
+        earlierDates: [],
+        checkedAt: new Date().toISOString(),
+        runner: 'cloudflare-browser-run',
+        detail: postProceedError
+      };
+    }
+
     const currentAppointment = extractCurrentAppointment(bodyText);
 
     await clickButtonByText(page, 'Update Appointment');
@@ -208,6 +215,25 @@ async function clickButtonByText(page: BrowserPage, text: string) {
     return true;
   }, text);
   if (!clicked) throw new Error(`ICA button not found or disabled: ${text}`);
+}
+
+async function waitForPostProceedResult(page: BrowserPage) {
+  try {
+    await page.waitForFunction(
+      () => {
+        const text = document.body?.innerText ?? '';
+        return (
+          text.includes('Update Appointment') ||
+          text.includes('Error in application') ||
+          text.includes('Error Message') ||
+          text.includes('Something went wrong')
+        );
+      },
+      { timeout: PAGE_TIMEOUT_MS }
+    );
+  } catch {
+    throw new Error(`ICA did not show appointment controls after Proceed. ${await pageDiagnostic(page)}`);
+  }
 }
 
 async function openDatePicker(page: BrowserPage) {
@@ -434,6 +460,18 @@ function extractCurrentAppointment(text: string): string | undefined {
   return text.match(/Current Appointment\s*:\s*([^\n]+)/)?.[1]?.trim();
 }
 
+export function extractPostProceedError(text: string): string | undefined {
+  if (text.includes('Error in application')) {
+    return 'ICA returned an application error after Proceed. Check that the application ID and service type are correct.';
+  }
+
+  if (/Something went wrong\.?\s*Please try again\.?/i.test(text)) {
+    return 'ICA returned "Something went wrong. Please try again." after Proceed. The checker reached the application-ID step, but ICA did not expose appointment data.';
+  }
+
+  return undefined;
+}
+
 function targetBefore(env: Env): string {
   return env.ICA_TARGET_BEFORE || '2026-07-01';
 }
@@ -444,7 +482,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isVerificationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /captcha|verification|timeout|application error|access denied|forbidden|blocked/i.test(message);
+  return /captcha|verification|access denied|forbidden|blocked/i.test(message);
 }
 
 function isIcaCheckStatus(value: unknown): value is IcaCheckStatus {
