@@ -99,6 +99,7 @@ export type Env = {
   PUBLIC_APP_NAME?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
+  EXTENSION_NOTIFY_TOKEN?: string;
   TICKETMASTER_API_KEY?: string;
   BANDSINTOWN_APP_ID?: string;
   AI_ENABLED?: string;
@@ -116,6 +117,10 @@ export type Env = {
   GEMINI_MODEL?: string;
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  SESSION_SECRET?: string;
+  ALLOWED_EMAILS?: string;
 };
 
 export type JobResult = {

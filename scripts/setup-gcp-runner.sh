@@ -8,6 +8,7 @@ INSTANCE_NAME="${GCP_RUNNER_INSTANCE:-personal-radar-runner}"
 ZONE="${GCP_ZONE:-us-west1-a}"
 MACHINE_TYPE="${GCP_MACHINE_TYPE:-e2-micro}"
 DISK_SIZE="${GCP_DISK_SIZE:-20GB}"
+DISK_TYPE="${GCP_DISK_TYPE:-pd-standard}"
 IMAGE_FAMILY="${GCP_IMAGE_FAMILY:-debian-12}"
 IMAGE_PROJECT="${GCP_IMAGE_PROJECT:-debian-cloud}"
 RUNNER_PORT="${GCP_RUNNER_PORT:-8788}"
@@ -37,7 +38,7 @@ fi
 
 echo "Using project=$PROJECT_ID zone=$ZONE instance=$INSTANCE_NAME"
 
-if ! gcloud compute instances describe "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" >/dev/null 2>&1; then
+if ! gcloud compute instances describe "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" --quiet >/dev/null 2>&1; then
   gcloud compute instances create "$INSTANCE_NAME" \
     --project "$PROJECT_ID" \
     --zone "$ZONE" \
@@ -45,21 +46,24 @@ if ! gcloud compute instances describe "$INSTANCE_NAME" --project "$PROJECT_ID" 
     --image-family "$IMAGE_FAMILY" \
     --image-project "$IMAGE_PROJECT" \
     --boot-disk-size "$DISK_SIZE" \
-    --tags "$NETWORK_TAG"
+    --boot-disk-type "$DISK_TYPE" \
+    --tags "$NETWORK_TAG" \
+    --quiet
 else
   echo "VM already exists; updating runner files only."
 fi
 
-if ! gcloud compute firewall-rules describe "$FIREWALL_RULE" --project "$PROJECT_ID" >/dev/null 2>&1; then
+if ! gcloud compute firewall-rules describe "$FIREWALL_RULE" --project "$PROJECT_ID" --quiet >/dev/null 2>&1; then
   gcloud compute firewall-rules create "$FIREWALL_RULE" \
     --project "$PROJECT_ID" \
     --allow "tcp:$RUNNER_PORT" \
     --target-tags "$NETWORK_TAG" \
     --source-ranges "0.0.0.0/0" \
-    --description "Allow protected Personal Radar fallback runner webhook"
+    --description "Allow protected Personal Radar fallback runner webhook" \
+    --quiet
 fi
 
-gcloud compute ssh "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" --command "
+gcloud compute ssh "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" --quiet --command "
   set -e
   sudo apt-get update
   sudo apt-get install -y curl git ca-certificates
@@ -72,7 +76,8 @@ gcloud compute ssh "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" --com
 
 gcloud compute scp --recurse "$RUNNER_DIR"/* "$INSTANCE_NAME:~/personal-radar-runner/" \
   --project "$PROJECT_ID" \
-  --zone "$ZONE"
+  --zone "$ZONE" \
+  --quiet
 
 TMP_ENV="$(mktemp)"
 cat > "$TMP_ENV" <<EOF
@@ -84,10 +89,11 @@ EOF
 
 gcloud compute scp "$TMP_ENV" "$INSTANCE_NAME:~/personal-radar-runner/.env" \
   --project "$PROJECT_ID" \
-  --zone "$ZONE"
+  --zone "$ZONE" \
+  --quiet
 rm -f "$TMP_ENV"
 
-gcloud compute ssh "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" --command '
+gcloud compute ssh "$INSTANCE_NAME" --project "$PROJECT_ID" --zone "$ZONE" --quiet --command '
   set -e
   cd ~/personal-radar-runner
   chmod 600 .env
@@ -121,7 +127,8 @@ SERVICE
 RUNNER_IP="$(gcloud compute instances describe "$INSTANCE_NAME" \
   --project "$PROJECT_ID" \
   --zone "$ZONE" \
-  --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+  --format='get(networkInterfaces[0].accessConfigs[0].natIP)' \
+  --quiet)"
 RUNNER_URL="http://$RUNNER_IP:$RUNNER_PORT"
 
 echo

@@ -49,7 +49,7 @@ In Google Cloud Console:
 3. Region/zone: choose a currently eligible Free Tier region if cost matters.
 4. Machine type: `e2-micro`.
 5. Boot disk: Debian 12 or Ubuntu 24.04.
-6. Disk size: 20-30 GB standard persistent disk.
+6. Disk size/type: 20-30 GB `pd-standard` persistent disk.
 7. Firewall: no inbound HTTP/HTTPS needed. SSH only.
 8. Create.
 
