@@ -149,7 +149,7 @@ async function selectCompletionFormalitiesService(page: BrowserPage) {
   await sleep(500);
 
   const selectedByText = await page.evaluate(() => {
-    const option = Array.from(document.querySelectorAll('[role="option"], mat-option, .mat-option')).find((candidate) =>
+    const option = Array.from(document.querySelectorAll('[role="option"], .ng-option, mat-option, .mat-option')).find((candidate) =>
       (candidate.textContent ?? '').includes('Completion of Formalities')
     );
     if (!option) return false;
