@@ -2,7 +2,7 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
-  import type { DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
+  import type { CronJobStatus, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
@@ -60,6 +60,7 @@
     checkerUrlConfigured: false,
     fallbackConfigured: false
   });
+  let cronJobs = $state<CronJobStatus[]>([]);
   let icaJobPending = $state(false);
   let icaJobStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
   let icaJobMessage = $state('尚未手动检查。');
@@ -93,6 +94,7 @@
     topics = data.topics;
     reminders = data.reminders;
     icaTool = data.icaTool;
+    cronJobs = data.cronJobs;
   });
 
   const navItems: Array<{ id: View; label: string }> = [
@@ -666,6 +668,26 @@
     return labels[status ?? ''] ?? '尚未运行';
   }
 
+  function jobStatusLabel(status: string | undefined) {
+    const labels: Record<string, string> = {
+      ok: '正常',
+      skipped: '跳过',
+      found_earlier: '发现更早日期',
+      blocked: '被验证拦截',
+      not_configured: '配置未完成',
+      error: '失败'
+    };
+    return labels[status ?? ''] ?? '尚未运行';
+  }
+
+  function jobStatusClass(job: CronJobStatus) {
+    if (!job.enabled) return 'disabled';
+    if (!job.lastRun) return 'idle';
+    if (job.lastRun.status === 'ok' || job.lastRun.status === 'found_earlier') return 'success';
+    if (job.lastRun.status === 'skipped') return 'skipped';
+    return 'error';
+  }
+
   function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
     return sourceTopics
       .filter((topic) => matchesPreferenceTopic(topic, query, view))
@@ -1073,12 +1095,46 @@
               </div>
             </div>
 
+            <section class="cron-status-card">
+              <div class="notebook-head compact-head">
+                <div>
+                  <h2>定时任务状态</h2>
+                  <span>Cloudflare Cron 的启用状态和最近一次运行结果。</span>
+                </div>
+              </div>
+              <div class="cron-job-list">
+                {#each cronJobs as job}
+                  <article class={`cron-job-row ${jobStatusClass(job)}`}>
+                    <div class="cron-job-main">
+                      <span class="cron-dot"></span>
+                      <div>
+                        <strong>{job.label}</strong>
+                        <p>{job.description}</p>
+                      </div>
+                    </div>
+                    <div class="cron-job-meta">
+                      <span>{job.schedule}</span>
+                      <strong>{job.enabled ? '已启用' : '已停用'}</strong>
+                    </div>
+                    <div class="cron-job-meta">
+                      <span>上次运行</span>
+                      <strong>{formatStatusTime(job.lastRun?.finishedAt ?? job.lastRun?.startedAt)}</strong>
+                    </div>
+                    <div class="cron-job-meta wide">
+                      <span>{jobStatusLabel(job.lastRun?.status)}</span>
+                      <strong>{job.lastRun?.detail ?? '暂无记录'}</strong>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            </section>
+
             <section class:running={icaJobStatus === 'running'} class={`job-run-card ica-tool-card ${icaJobStatus}`}>
               <div class="job-run-copy">
                 <span>ICA 预约检查</span>
-                <strong>{icaStatusLabel(icaTool.lastJob?.status)}</strong>
+                <strong>{icaTool.enabled ? icaStatusLabel(icaTool.lastJob?.status) : 'Cloudflare 定时已停用'}</strong>
                 <p>
-                  目标：寻找 {icaTool.targetBefore} 之前的可选日期。定时检查为每天 08:00、11:00、14:00、17:00、19:00。
+                  目标：寻找 {icaTool.targetBefore} 之前的可选日期。ICA 搜索接口会拒绝 Cloudflare Browser Run，定时检查已停止。
                 </p>
               </div>
               <div class="job-run-controls">
@@ -1089,13 +1145,17 @@
                 <button
                   class="small-button primary"
                   type="button"
-                  disabled={icaJobPending || !icaTool.checkerUrlConfigured}
+                  disabled={icaJobPending || !icaTool.enabled || !icaTool.checkerUrlConfigured}
                   onclick={triggerIcaCheck}
                 >
-                  {icaJobPending ? '检查中...' : '立即检查'}
+                  {icaJobPending ? '检查中...' : icaTool.enabled ? '立即检查' : '已停用'}
                 </button>
               </div>
               <div class="tool-status-grid">
+                <div>
+                  <span>定时检查</span>
+                  <strong>{icaTool.enabled ? '已启用' : '已停用'}</strong>
+                </div>
                 <div>
                   <span>远程触发</span>
                   <strong>{icaTool.checkerUrlConfigured ? '已配置' : '未配置'}</strong>
@@ -1122,6 +1182,9 @@
                   {/if}
                   {#if !icaTool.checkerUrlConfigured}
                     · 需要配置 CRON_WORKER 服务绑定或 ICA_CHECKER_URL 后才能从网页手动触发。
+                  {/if}
+                  {#if !icaTool.enabled}
+                    · Cloudflare 定时任务已停用，后续改用 GCP / 持久浏览器方案。
                   {/if}
                 </p>
               </div>
@@ -2663,6 +2726,7 @@
 
   .settings-card,
   .notebook-card,
+  .cron-status-card,
   .job-run-card,
   .settings-grid.compact button {
     border: 1px solid var(--line);
@@ -2672,6 +2736,7 @@
 
   .settings-card,
   .notebook-card,
+  .cron-status-card,
   .job-run-card {
     padding: 16px;
   }
@@ -2679,6 +2744,93 @@
   .tools-panel {
     display: grid;
     gap: 12px;
+  }
+
+  .compact-head {
+    margin-bottom: 12px;
+  }
+
+  .cron-job-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .cron-job-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(92px, 0.34fr) minmax(128px, 0.42fr) minmax(180px, 0.76fr);
+    gap: 10px;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--mint) 38%, white);
+    padding: 10px;
+  }
+
+  .cron-job-main {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .cron-dot {
+    width: 9px;
+    height: 9px;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  .cron-job-row.success .cron-dot {
+    background: var(--jade);
+  }
+
+  .cron-job-row.skipped .cron-dot {
+    background: var(--gold);
+  }
+
+  .cron-job-row.error .cron-dot {
+    background: #d9634f;
+  }
+
+  .cron-job-row.disabled {
+    background: #fff8eb;
+    opacity: 0.78;
+  }
+
+  .cron-job-main strong,
+  .cron-job-meta strong {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  .cron-job-main p,
+  .cron-job-meta span {
+    color: var(--muted);
+  }
+
+  .cron-job-main p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .cron-job-meta {
+    min-width: 0;
+  }
+
+  .cron-job-meta span {
+    display: block;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .cron-job-meta strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.3;
   }
 
   .job-run-card {
@@ -2717,7 +2869,7 @@
   .tool-status-grid {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 10px;
     position: relative;
   }
@@ -3357,6 +3509,16 @@
     .settings-grid,
     .settings-grid.compact {
       grid-template-columns: 1fr;
+    }
+
+    .cron-job-row {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+
+    .cron-job-main,
+    .cron-job-meta.wide {
+      grid-column: 1 / -1;
     }
 
     .job-run-card,

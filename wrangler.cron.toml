@@ -14,7 +14,6 @@ database_id = "cd24444b-000a-4435-9c7b-ee3c659a41cf"
 [triggers]
 crons = [
   "0 */6 * * *",
-  "0 0,3,6,9,11 * * *",
   "30 0 * * *"
 ]
 
@@ -25,5 +24,5 @@ AI_FALLBACK_PROVIDER = "deepseek"
 AI_MAX_ITEMS_PER_DAY = "20"
 AI_MONTHLY_BUDGET_USD = "1"
 BANDSINTOWN_APP_ID = "personal-radar"
-ICA_CHECK_ENABLED = "true"
+ICA_CHECK_ENABLED = "false"
 ICA_TARGET_BEFORE = "2026-07-01"

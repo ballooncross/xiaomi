@@ -111,41 +111,24 @@ npm run deploy:cron
 
 The Pages app serves the UI and API routes. The separate cron Worker runs scheduled fetch and digest jobs against the same D1 database.
 
-The production cron config has `ICA_CHECK_ENABLED = "true"` so it starts checking after the app ID secret exists. Add the secret, then deploy the cron Worker:
+Cloudflare Browser Run is not reliable for the ICA appointment checker because ICA's protected appointment search endpoint can reject automated sessions after the application-ID step. The production cron config keeps `ICA_CHECK_ENABLED = "false"` and does not schedule ICA checks. Use the GCP Playwright fallback runner in [GCP Playwright Runner](./gcp-playwright-runner.md) if you want to continue testing appointment automation with a persistent browser profile.
 
-```bash
-npx wrangler secret put ICA_APPLICATION_ID --config wrangler.cron.toml
-npm run deploy:cron
-```
+The web app still exposes the ICA tool under 我的 > 工具 for status history. The `立即检查` button is disabled while `ICA_CHECK_ENABLED = "false"`.
 
-The app never auto-books or updates the appointment. It only checks availability and sends Telegram when a selectable ICA appointment date before `ICA_TARGET_BEFORE` appears. To pause the checker, set `ICA_CHECK_ENABLED = "false"` in `wrangler.cron.toml` and redeploy the cron Worker.
-
-The web app also exposes the checker under 我的 > 工具. The `立即检查` button calls the cron Worker through the `CRON_WORKER` service binding in `wrangler.toml`, so no public Worker URL is required in production. It still requires `ADMIN_TOKEN` in the browser field because the Pages API verifies the request before forwarding it.
-
-After the cron Worker is deployed and `ADMIN_TOKEN`, `ICA_APPLICATION_ID`, and `ICA_CHECK_ENABLED` are configured, you can also run a one-off remote check without waiting for the next cron time:
+If you temporarily re-enable the Cloudflare checker, the app never auto-books or updates the appointment. It only checks availability and sends Telegram when a selectable ICA appointment date before `ICA_TARGET_BEFORE` appears. A one-off remote check would use:
 
 ```bash
 curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ica-check \
   -H 'x-admin-token: YOUR_ADMIN_TOKEN'
 ```
 
-Use the Cloudflare Workers dashboard to find the deployed Worker route if your account exposes a workers.dev subdomain. This manual route runs the same checker as the cron schedule and still never updates or books an appointment.
-
-If Cloudflare Browser Run is blocked by the target site or remains unreliable, use the GCP Playwright fallback runner in [GCP Playwright Runner](./gcp-playwright-runner.md). Keep the main app on Cloudflare and move only the browser automation job to the VM.
-
-After the fallback is configured, both scheduled ICA checks and the 我的 > 工具 > 立即检查 button use the same behavior:
-
-1. Try Cloudflare Browser Run first.
-2. If Cloudflare fails with `blocked`, `error`, or missing Browser Run config, POST to `ICA_FALLBACK_CHECK_URL`.
-3. Record the fallback result in D1.
-4. Send Telegram only from the Cloudflare app if an earlier date is newly found.
+Use the Cloudflare Workers dashboard to find the deployed Worker route if your account exposes a workers.dev subdomain.
 
 ## Cron Schedule
 
 `wrangler.cron.toml` currently configures:
 
 - every 6 hours: fetch concerts and trend/news items
-- `00:00`, `03:00`, `06:00`, `09:00`, `11:00 UTC`: check ICA appointment availability, which is `08:00`, `11:00`, `14:00`, `17:00`, `19:00 Asia/Singapore`
 - `00:30 UTC`: send daily digest, which is `08:30 Asia/Singapore`
 
 ## Security

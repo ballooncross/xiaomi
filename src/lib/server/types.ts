@@ -134,3 +134,12 @@ export type JobRun = {
   finishedAt?: string;
   detail: string;
 };
+
+export type CronJobStatus = {
+  jobName: string;
+  label: string;
+  description: string;
+  schedule: string;
+  enabled: boolean;
+  lastRun?: JobRun;
+};

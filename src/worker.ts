@@ -4,12 +4,7 @@ import type { Env } from './lib/server/types';
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    const cron = (event as ScheduledEvent & { cron?: string }).cron;
     const hourMinute = new Date(event.scheduledTime).toISOString().slice(11, 16);
-    if (cron === '0 0,3,6,9,11 * * *') {
-      ctx.waitUntil(runIcaAppointmentCheckJob(env));
-      return;
-    }
     if (hourMinute === '00:30') {
       ctx.waitUntil(runDailyDigestJob(env));
       return;
