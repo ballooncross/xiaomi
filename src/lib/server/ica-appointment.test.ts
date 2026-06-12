@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { mergeIcaFallbackDetail, normalizeIcaFallbackUrl, shouldTriggerIcaFallback } from './ica-appointment';
+import {
+  extractPostProceedError,
+  mergeIcaFallbackDetail,
+  normalizeIcaFallbackUrl,
+  shouldTriggerIcaFallback
+} from './ica-appointment';
 
 describe('ICA fallback helpers', () => {
   it('normalizes the fallback runner URL', () => {
@@ -26,5 +31,12 @@ describe('ICA fallback helpers', () => {
     expect(mergeIcaFallbackDetail({ status: 'blocked', detail: 'captcha page' }, 'No earlier date')).toContain(
       'Primary detail: captcha page'
     );
+  });
+
+  it('recognizes ICA generic errors after Proceed', () => {
+    expect(extractPostProceedError('Error Message\nSomething went wrong. Please try again.')).toContain(
+      'Something went wrong'
+    );
+    expect(extractPostProceedError('Update Appointment')).toBeUndefined();
   });
 });
