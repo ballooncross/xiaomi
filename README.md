@@ -48,6 +48,10 @@ npm run deploy              # deploy Pages app
 npm run deploy:cron         # deploy scheduled worker
 ```
 
+## Deployment Rule
+
+Production deployment is tied to the repository's canonical branch. After deploying, or as part of the deployment workflow, always make sure the deployed code has been merged into `main` or `master` so production matches the source of record.
+
 Run `npm run db:migrate:local` after pulling schema changes. The birthday notebook uses the `date_reminders` D1 table and stores lunar dates for annual reminders.
 
 ## Docs

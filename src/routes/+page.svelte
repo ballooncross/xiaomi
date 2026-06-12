@@ -25,7 +25,7 @@
   let items = $state<RadarItem[]>([]);
   let topics = $state<WatchTopic[]>([]);
   let reminders = $state<ReminderView[]>([]);
-  let activeView = $state<View>('home');
+  let activeView = $state<View>(viewFromPath(page.url.pathname));
   let activeFilter = $state('for-you');
   let searchQuery = $state('');
   let searchOpen = $state(false);
@@ -80,7 +80,8 @@
   let reminderPinned = $state(false);
 
   $effect(() => {
-    activeView = viewFromPath(page.url.pathname);
+    const routeView = viewFromPath(page.url.pathname);
+    if (activeView !== routeView) activeView = routeView;
   });
 
   onMount(() => {
