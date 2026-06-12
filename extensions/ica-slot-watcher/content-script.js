@@ -457,41 +457,51 @@
       await sleep(500);
 
       // Step 3: Click Proceed
-      setStatus("Step 3/6: Clicking Proceed...");
+      setStatus("Step 3: Clicking Proceed...");
       const proceedBtn = findButton("Proceed") || document.querySelector(".btnProceed");
       if (!proceedBtn) throw new Error("Proceed button not found on service selection page");
       proceedBtn.click();
 
-      // Step 4: Wait for appointment page
-      setStatus("Step 4/6: Waiting for appointment page...");
-      await waitForTextInPage(["Update Appointment", "Error Message", "Something went wrong"], 25000);
+      // Step 4: Wait for next page — could be "Update Appointment" page OR directly the location/calendar page
+      setStatus("Step 4: Waiting for next page...");
+      await waitForTextInPage([
+        "Update Appointment",
+        "Appointment Details",
+        "Advanced search",
+        "Search by date",
+        "Search by location",
+        "Error Message",
+        "Something went wrong"
+      ], 25000);
 
-      const bodyText = document.body.innerText;
+      var bodyText = document.body.innerText;
       if (bodyText.includes("Something went wrong") || bodyText.includes("Error Message")) {
         throw new Error("ICA returned an error after Proceed. Check application ID.");
       }
 
+      // If "Update Appointment" button exists, click it (intermediate page)
       await sleep(800);
-      const updateBtn = findButton("Update Appointment");
-      if (!updateBtn) throw new Error("Update Appointment button not found");
-      updateBtn.click();
-
-      // Step 5: Wait for location selection with appointment details
-      setStatus("Step 5/6: Waiting for appointment details...");
-      await waitForTextInPage(["Appointment Details"], 25000);
-      await sleep(800);
+      var updateBtn = findButton("Update Appointment");
+      if (updateBtn) {
+        setStatus("Step 5: Clicking Update Appointment...");
+        updateBtn.click();
+        await waitForTextInPage(["Appointment Details", "Advanced search", "Search by date"], 25000);
+        await sleep(800);
+      }
+      // Otherwise we landed directly on the location/calendar page — continue
 
       // Click Advanced Search tab
-      const adsTab = document.querySelector("#adsTab");
+      setStatus("Switching to Advanced Search...");
+      var adsTab = document.querySelector("#adsTab");
       if (adsTab && !adsTab.classList.contains("btn-primary")) {
         adsTab.click();
         await sleep(500);
       }
 
-      // Step 6: Fill date range
-      setStatus("Step 6/6: Setting date range...");
-      const fromDate = formatDateForIca(new Date());
-      const toDate = formatDateForIca(parseIsoDate(state.searchToDate));
+      // Fill date range
+      setStatus("Setting date range...");
+      var fromDate = formatDateForIca(new Date());
+      var toDate = formatDateForIca(parseIsoDate(state.searchToDate));
       await sendPageAction("set-dates", { fromDate, toDate });
       await sleep(500);
 
