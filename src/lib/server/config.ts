@@ -2,6 +2,7 @@ import type { Env } from './types';
 
 export const defaultEnv: Env = {
   ADMIN_TOKEN: '',
+  ICA_CHECKER_URL: '',
   PUBLIC_APP_NAME: 'Personal Radar',
   TELEGRAM_BOT_TOKEN: '',
   TELEGRAM_CHAT_ID: '',

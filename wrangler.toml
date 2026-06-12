@@ -7,6 +7,10 @@ binding = "DB"
 database_name = "personal-radar"
 database_id = "cd24444b-000a-4435-9c7b-ee3c659a41cf"
 
+[[services]]
+binding = "CRON_WORKER"
+service = "personal-radar-cron"
+
 [vars]
 AI_ENABLED = "auto"
 AI_PROVIDER = "gemini"

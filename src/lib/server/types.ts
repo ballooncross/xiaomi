@@ -92,6 +92,10 @@ export type Digest = {
 export type Env = {
   DB?: D1Database;
   ADMIN_TOKEN?: string;
+  CRON_WORKER?: {
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  };
+  ICA_CHECKER_URL?: string;
   PUBLIC_APP_NAME?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
@@ -117,5 +121,14 @@ export type JobResult = {
   updated: number;
   considered: number;
   notified: number;
+  detail: string;
+};
+
+export type JobRun = {
+  id: string;
+  jobName: string;
+  status: string;
+  startedAt: string;
+  finishedAt?: string;
   detail: string;
 };

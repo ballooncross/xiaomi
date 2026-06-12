@@ -103,7 +103,7 @@ ICA_APPLICATION_ID=ISC...
 ICA_TARGET_BEFORE=2026-07-01
 ```
 
-Plain `npm run dev` cannot launch Cloudflare Browser Run locally. Deploy the cron Worker, then use the protected Worker route to test the real browser path:
+Plain `npm run dev` cannot launch Cloudflare Browser Run locally. In production, 我的 > 工具 > ICA 预约检查 calls the cron Worker through the `CRON_WORKER` service binding. For local fallback testing, set `ICA_CHECKER_URL` to the deployed Worker URL in `.env.local`, then use the same UI button or call the protected Worker route directly:
 
 ```bash
 curl -X POST https://personal-radar-cron.<your-workers-subdomain>.workers.dev/ica-check \
