@@ -7,7 +7,7 @@
   const DEFAULTS = {
     enabled: false,
     intervalSeconds: 10,
-    autoRefreshSession: true,
+    autoRefreshSession: false,
     refreshMinutes: 13,
     targetBefore: "2026-07-01",
     searchToDate: "2026-06-19",
@@ -105,8 +105,8 @@
             <input data-isw-refresh-minutes type="number" min="5" step="1" value="${state.refreshMinutes}">
           </label>
           <label class="isw-check">
-            <input data-isw-auto-refresh type="checkbox" checked>
-            Auto-renew session (navigate from start)
+            <input data-isw-auto-refresh type="checkbox">
+            Periodic session refresh (every N min)
           </label>
           <label class="isw-check">
             <input data-isw-no-slots type="checkbox">
@@ -380,7 +380,7 @@
   }
 
   function renewSession() {
-    if (!state.enabled || !state.autoRefreshSession) return;
+    if (!state.enabled) return;
 
     if (state.running || state.setupInProgress) {
       state.refreshTimer = window.setTimeout(renewSession, 30 * 1000);
@@ -543,12 +543,12 @@
       setStatus(state.lastResult);
       showResult({ summary: state.lastResult, dates: [] });
       if (isLikelySessionExpired(state.lastError)) {
-        await alertUser("ICA session may have expired. Will auto-renew if enabled.", true);
+        await alertUser("ICA session may have expired. Re-navigating from start.", true);
         await notifyRadarOnce("ica_session_expired", {
           summary: "ICA session expired: " + state.lastError,
           dates: []
         });
-        if (state.enabled && state.autoRefreshSession && state.applicationId) {
+        if (state.enabled && state.applicationId) {
           stopTimers();
           await sleep(2000);
           renewSession();
@@ -613,10 +613,8 @@
   }
 
   function evaluateSlots(slotsDetail) {
-    var dates = extractDates(slotsDetail.body)
-      .filter(function (date) { return date < state.targetBefore; })
-      .sort();
-    var uniqueDates = Array.from(new Set(dates));
+    var allDates = extractDates(slotsDetail.body).sort();
+    var uniqueDates = Array.from(new Set(allDates));
     var earliest = uniqueDates[0] || "";
     var checkedAt = formatTime(new Date());
 
@@ -633,7 +631,7 @@
         hasEarlierDate: true,
         dates: uniqueDates,
         earliestDate: earliest,
-        summary: "Earlier ICA slot found before " + state.targetBefore + ": " + earliest + "\n" + uniqueDates.join(", ")
+        summary: "Slot found: " + earliest + "\n" + uniqueDates.join(", ")
       };
     }
 
@@ -641,7 +639,7 @@
       hasEarlierDate: false,
       dates: [],
       earliestDate: "",
-      summary: "Checked " + checkedAt + ". No slot before " + state.targetBefore + "."
+      summary: "Checked " + checkedAt + ". No slots available in search range."
     };
   }
 
