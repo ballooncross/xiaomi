@@ -9,7 +9,6 @@
     intervalSeconds: 10,
     autoRefreshSession: false,
     refreshMinutes: 13,
-    targetBefore: "2026-07-01",
     searchFromDate: "",
     searchToDate: "2026-06-19",
     applicationId: "",
@@ -89,10 +88,6 @@
           <label class="isw-label">
             Application ID
             <input data-isw-app-id type="text" placeholder="ISC2509SFXXXXXX" value="">
-          </label>
-          <label class="isw-label">
-            Before date
-            <input data-isw-target type="date" value="${state.targetBefore}">
           </label>
           <label class="isw-label">
             Search from date
@@ -272,7 +267,6 @@
       root.classList.toggle("isw-collapsed");
     });
     root.querySelector("[data-isw-app-id]").addEventListener("change", saveSettingsFromUi);
-    root.querySelector("[data-isw-target]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-search-from]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-search-to]").addEventListener("change", saveSettingsFromUi);
     root.querySelector("[data-isw-interval]").addEventListener("change", saveSettingsFromUi);
@@ -306,7 +300,6 @@
   function saveSettingsFromUi() {
     const root = document.getElementById("ica-slot-watcher");
     state.applicationId = root.querySelector("[data-isw-app-id]").value.trim();
-    state.targetBefore = root.querySelector("[data-isw-target]").value || DEFAULTS.targetBefore;
     state.searchFromDate = root.querySelector("[data-isw-search-from]").value || "";
     state.searchToDate = root.querySelector("[data-isw-search-to]").value || DEFAULTS.searchToDate;
     state.intervalSeconds = Math.max(10, Number(root.querySelector("[data-isw-interval]").value || 10));
@@ -324,7 +317,6 @@
       intervalSeconds: state.intervalSeconds,
       autoRefreshSession: state.autoRefreshSession,
       refreshMinutes: state.refreshMinutes,
-      targetBefore: state.targetBefore,
       searchToDate: state.searchToDate,
       notifyWhenNoSlots: state.notifyWhenNoSlots,
       telegramNotifyEnabled: state.telegramNotifyEnabled,
@@ -338,7 +330,6 @@
     const root = document.getElementById("ica-slot-watcher");
     if (!root) return;
     root.querySelector("[data-isw-app-id]").value = state.applicationId;
-    root.querySelector("[data-isw-target]").value = state.targetBefore;
     root.querySelector("[data-isw-search-from]").value = state.searchFromDate || "";
     root.querySelector("[data-isw-search-to]").value = state.searchToDate;
     root.querySelector("[data-isw-interval]").value = state.intervalSeconds;
