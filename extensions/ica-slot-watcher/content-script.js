@@ -821,6 +821,11 @@
     state.lastRadarNotifications.set(signature, Date.now());
 
     try {
+      var today = new Date();
+      var fromDateStr = today.getFullYear() + "-" +
+        String(today.getMonth() + 1).padStart(2, "0") + "-" +
+        String(today.getDate()).padStart(2, "0");
+
       var response = await fetch(state.radarNotifyUrl, {
         method: "POST",
         headers: {
@@ -832,7 +837,8 @@
           summary: result.summary,
           earliestDate: result.earliestDate || "",
           earlierDates: result.dates || [],
-          targetBefore: state.targetBefore,
+          searchFrom: fromDateStr,
+          searchTo: state.searchToDate,
           pageUrl: location.href,
           checkedAt: new Date().toISOString()
         })

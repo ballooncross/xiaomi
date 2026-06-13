@@ -17,6 +17,8 @@ type ExtensionNotifyBody = {
   summary?: string;
   earliestDate?: string;
   earlierDates?: string[];
+  searchFrom?: string;
+  searchTo?: string;
   targetBefore?: string;
   pageUrl?: string;
   checkedAt?: string;
@@ -63,23 +65,46 @@ function readToken(request: Request): string {
 }
 
 function formatMessage(body: ExtensionNotifyBody): string {
-  const title =
-    body.type === 'ica_slot_found'
-      ? 'ICA 预约提醒：发现更早日期'
-      : body.type === 'ica_session_expired'
-        ? 'ICA 预约提醒：页面会话可能已过期'
-        : 'ICA 预约提醒：检查异常';
+  const searchRange =
+    body.searchFrom && body.searchTo
+      ? `${body.searchFrom} → ${body.searchTo}`
+      : body.targetBefore
+        ? `before ${body.targetBefore}`
+        : '';
 
+  if (body.type === 'ica_slot_found') {
+    const lines = [
+      '✅ ICA 有空位！',
+      '',
+      body.earliestDate ? `最早日期：${body.earliestDate}` : '',
+      body.earlierDates && body.earlierDates.length > 1
+        ? `所有日期：${body.earlierDates.slice(0, 10).join(', ')}`
+        : '',
+      searchRange ? `查询范围：${searchRange}` : '',
+      '',
+      '请尽快登录 ICA 预约页面确认。'
+    ];
+    return lines.filter(Boolean).join('\n').slice(0, 3500);
+  }
+
+  if (body.type === 'ica_session_expired') {
+    const lines = [
+      '⚠️ ICA 会话已过期',
+      '',
+      body.summary || '页面会话超时，正在重新登录。',
+      searchRange ? `查询范围：${searchRange}` : '',
+      body.checkedAt ? `时间：${body.checkedAt}` : ''
+    ];
+    return lines.filter(Boolean).join('\n').slice(0, 3500);
+  }
+
+  // ica_check_error or unknown
   const lines = [
-    title,
+    '❌ ICA 检查出错',
     '',
-    body.summary || 'ICA Slot Watcher sent a notification.',
-    body.earliestDate ? `最早日期：${body.earliestDate}` : '',
-    body.targetBefore ? `目标早于：${body.targetBefore}` : '',
-    body.earlierDates?.length ? `候选日期：${body.earlierDates.slice(0, 10).join(', ')}` : '',
-    body.checkedAt ? `检查时间：${body.checkedAt}` : '',
-    body.pageUrl ? `页面：${body.pageUrl}` : ''
-  ].filter(Boolean);
-
-  return lines.join('\n').slice(0, 3500);
+    body.summary || '检查过程中发生错误。',
+    searchRange ? `查询范围：${searchRange}` : '',
+    body.checkedAt ? `时间：${body.checkedAt}` : ''
+  ];
+  return lines.filter(Boolean).join('\n').slice(0, 3500);
 }
