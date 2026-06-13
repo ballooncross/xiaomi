@@ -698,43 +698,32 @@
 
   function evaluateAllSlots(apiSlots, domDates) {
     var checkedAt = formatTime(new Date());
-    var today = new Date();
-    var todayStr = today.getFullYear() + "-" +
-      String(today.getMonth() + 1).padStart(2, "0") + "-" +
-      String(today.getDate()).padStart(2, "0");
+    var todayStr = toIsoDateStr(new Date());
     var toStr = state.searchToDate || "2099-12-31";
 
-    // Collect dates from API response
-    var apiDates = [];
+    // Method 1: Parse API response — look for slotDates with isNoSlotDay === false
+    var apiAvailable = [];
+    var apiTotal = 0;
     var apiStatus = "";
     if (apiSlots) {
       apiStatus = apiSlots.ok ? "HTTP " + apiSlots.status : "HTTP " + apiSlots.status + " (error)";
-      if (apiSlots.ok) {
-        apiDates = extractDates(apiSlots.body);
-
-        // Also check for explicit slot arrays (common API patterns)
-        var body = apiSlots.body;
-        if (body && typeof body === "object") {
-          var slotArrays = findSlotArrays(body);
-          if (slotArrays.totalSlots > 0 && apiDates.length === 0) {
-            // API has slot objects but extractDates missed them — flag it
-            apiDates = slotArrays.dates;
-          }
-        }
+      if (apiSlots.ok && apiSlots.body && typeof apiSlots.body === "object") {
+        var parsed = parseIcaSlotsResponse(apiSlots.body);
+        apiAvailable = parsed.available;
+        apiTotal = parsed.total;
       }
     }
 
-    // Merge API dates + DOM dates, filter to search range
-    var allDates = apiDates.concat(domDates);
+    // Merge API + DOM, filter to search range
+    var allDates = apiAvailable.concat(domDates);
     var inRange = allDates
       .filter(function (d) { return d >= todayStr && d <= toStr; })
       .sort();
     var uniqueDates = Array.from(new Set(inRange));
     var earliest = uniqueDates[0] || "";
 
-    // Build debug info
-    var debug = "[api: " + apiStatus + ", apiDates: " + apiDates.length +
-      ", domDates: " + domDates.length + ", inRange: " + uniqueDates.length + "]";
+    var debug = "[api: " + apiStatus + ", slots: " + apiAvailable.length + "/" + apiTotal +
+      ", dom: " + domDates.length + ", inRange: " + uniqueDates.length + "]";
 
     if (apiSlots && !apiSlots.ok) {
       return {
@@ -761,58 +750,68 @@
     };
   }
 
-  function findSlotArrays(obj) {
-    var totalSlots = 0;
-    var dates = [];
-    function walk(node) {
-      if (!node || typeof node !== "object") return;
-      if (Array.isArray(node)) {
-        if (node.length > 0 && typeof node[0] === "object" && node[0] !== null) {
-          var first = node[0];
-          var keys = Object.keys(first).join(",").toLowerCase();
-          if (/slot|time|date|avail|appoint/.test(keys)) {
-            totalSlots += node.length;
-            node.forEach(function (item) {
-              Object.values(item).forEach(function (v) {
-                if (typeof v === "string") {
-                  var m = v.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
-                  if (m) dates.push(m[0]);
-                }
-              });
-            });
-          }
-        }
-        node.forEach(walk);
-      } else {
-        Object.values(node).forEach(walk);
-      }
+  // Parse ICA /Slots API response: { locationWiseData: [{ slotDates: [{ slotDate, isNoSlotDay }] }] }
+  function parseIcaSlotsResponse(body) {
+    var available = [];
+    var total = 0;
+
+    var locations = body.locationWiseData || body.LocationWiseData || [];
+    if (!Array.isArray(locations)) locations = [];
+
+    locations.forEach(function (loc) {
+      var slots = loc.slotDates || loc.SlotDates || [];
+      if (!Array.isArray(slots)) return;
+
+      slots.forEach(function (slot) {
+        total++;
+        var isNoSlot = slot.isNoSlotDay === true || slot.IsNoSlotDay === true;
+        if (isNoSlot) return;
+
+        var raw = slot.slotDate || slot.SlotDate || "";
+        var m = String(raw).match(/(20\d{2})-(\d{2})-(\d{2})/);
+        if (m) available.push(m[1] + "-" + m[2] + "-" + m[3]);
+      });
+    });
+
+    // Fallback: if response has a different shape, try generic date extraction
+    if (total === 0) {
+      var fallbackDates = extractDates(body);
+      return { available: fallbackDates, total: fallbackDates.length };
     }
-    walk(obj);
-    return { totalSlots: totalSlots, dates: dates };
+
+    return { available: available, total: total };
   }
 
+  // Extract available dates from the DOM (slot result carousel, not the advanced-search calendar)
   function extractDatesFromDom() {
-    var monthMap = {
-      January: "01", February: "02", March: "03", April: "04",
-      May: "05", June: "06", July: "07", August: "08",
-      September: "09", October: "10", November: "11", December: "12"
+    var monthAbbr = {
+      Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+      Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12"
     };
 
     var dates = [];
-    var views = document.querySelectorAll("bs-days-calendar-view");
-    views.forEach(function (view) {
-      var headSpans = view.querySelectorAll(".bs-datepicker-head button.current span");
-      var parts = [];
-      headSpans.forEach(function (s) { parts.push((s.textContent || "").trim()); });
-      var month = monthMap[parts[0]];
-      var year = parts[1];
-      if (!month || !year) return;
+    var year = new Date().getFullYear();
 
-      view.querySelectorAll('[role="gridcell"] span[bsdatepickerdaydecorator]').forEach(function (span) {
-        if (span.classList.contains("disabled") || span.classList.contains("is-other-month")) return;
-        var day = (span.textContent || "").trim().padStart(2, "0");
-        dates.push(year + "-" + month + "-" + day);
-      });
+    // ICA renders results as .date-holder inside app-service-day-section carousel
+    // Available = .date-holder without .restrictedDate
+    document.querySelectorAll(".date-holder").forEach(function (holder) {
+      if (holder.classList.contains("restrictedDate")) return;
+
+      var monthEl = holder.querySelector(".monthText");
+      var dateEl = holder.querySelector(".dateText");
+      if (!monthEl || !dateEl) return;
+
+      var monthStr = (monthEl.textContent || "").trim();
+      var dayStr = (dateEl.textContent || "").trim().padStart(2, "0");
+      var mm = monthAbbr[monthStr];
+      if (!mm || !dayStr) return;
+
+      // Infer year: if month is before current month, it's next year
+      var monthNum = parseInt(mm, 10);
+      var currentMonth = new Date().getMonth() + 1;
+      var y = monthNum < currentMonth ? year + 1 : year;
+
+      dates.push(y + "-" + mm + "-" + dayStr);
     });
 
     return dates;
