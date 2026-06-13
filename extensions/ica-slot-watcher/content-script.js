@@ -260,11 +260,7 @@
     document.documentElement.append(style, root);
 
     root.querySelector("[data-isw-run]").addEventListener("click", () => {
-      if (needsSetupNavigation()) {
-        runSetupThenAction("manual-check");
-      } else {
-        runCheck("manual");
-      }
+      ensureReadyThen("manual-check");
     });
     root.querySelector("[data-isw-toggle]").addEventListener("click", toggle);
     root.querySelector("[data-isw-collapse]").addEventListener("click", () => {
@@ -293,9 +289,9 @@
       } else if (saved.pendingNavigationSetup && state.applicationId &&
           location.href.includes("/eappt/")) {
         chrome.storage.local.set({ pendingNavigationSetup: false });
-        if (state.enabled) startTimers();
+        if (state.enabled) ensureReadyThen("start");
       } else if (state.enabled) {
-        startTimers();
+        ensureReadyThen("start");
       }
     });
   }
@@ -353,12 +349,7 @@
     state.enabled = !state.enabled;
     chrome.storage.local.set({ enabled: state.enabled });
     if (state.enabled) {
-      if (needsSetupNavigation()) {
-        runSetupThenAction("start");
-      } else {
-        startTimers();
-        runCheck("start");
-      }
+      ensureReadyThen("start");
     } else {
       stopTimers();
       setStatus("Stopped");
@@ -366,8 +357,49 @@
     updateUiFromState();
   }
 
-  function needsSetupNavigation() {
-    return !location.href.includes("/eappt/locationselection");
+  async function ensureReadyThen(afterAction) {
+    if (location.href.includes("/eappt/locationselection")) {
+      // Already on the search page — just ensure adsTab + dates, then go
+      await prepareAdvancedSearch();
+      if (afterAction === "start") {
+        startTimers();
+        runCheck("start");
+      } else if (afterAction === "manual-check") {
+        runCheck("manual");
+      }
+    } else if (location.href.includes("/eappt/serviceselection")) {
+      await runFullSetupFlow(afterAction);
+    } else if (state.applicationId) {
+      // Some other ICA page — navigate to service selection
+      runSetupThenAction(afterAction);
+    } else {
+      setStatus("Please enter Application ID first.");
+    }
+  }
+
+  async function prepareAdvancedSearch() {
+    state.setupInProgress = true;
+    try {
+      if (!state.bridgeReady) {
+        await waitForBridgeReady(10000);
+      }
+      // Click Advanced Search tab if not active
+      var adsTab = document.querySelector("#adsTab");
+      if (adsTab && !adsTab.classList.contains("btn-primary")) {
+        adsTab.click();
+        await sleep(500);
+      }
+      // Fill date range
+      var fromDate = formatDateForIca(new Date());
+      var toDate = formatDateForIca(parseIsoDate(state.searchToDate));
+      await sendPageAction("set-dates", { fromDate, toDate });
+      await sleep(300);
+      setStatus("Ready on advanced search page.");
+    } catch (err) {
+      setStatus("Prepare failed: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      state.setupInProgress = false;
+    }
   }
 
   function startTimers() {
