@@ -31,6 +31,7 @@
     lastError: null,
     waitingForSlotsResolve: null,
     waitingForActionResolve: null,
+    consecutiveErrors: 0,
     lastRadarNotifications: new Map()
   };
 
@@ -551,6 +552,8 @@
       state.lastResult = result.summary;
       showResult(result);
 
+      state.consecutiveErrors = 0;
+
       if (result.hasEarlierDate) {
         await alertUser(result.summary, true);
         await notifyRadarOnce("ica_slot_found", result);
@@ -561,24 +564,39 @@
       await clickBack();
     } catch (error) {
       state.lastError = error instanceof Error ? error.message : String(error);
-      state.lastResult = "Error: " + state.lastError;
+      state.consecutiveErrors++;
+      state.lastResult = "Error (" + state.consecutiveErrors + "): " + state.lastError;
       setStatus(state.lastResult);
       showResult({ summary: state.lastResult, dates: [] });
-      if (needsRenavigation(state.lastError)) {
-        setStatus("Re-navigating from start...");
-        await notifyRadarOnce("ica_session_expired", {
-          summary: "ICA session lost, re-navigating: " + state.lastError,
-          dates: []
-        });
-        if (state.enabled && state.applicationId) {
+
+      if (needsRenavigation(state.lastError) && state.enabled && state.applicationId) {
+        if (state.consecutiveErrors <= 2) {
+          // First 2 failures: just refresh the page, often recovers on its own
+          setStatus("Retry " + state.consecutiveErrors + "/3: refreshing page...");
+          await sleep(3000);
+          window.location.reload();
+          return;
+        } else if (state.consecutiveErrors <= 4) {
+          // Failures 3-4: re-navigate from start
+          setStatus("Retry " + state.consecutiveErrors + "/5: re-navigating from start...");
           stopTimers();
           await sleep(2000);
           renewSession();
           return;
+        } else {
+          // 5+ failures: notify via Telegram, keep trying
+          await notifyRadarOnce("ica_session_expired", {
+            summary: "ICA session lost after " + state.consecutiveErrors + " retries: " + state.lastError,
+            dates: []
+          });
+          stopTimers();
+          await sleep(5000);
+          renewSession();
+          return;
         }
-      } else {
+      } else if (state.consecutiveErrors >= 5) {
         await notifyRadarOnce("ica_check_error", {
-          summary: state.lastResult,
+          summary: "ICA check failed " + state.consecutiveErrors + " times: " + state.lastError,
           dates: []
         });
       }
