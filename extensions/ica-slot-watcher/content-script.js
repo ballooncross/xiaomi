@@ -564,16 +564,17 @@
       state.lastResult = "Error: " + state.lastError;
       setStatus(state.lastResult);
       showResult({ summary: state.lastResult, dates: [] });
-      if (isLikelySessionExpired(state.lastError)) {
-        await alertUser("ICA session may have expired. Re-navigating from start.", true);
+      if (needsRenavigation(state.lastError)) {
+        setStatus("Re-navigating from start...");
         await notifyRadarOnce("ica_session_expired", {
-          summary: "ICA session expired: " + state.lastError,
+          summary: "ICA session lost, re-navigating: " + state.lastError,
           dates: []
         });
         if (state.enabled && state.applicationId) {
           stopTimers();
           await sleep(2000);
           renewSession();
+          return;
         }
       } else {
         await notifyRadarOnce("ica_check_error", {
@@ -853,9 +854,10 @@
     }
   }
 
-  function isLikelySessionExpired(errorMessage) {
+  function needsRenavigation(errorMessage) {
     var text = (document.body ? document.body.innerText : "").replace(/\s+/g, " ");
     return (
+      /setup navigation needed|not on ica location/i.test(errorMessage) ||
       /session|expired|timed out|please log in|login again|something went wrong/i.test(errorMessage + " " + text) ||
       (!location.href.includes("/eappt/locationselection") && !location.href.includes("/eappt/serviceselection")) ||
       (!document.querySelector(".btnProceed") && !document.querySelector("ng-select"))
