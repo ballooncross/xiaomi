@@ -279,7 +279,8 @@
   }
 
   function loadSettings() {
-    chrome.storage.local.get({ ...DEFAULTS, pendingNavigationSetup: false }, (saved) => {
+    chrome.storage.local.get({ ...DEFAULTS, pendingNavigationSetup: false, consecutiveErrors: 0 }, (saved) => {
+      state.consecutiveErrors = saved.consecutiveErrors || 0;
       Object.assign(state, saved);
       updateUiFromState();
 
@@ -576,15 +577,24 @@
 
     try {
       ensureAdvancedSearchPage();
-      const slotsResponsePromise = waitForSlotsResponse(12000);
+      var slotsResponsePromise = waitForSlotsResponse(12000);
       await clickProceed();
-      const slots = await slotsResponsePromise;
-      const result = evaluateSlots(slots);
-      state.lastSlots = slots;
+      await sleep(800);
+
+      // Method 1: intercept /Slots API response
+      var apiSlots = null;
+      try { apiSlots = await slotsResponsePromise; } catch (_) { /* timeout ok, try DOM */ }
+
+      // Method 2: check DOM for selectable calendar dates
+      var domDates = extractDatesFromDom();
+
+      var result = evaluateAllSlots(apiSlots, domDates);
+      state.lastSlots = apiSlots;
       state.lastResult = result.summary;
       showResult(result);
 
       state.consecutiveErrors = 0;
+      chrome.storage.local.set({ consecutiveErrors: 0 });
 
       if (result.hasEarlierDate) {
         await alertUser(result.summary, true);
@@ -597,6 +607,7 @@
     } catch (error) {
       state.lastError = error instanceof Error ? error.message : String(error);
       state.consecutiveErrors++;
+      chrome.storage.local.set({ consecutiveErrors: state.consecutiveErrors });
       state.lastResult = "Error (" + state.consecutiveErrors + "): " + state.lastError;
       setStatus(state.lastResult);
       showResult({ summary: state.lastResult, dates: [] });
@@ -685,17 +696,51 @@
     });
   }
 
-  function evaluateSlots(slotsDetail) {
-    var allDates = extractDates(slotsDetail.body).sort();
-    var uniqueDates = Array.from(new Set(allDates));
-    var earliest = uniqueDates[0] || "";
+  function evaluateAllSlots(apiSlots, domDates) {
     var checkedAt = formatTime(new Date());
+    var today = new Date();
+    var todayStr = today.getFullYear() + "-" +
+      String(today.getMonth() + 1).padStart(2, "0") + "-" +
+      String(today.getDate()).padStart(2, "0");
+    var toStr = state.searchToDate || "2099-12-31";
 
-    if (!slotsDetail.ok) {
+    // Collect dates from API response
+    var apiDates = [];
+    var apiStatus = "";
+    if (apiSlots) {
+      apiStatus = apiSlots.ok ? "HTTP " + apiSlots.status : "HTTP " + apiSlots.status + " (error)";
+      if (apiSlots.ok) {
+        apiDates = extractDates(apiSlots.body);
+
+        // Also check for explicit slot arrays (common API patterns)
+        var body = apiSlots.body;
+        if (body && typeof body === "object") {
+          var slotArrays = findSlotArrays(body);
+          if (slotArrays.totalSlots > 0 && apiDates.length === 0) {
+            // API has slot objects but extractDates missed them — flag it
+            apiDates = slotArrays.dates;
+          }
+        }
+      }
+    }
+
+    // Merge API dates + DOM dates, filter to search range
+    var allDates = apiDates.concat(domDates);
+    var inRange = allDates
+      .filter(function (d) { return d >= todayStr && d <= toStr; })
+      .sort();
+    var uniqueDates = Array.from(new Set(inRange));
+    var earliest = uniqueDates[0] || "";
+
+    // Build debug info
+    var debug = "[api: " + apiStatus + ", apiDates: " + apiDates.length +
+      ", domDates: " + domDates.length + ", inRange: " + uniqueDates.length + "]";
+
+    if (apiSlots && !apiSlots.ok) {
       return {
         hasEarlierDate: false,
         dates: [],
-        summary: "Checked " + checkedAt + ". ICA /Slots returned HTTP " + slotsDetail.status + "."
+        summary: "Checked " + checkedAt + ". /Slots " + apiStatus + ". " + debug
       };
     }
 
@@ -704,7 +749,7 @@
         hasEarlierDate: true,
         dates: uniqueDates,
         earliestDate: earliest,
-        summary: "Slot found: " + earliest + "\n" + uniqueDates.join(", ")
+        summary: "Slot found: " + earliest + "\n" + uniqueDates.join(", ") + "\n" + debug
       };
     }
 
@@ -712,8 +757,65 @@
       hasEarlierDate: false,
       dates: [],
       earliestDate: "",
-      summary: "Checked " + checkedAt + ". No slots available in search range."
+      summary: "Checked " + checkedAt + ". No slots in range. " + debug
     };
+  }
+
+  function findSlotArrays(obj) {
+    var totalSlots = 0;
+    var dates = [];
+    function walk(node) {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        if (node.length > 0 && typeof node[0] === "object" && node[0] !== null) {
+          var first = node[0];
+          var keys = Object.keys(first).join(",").toLowerCase();
+          if (/slot|time|date|avail|appoint/.test(keys)) {
+            totalSlots += node.length;
+            node.forEach(function (item) {
+              Object.values(item).forEach(function (v) {
+                if (typeof v === "string") {
+                  var m = v.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+                  if (m) dates.push(m[0]);
+                }
+              });
+            });
+          }
+        }
+        node.forEach(walk);
+      } else {
+        Object.values(node).forEach(walk);
+      }
+    }
+    walk(obj);
+    return { totalSlots: totalSlots, dates: dates };
+  }
+
+  function extractDatesFromDom() {
+    var monthMap = {
+      January: "01", February: "02", March: "03", April: "04",
+      May: "05", June: "06", July: "07", August: "08",
+      September: "09", October: "10", November: "11", December: "12"
+    };
+
+    var dates = [];
+    var views = document.querySelectorAll("bs-days-calendar-view");
+    views.forEach(function (view) {
+      var headSpans = view.querySelectorAll(".bs-datepicker-head button.current span");
+      var parts = [];
+      headSpans.forEach(function (s) { parts.push((s.textContent || "").trim()); });
+      var month = monthMap[parts[0]];
+      var year = parts[1];
+      if (!month || !year) return;
+
+      view.querySelectorAll('[role="gridcell"] span[bsdatepickerdaydecorator]').forEach(function (span) {
+        if (span.classList.contains("disabled") || span.classList.contains("is-other-month")) return;
+        var day = (span.textContent || "").trim().padStart(2, "0");
+        dates.push(year + "-" + month + "-" + day);
+      });
+    });
+
+    return dates;
   }
 
   function extractDates(value) {
