@@ -1,5 +1,16 @@
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
-import type { DateReminder, Env, FeedbackAction, JobRun, RadarItem, WatchTopic } from './types';
+import type {
+  AgentFeedItem,
+  AgentOutcomeStats,
+  AiContextDocument,
+  DateReminder,
+  Env,
+  FeedbackAction,
+  JobRun,
+  PreferenceSignal,
+  RadarItem,
+  WatchTopic
+} from './types';
 
 type ItemRow = {
   id: string;
@@ -20,8 +31,59 @@ type ItemRow = {
   raw_json: string;
   score: number;
   status: RadarItem['status'];
+  related_item_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type AgentFeedRow = {
+  id: string;
+  source: string;
+  cadence: string;
+  title: string;
+  summary: string;
+  url: string | null;
+  kind: string;
+  confidence: number;
+  relevance_reason: string;
+  topics: string;
+  metadata_json: string;
+  status: string;
+  promoted_item_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PreferenceSignalRow = {
+  id: string;
+  signal_type: string;
+  signal_value: string;
+  related_item_id: string | null;
+  related_topic_id: string | null;
+  source: string;
+  created_at: string;
+};
+
+type AiContextRow = {
+  id: string;
+  version: number;
+  context_json: string;
+  compiled_from: string;
+  signal_count: number;
+  created_at: string;
+};
+
+type AgentOutcomeRow = {
+  agent_feed_id: string;
+  outcome: string;
+};
+
+type FeedbackJoinRow = {
+  action: string;
+  topics: string;
+  source_type: string;
+  created_at: string;
+  item_id: string;
 };
 
 type TopicRow = {
@@ -68,7 +130,12 @@ const memory = {
   items: [...demoItems],
   reminders: [...defaultDateReminders],
   feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string }>,
-  jobs: [] as JobRun[]
+  jobs: [] as JobRun[],
+  agentFeeds: [] as AgentFeedItem[],
+  preferenceSignals: [] as PreferenceSignal[],
+  aiContextSnapshots: [] as (AiContextDocument & { id: string })[],
+  agentOutcomes: [] as Array<{ id: string; agentFeedId: string; outcome: string; createdAt: string }>,
+  impressions: [] as Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>
 };
 
 export function getDb(env?: Env): RadarDb {
@@ -90,6 +157,35 @@ export abstract class RadarDb {
   abstract logNotification(input: { itemId?: string; channel: string; type: string; status: string; message: string }): Promise<void>;
   abstract logJob(input: { jobName: string; status: string; detail: string }): Promise<void>;
   abstract listJobRuns(jobName: string, limit?: number): Promise<JobRun[]>;
+
+  // Agent feed methods
+  abstract insertAgentFeed(feed: AgentFeedItem): Promise<void>;
+  abstract listAgentFeeds(options?: { status?: string; limit?: number }): Promise<AgentFeedItem[]>;
+  abstract updateAgentFeedStatus(id: string, status: string, promotedItemId?: string): Promise<void>;
+  abstract findAgentFeedByUrl(url: string): Promise<AgentFeedItem | null>;
+  abstract findAgentFeedByPromotedItemId(itemId: string): Promise<AgentFeedItem | null>;
+
+  // Preference signal methods
+  abstract insertPreferenceSignal(signal: PreferenceSignal): Promise<void>;
+  abstract listPreferenceSignals(options?: { since?: string; type?: string; limit?: number }): Promise<PreferenceSignal[]>;
+
+  // AI context methods
+  abstract insertAiContextSnapshot(doc: AiContextDocument): Promise<void>;
+  abstract getLatestAiContext(): Promise<AiContextDocument | null>;
+
+  // Agent outcome methods
+  abstract recordAgentOutcome(feedId: string, outcome: string): Promise<void>;
+  abstract getAgentOutcomeStats(): Promise<AgentOutcomeStats>;
+
+  // Feedback query for context compilation
+  abstract listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>>;
+
+  // Impression tracking
+  abstract recordImpressions(itemIds: string[], impressionType?: string): Promise<void>;
+  abstract getImpressionCounts(itemIds: string[]): Promise<Map<string, number>>;
+
+  // Recent items for dedup context
+  abstract getRecentItemSummaries(days: number): Promise<Array<{ title: string; url?: string; externalId: string }>>;
 }
 
 class MemoryRadarDb extends RadarDb {
@@ -169,6 +265,98 @@ class MemoryRadarDb extends RadarDb {
 
   async listJobRuns(jobName: string, limit = 5): Promise<JobRun[]> {
     return memory.jobs.filter((job) => job.jobName === jobName).slice(0, limit);
+  }
+
+  async insertAgentFeed(feed: AgentFeedItem): Promise<void> {
+    memory.agentFeeds.push(feed);
+  }
+
+  async listAgentFeeds(options?: { status?: string; limit?: number }): Promise<AgentFeedItem[]> {
+    let feeds = [...memory.agentFeeds];
+    if (options?.status) feeds = feeds.filter((f) => f.status === options.status);
+    return feeds.slice(0, options?.limit ?? 50);
+  }
+
+  async updateAgentFeedStatus(id: string, status: string, promotedItemId?: string): Promise<void> {
+    const feed = memory.agentFeeds.find((f) => f.id === id);
+    if (feed) {
+      feed.status = status as AgentFeedItem['status'];
+      if (promotedItemId) feed.promotedItemId = promotedItemId;
+    }
+  }
+
+  async findAgentFeedByUrl(url: string): Promise<AgentFeedItem | null> {
+    return memory.agentFeeds.find((f) => f.url === url) ?? null;
+  }
+
+  async findAgentFeedByPromotedItemId(itemId: string): Promise<AgentFeedItem | null> {
+    return memory.agentFeeds.find((f) => f.promotedItemId === itemId) ?? null;
+  }
+
+  async insertPreferenceSignal(signal: PreferenceSignal): Promise<void> {
+    memory.preferenceSignals.push(signal);
+  }
+
+  async listPreferenceSignals(options?: { since?: string; type?: string; limit?: number }): Promise<PreferenceSignal[]> {
+    let signals = [...memory.preferenceSignals];
+    if (options?.since) signals = signals.filter((s) => (s.createdAt ?? '') >= options.since!);
+    if (options?.type) signals = signals.filter((s) => s.signalType === options.type);
+    return signals.slice(0, options?.limit ?? 500);
+  }
+
+  async insertAiContextSnapshot(doc: AiContextDocument): Promise<void> {
+    memory.aiContextSnapshots.push({ ...doc, id: crypto.randomUUID() });
+  }
+
+  async getLatestAiContext(): Promise<AiContextDocument | null> {
+    if (memory.aiContextSnapshots.length === 0) return null;
+    return memory.aiContextSnapshots[memory.aiContextSnapshots.length - 1];
+  }
+
+  async recordAgentOutcome(feedId: string, outcome: string): Promise<void> {
+    memory.agentOutcomes.push({ id: crypto.randomUUID(), agentFeedId: feedId, outcome, createdAt: new Date().toISOString() });
+  }
+
+  async getAgentOutcomeStats(): Promise<AgentOutcomeStats> {
+    const outcomes = memory.agentOutcomes;
+    return {
+      total: outcomes.length,
+      saved: outcomes.filter((o) => o.outcome === 'saved').length,
+      tracked: outcomes.filter((o) => o.outcome === 'tracked').length,
+      dismissed: outcomes.filter((o) => o.outcome === 'dismissed').length,
+      ignored: outcomes.filter((o) => o.outcome === 'ignored').length,
+      byTopic: [],
+      bySource: {}
+    };
+  }
+
+  async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    return memory.feedback
+      .filter(() => true)
+      .map((f) => {
+        const item = memory.items.find((i) => i.id === f.itemId);
+        return { itemId: f.itemId, action: f.action, topics: item?.topics ?? [], sourceType: item?.sourceType ?? '', createdAt: cutoff };
+      });
+  }
+
+  async recordImpressions(itemIds: string[]): Promise<void> {
+    const now = new Date().toISOString();
+    for (const itemId of itemIds) {
+      memory.impressions.push({ id: crypto.randomUUID(), itemId, impressionType: 'feed', createdAt: now });
+    }
+  }
+
+  async getImpressionCounts(itemIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    for (const id of itemIds) {
+      counts.set(id, memory.impressions.filter((i) => i.itemId === id).length);
+    }
+    return counts;
+  }
+
+  async getRecentItemSummaries(days: number): Promise<Array<{ title: string; url?: string; externalId: string }>> {
+    return memory.items.map((i) => ({ title: i.title, url: i.url, externalId: i.externalId }));
   }
 }
 
@@ -383,6 +571,31 @@ class D1RadarDb extends RadarDb {
       if (action === 'save') await this.updateItemStatus(itemId, 'saved');
       if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
       if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
+
+      // Also record as preference signal
+      await this.insertPreferenceSignal({
+        id: crypto.randomUUID(),
+        signalType: 'feedback',
+        signalValue: action,
+        relatedItemId: itemId,
+        source: 'ui',
+      });
+
+      // Track agent outcomes for agent-sourced items
+      const item = await this.db
+        .prepare('SELECT source_type FROM items WHERE id = ?')
+        .bind(itemId)
+        .first<{ source_type: string }>();
+      if (item?.source_type === 'agent') {
+        const agentFeed = await this.findAgentFeedByPromotedItemId(itemId);
+        if (agentFeed) {
+          const outcome = action === 'save' ? 'saved'
+            : action === 'track' ? 'tracked'
+            : action === 'not_relevant' || action === 'less_like_this' ? 'dismissed'
+            : 'clicked';
+          await this.recordAgentOutcome(agentFeed.id, outcome);
+        }
+      }
     } catch (error) {
       if (isMissingTableError(error)) return new MemoryRadarDb().recordFeedback(itemId, action, reason);
       throw error;
@@ -432,6 +645,304 @@ class D1RadarDb extends RadarDb {
         .bind(jobName, limit)
         .all<JobRunRow>();
       return results.map(jobRunFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async insertAgentFeed(feed: AgentFeedItem): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO agent_feeds (id, source, cadence, title, summary, url, kind, confidence,
+           relevance_reason, topics, metadata_json, status, promoted_item_id, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+        )
+        .bind(
+          feed.id, feed.source, feed.cadence, feed.title, feed.summary,
+          feed.url ?? null, feed.kind, feed.confidence, feed.relevanceReason,
+          JSON.stringify(feed.topics), JSON.stringify(feed.metadata),
+          feed.status, feed.promotedItemId ?? null
+        )
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().insertAgentFeed(feed);
+      throw error;
+    }
+  }
+
+  async listAgentFeeds(options?: { status?: string; limit?: number }): Promise<AgentFeedItem[]> {
+    try {
+      let sql = 'SELECT * FROM agent_feeds';
+      const binds: unknown[] = [];
+      if (options?.status) {
+        sql += ' WHERE status = ?';
+        binds.push(options.status);
+      }
+      sql += ' ORDER BY created_at DESC LIMIT ?';
+      binds.push(options?.limit ?? 50);
+      const stmt = this.db.prepare(sql);
+      const { results } = await (binds.length === 1 ? stmt.bind(binds[0]) : stmt.bind(...binds)).all<AgentFeedRow>();
+      return results.map(agentFeedFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async updateAgentFeedStatus(id: string, status: string, promotedItemId?: string): Promise<void> {
+    try {
+      await this.db
+        .prepare('UPDATE agent_feeds SET status = ?, promoted_item_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(status, promotedItemId ?? null, id)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async findAgentFeedByUrl(url: string): Promise<AgentFeedItem | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT * FROM agent_feeds WHERE url = ? LIMIT 1')
+        .bind(url)
+        .first<AgentFeedRow>();
+      return row ? agentFeedFromRow(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async findAgentFeedByPromotedItemId(itemId: string): Promise<AgentFeedItem | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT * FROM agent_feeds WHERE promoted_item_id = ? LIMIT 1')
+        .bind(itemId)
+        .first<AgentFeedRow>();
+      return row ? agentFeedFromRow(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async insertPreferenceSignal(signal: PreferenceSignal): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO preference_signals (id, signal_type, signal_value, related_item_id, related_topic_id, source)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .bind(signal.id, signal.signalType, signal.signalValue, signal.relatedItemId ?? null, signal.relatedTopicId ?? null, signal.source)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().insertPreferenceSignal(signal);
+      throw error;
+    }
+  }
+
+  async listPreferenceSignals(options?: { since?: string; type?: string; limit?: number }): Promise<PreferenceSignal[]> {
+    try {
+      let sql = 'SELECT * FROM preference_signals WHERE 1=1';
+      const binds: unknown[] = [];
+      if (options?.since) { sql += ' AND created_at >= ?'; binds.push(options.since); }
+      if (options?.type) { sql += ' AND signal_type = ?'; binds.push(options.type); }
+      sql += ' ORDER BY created_at DESC LIMIT ?';
+      binds.push(options?.limit ?? 500);
+      const stmt = this.db.prepare(sql);
+      const { results } = await (binds.length === 1 ? stmt.bind(binds[0]) : stmt.bind(...binds)).all<PreferenceSignalRow>();
+      return results.map(preferenceSignalFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async insertAiContextSnapshot(doc: AiContextDocument): Promise<void> {
+    try {
+      const signalCount = await this.db
+        .prepare('SELECT COUNT(*) as cnt FROM preference_signals')
+        .first<{ cnt: number }>()
+        .then((r) => r?.cnt ?? 0);
+
+      await this.db
+        .prepare(
+          `INSERT INTO ai_context_snapshots (id, version, context_json, compiled_from, signal_count)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .bind(
+          crypto.randomUUID(), doc.version, JSON.stringify(doc),
+          `${doc.interestProfile.primary.length} topics, ${doc.stats.totalFeedbackEvents} feedback events`,
+          signalCount
+        )
+        .run();
+
+      // Keep only the last 10 snapshots
+      await this.db
+        .prepare('DELETE FROM ai_context_snapshots WHERE id NOT IN (SELECT id FROM ai_context_snapshots ORDER BY version DESC LIMIT 10)')
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().insertAiContextSnapshot(doc);
+      throw error;
+    }
+  }
+
+  async getLatestAiContext(): Promise<AiContextDocument | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT * FROM ai_context_snapshots ORDER BY version DESC LIMIT 1')
+        .first<AiContextRow>();
+      if (!row) return null;
+      return parseJson<AiContextDocument>(row.context_json, null as unknown as AiContextDocument);
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async recordAgentOutcome(feedId: string, outcome: string): Promise<void> {
+    try {
+      await this.db
+        .prepare('INSERT INTO agent_suggestion_outcomes (id, agent_feed_id, outcome) VALUES (?, ?, ?)')
+        .bind(crypto.randomUUID(), feedId, outcome)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getAgentOutcomeStats(): Promise<AgentOutcomeStats> {
+    try {
+      const { results: outcomes } = await this.db
+        .prepare('SELECT agent_feed_id, outcome FROM agent_suggestion_outcomes')
+        .all<AgentOutcomeRow>();
+
+      const stats: AgentOutcomeStats = {
+        total: outcomes.length,
+        saved: outcomes.filter((o) => o.outcome === 'saved').length,
+        tracked: outcomes.filter((o) => o.outcome === 'tracked').length,
+        dismissed: outcomes.filter((o) => o.outcome === 'dismissed').length,
+        ignored: outcomes.filter((o) => o.outcome === 'ignored').length,
+        byTopic: [],
+        bySource: {}
+      };
+
+      // Compute by-source stats
+      const feedIds = [...new Set(outcomes.map((o) => o.agent_feed_id))];
+      if (feedIds.length > 0) {
+        const placeholders = feedIds.map(() => '?').join(',');
+        const { results: feeds } = await this.db
+          .prepare(`SELECT id, source, topics FROM agent_feeds WHERE id IN (${placeholders})`)
+          .bind(...feedIds)
+          .all<{ id: string; source: string; topics: string }>();
+
+        const feedMap = new Map(feeds.map((f) => [f.id, f]));
+        const bySource: Record<string, { total: number; saved: number; dismissed: number }> = {};
+        const byTopic: Record<string, { total: number; saved: number; dismissed: number }> = {};
+
+        for (const o of outcomes) {
+          const feed = feedMap.get(o.agent_feed_id);
+          if (!feed) continue;
+
+          if (!bySource[feed.source]) bySource[feed.source] = { total: 0, saved: 0, dismissed: 0 };
+          bySource[feed.source].total++;
+          if (o.outcome === 'saved') bySource[feed.source].saved++;
+          if (o.outcome === 'dismissed') bySource[feed.source].dismissed++;
+
+          const topics = parseJson<string[]>(feed.topics, []);
+          for (const t of topics) {
+            if (!byTopic[t]) byTopic[t] = { total: 0, saved: 0, dismissed: 0 };
+            byTopic[t].total++;
+            if (o.outcome === 'saved') byTopic[t].saved++;
+            if (o.outcome === 'dismissed') byTopic[t].dismissed++;
+          }
+        }
+
+        stats.bySource = bySource;
+        stats.byTopic = Object.entries(byTopic).map(([topic, s]) => ({
+          topic,
+          saveRate: s.total > 0 ? s.saved / s.total : 0,
+          dismissRate: s.total > 0 ? s.dismissed / s.total : 0,
+          count: s.total
+        }));
+      }
+
+      return stats;
+    } catch (error) {
+      if (isMissingTableError(error)) return { total: 0, saved: 0, tracked: 0, dismissed: 0, ignored: 0, byTopic: [], bySource: {} };
+      throw error;
+    }
+  }
+
+  async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
+    try {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const { results } = await this.db
+        .prepare(
+          `SELECT f.item_id, f.action, i.topics, i.source_type, f.created_at
+           FROM feedback_events f
+           LEFT JOIN items i ON f.item_id = i.id
+           WHERE f.created_at >= ?
+           ORDER BY f.created_at DESC`
+        )
+        .bind(cutoff)
+        .all<FeedbackJoinRow>();
+      return results.map((r) => ({
+        itemId: r.item_id,
+        action: r.action,
+        topics: parseJson<string[]>(r.topics, []),
+        sourceType: r.source_type ?? '',
+        createdAt: r.created_at
+      }));
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async recordImpressions(itemIds: string[], impressionType = 'feed'): Promise<void> {
+    try {
+      const batch = itemIds.map((id) =>
+        this.db
+          .prepare('INSERT INTO item_impressions (id, item_id, impression_type) VALUES (?, ?, ?)')
+          .bind(crypto.randomUUID(), id, impressionType)
+      );
+      if (batch.length > 0) await this.db.batch(batch);
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getImpressionCounts(itemIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (itemIds.length === 0) return counts;
+    try {
+      const placeholders = itemIds.map(() => '?').join(',');
+      const { results } = await this.db
+        .prepare(`SELECT item_id, COUNT(*) as cnt FROM item_impressions WHERE item_id IN (${placeholders}) GROUP BY item_id`)
+        .bind(...itemIds)
+        .all<{ item_id: string; cnt: number }>();
+      for (const r of results) counts.set(r.item_id, r.cnt);
+      return counts;
+    } catch (error) {
+      if (isMissingTableError(error)) return counts;
+      throw error;
+    }
+  }
+
+  async getRecentItemSummaries(days: number): Promise<Array<{ title: string; url?: string; externalId: string }>> {
+    try {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const { results } = await this.db
+        .prepare('SELECT title, url, external_id FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT 200')
+        .bind(cutoff)
+        .all<{ title: string; url: string | null; external_id: string }>();
+      return results.map((r) => ({ title: r.title, url: r.url ?? undefined, externalId: r.external_id }));
     } catch (error) {
       if (isMissingTableError(error)) return [];
       throw error;
@@ -515,6 +1026,38 @@ function parseJson<T>(value: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function agentFeedFromRow(row: AgentFeedRow): AgentFeedItem {
+  return {
+    id: row.id,
+    source: row.source,
+    cadence: row.cadence as AgentFeedItem['cadence'],
+    title: row.title,
+    summary: row.summary,
+    url: row.url ?? undefined,
+    kind: row.kind as AgentFeedItem['kind'],
+    confidence: row.confidence,
+    relevanceReason: row.relevance_reason,
+    topics: parseJson<string[]>(row.topics, []),
+    metadata: parseJson<Record<string, unknown>>(row.metadata_json, {}),
+    status: row.status as AgentFeedItem['status'],
+    promotedItemId: row.promoted_item_id ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function preferenceSignalFromRow(row: PreferenceSignalRow): PreferenceSignal {
+  return {
+    id: row.id,
+    signalType: row.signal_type as PreferenceSignal['signalType'],
+    signalValue: row.signal_value,
+    relatedItemId: row.related_item_id ?? undefined,
+    relatedTopicId: row.related_topic_id ?? undefined,
+    source: row.source,
+    createdAt: row.created_at
+  };
 }
 
 function isMissingTableError(error: unknown): boolean {
