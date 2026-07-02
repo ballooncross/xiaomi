@@ -1,6 +1,6 @@
 export type WatchType = 'artist' | 'topic' | 'source';
 export type WatchMode = 'follow' | 'blacklist';
-export type ItemKind = 'concert' | 'trend' | 'news' | 'opportunity';
+export type ItemKind = 'concert' | 'trend' | 'news' | 'opportunity' | 'insight';
 export type ItemStatus = 'new' | 'saved' | 'tracking' | 'dismissed';
 export type FeedbackAction = 'save' | 'track' | 'not_relevant' | 'more_like_this' | 'less_like_this';
 export type CalendarType = 'gregorian' | 'lunar';
@@ -147,4 +147,114 @@ export type CronJobStatus = {
   schedule: string;
   enabled: boolean;
   lastRun?: JobRun;
+};
+
+export type AgentFeedCadence = 'hourly' | 'daily' | 'weekly';
+export type AgentFeedStatus = 'pending' | 'promoted' | 'dismissed' | 'expired';
+
+export type AgentFeedItem = {
+  id: string;
+  source: string;
+  cadence: AgentFeedCadence;
+  title: string;
+  summary: string;
+  url?: string;
+  kind: ItemKind;
+  confidence: number;
+  relevanceReason: string;
+  topics: string[];
+  metadata: Record<string, unknown>;
+  status: AgentFeedStatus;
+  promotedItemId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SignalType =
+  | 'feedback'
+  | 'topic_added'
+  | 'topic_removed'
+  | 'note'
+  | 'interest'
+  | 'not_interested'
+  | 'more_like_this'
+  | 'region_hint'
+  | 'free_text'
+  | 'agent_suggestion';
+
+export type PreferenceSignal = {
+  id: string;
+  signalType: SignalType;
+  signalValue: string;
+  relatedItemId?: string;
+  relatedTopicId?: string;
+  source: string;
+  createdAt?: string;
+};
+
+export type AiContextDocument = {
+  version: number;
+  compiledAt: string;
+  identity: {
+    region: string;
+    additionalRegions: string[];
+    languages: string[];
+    timezone: string;
+  };
+  interestProfile: {
+    primary: Array<{
+      topic: string;
+      category: string;
+      strength: number;
+      keywords: string[];
+    }>;
+    emerging: Array<{
+      topic: string;
+      reason: string;
+      suggestedKeywords: string[];
+    }>;
+    declined: Array<{
+      topic: string;
+      reason: string;
+    }>;
+    naturalLanguageInputs: string[];
+  };
+  queryStrategies: Array<{
+    topic: string;
+    suggestedQueries: string[];
+    preferredSources: string[];
+    cadence: AgentFeedCadence;
+  }>;
+  sources: {
+    active: Array<{ id: string; type: string; name: string; saveRate?: number }>;
+    suggested: Array<{ type: string; name: string; reason: string }>;
+  };
+  constraints: {
+    maxItemsPerDay: number;
+    avoidTopics: string[];
+    avoidSources: string[];
+    preferredLanguages: string[];
+  };
+  activeThemes: Array<{
+    theme: string;
+    evidence: string;
+    expiresAt: string;
+  }>;
+  stats: {
+    totalFeedbackEvents: number;
+    totalAgentFeeds: number;
+    agentSaveRate: number;
+    topPerformingTopics: string[];
+    worstPerformingTopics: string[];
+  };
+};
+
+export type AgentOutcomeStats = {
+  total: number;
+  saved: number;
+  tracked: number;
+  dismissed: number;
+  ignored: number;
+  byTopic: Array<{ topic: string; saveRate: number; dismissRate: number; count: number }>;
+  bySource: Record<string, { total: number; saved: number; dismissed: number }>;
 };

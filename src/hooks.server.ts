@@ -21,7 +21,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	if (event.url.pathname.startsWith('/api/admin/')) {
+	if (event.url.pathname.startsWith('/api/admin/') || event.url.pathname.startsWith('/api/agent/')) {
 		return resolve(event);
 	}
 

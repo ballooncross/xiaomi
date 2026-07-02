@@ -5,12 +5,18 @@ const sourceWeight: Record<string, number> = {
   bandsintown: 20,
   gdelt: 18,
   google_news: 16,
+  agent: 14,
   rss: 10,
   demo: 0,
   manual: 8
 };
 
-export function scoreItem(item: RadarItem, topics: WatchTopic[]): RadarItem {
+export type ScoringContext = {
+  impressionCounts?: Map<string, number>;
+  contextBoosts?: Map<string, number>;
+};
+
+export function scoreItem(item: RadarItem, topics: WatchTopic[], ctx?: ScoringContext): RadarItem {
   const haystack = [item.title, item.summary, item.description, item.location, ...item.artists, ...item.topics]
     .filter(Boolean)
     .join(' ')
@@ -36,6 +42,22 @@ export function scoreItem(item: RadarItem, topics: WatchTopic[]): RadarItem {
   if (haystack.includes('past event') || haystack.includes('already passed')) score -= 35;
   if (item.url) score += 4;
 
+  // Context-based boosts from compiled preferences
+  if (ctx?.contextBoosts) {
+    for (const topic of item.topics) {
+      const boost = ctx.contextBoosts.get(topic.toLowerCase());
+      if (boost) score += boost;
+    }
+  }
+
+  // Impression decay: reduce score for items the user has already seen
+  if (ctx?.impressionCounts) {
+    const impressions = ctx.impressionCounts.get(item.id) ?? 0;
+    if (impressions > 0) {
+      score += impressionDecay(impressions, score);
+    }
+  }
+
   return { ...item, score: Math.max(0, Math.min(score, 100)), summary: item.summary || fallbackSummary(item) };
 }
 
@@ -56,6 +78,15 @@ export function statusForFeedback(action: FeedbackAction): RadarItem['status'] |
 export function fallbackSummary(item: RadarItem): string {
   const text = item.description || item.title;
   return text.length <= 180 ? text : `${text.slice(0, 177).trim()}...`;
+}
+
+function impressionDecay(impressionCount: number, currentScore: number): number {
+  const maxImpressions = currentScore >= 90 ? 7
+    : currentScore >= 70 ? 4
+    : currentScore >= 50 ? 2
+    : 1;
+  if (impressionCount >= maxImpressions) return -100;
+  return -(impressionCount * 5);
 }
 
 export function reasonForItem(item: RadarItem): string {
