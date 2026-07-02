@@ -69,7 +69,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     });
 
     // Auto-promote high-confidence items that match active watch topics
-    const shouldPromote = feed.confidence >= 0.7 && matchesAnyTopic(feed, topics);
+    const shouldPromote = feed.confidence >= 0.45 && matchesAnyTopic(feed, topics);
     if (shouldPromote) {
       const item: RadarItem = {
         id: crypto.randomUUID(),
