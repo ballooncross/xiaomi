@@ -104,7 +104,9 @@ async function runScan(context: AgentContext, decision: ScanDecision): Promise<D
   };
 
   // AI search runs concurrently with the API sweep on full/deep scans
-  const aiPromise = useAi(decision.tier) ? runAiSearch(context) : Promise.resolve({ items: [], suggestedSources: [] });
+  const aiPromise = useAi(decision.tier)
+    ? runAiSearch(context)
+    : Promise.resolve({ items: [], suggestedSources: [], derivedAvoid: [] as string[] });
 
   for (const query of queries) {
     const eligible = queryDriven.filter((source) => source.lang === 'any' || source.lang === query.lang);
@@ -126,7 +128,7 @@ async function runScan(context: AgentContext, decision: ScanDecision): Promise<D
   aiResult.items.forEach(consider);
 
   if (!config.dryRun) {
-    await submitSignals(buildRunSignals(aiResult.suggestedSources, decision));
+    await submitSignals(buildRunSignals(aiResult, context, decision));
   }
 
   return collected;
@@ -137,17 +139,30 @@ function useAi(tier: ScanTier): boolean {
 }
 
 function buildRunSignals(
-  suggestedSources: Array<{ name: string; kind: string; url: string; reason: string }>,
+  aiResult: { suggestedSources: Array<{ name: string; kind: string; url: string; reason: string }>; derivedAvoid: string[] },
+  context: AgentContext,
   decision: ScanDecision
 ): AgentSignal[] {
-  const signals: AgentSignal[] = suggestedSources.map((source) => ({
+  const signals: AgentSignal[] = aiResult.suggestedSources.map((source) => ({
     type: 'source_suggestion',
     value: JSON.stringify(source),
     source: 'agent'
   }));
   if (signals.length > 0) {
-    log(`  Proposing ${signals.length} new sources: ${suggestedSources.map((source) => source.name).join(', ')}`);
+    log(`  Proposing ${signals.length} new sources: ${aiResult.suggestedSources.map((source) => source.name).join(', ')}`);
   }
+
+  // Exclusions the AI read out of the user's free-form notes ("but not X")
+  // become not_interested signals so keyword scoring learns them too
+  const alreadyAvoided = new Set(
+    (context.structuredContext?.constraints?.avoidTopics ?? []).map((topic) => topic.toLowerCase())
+  );
+  for (const phrase of aiResult.derivedAvoid) {
+    if (alreadyAvoided.has(phrase.toLowerCase())) continue;
+    log(`  Derived exclusion from interest notes: "${phrase}"`);
+    signals.push({ type: 'not_interested', value: phrase, source: 'agent' });
+  }
+
   signals.push({
     type: 'free_text',
     value: `[${decision.tier}] agent scan (${decision.reason})`,

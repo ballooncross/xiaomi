@@ -3,6 +3,7 @@ import type { AgentContext, DiscoveredItem } from '../types';
 export type AiSearchResult = {
   items: DiscoveredItem[];
   suggestedSources: Array<{ name: string; kind: string; url: string; reason: string }>;
+  derivedAvoid: string[];
 };
 
 /**
@@ -23,24 +24,29 @@ export function buildTrendPrompt(context: AgentContext): string {
 
   const avoid = (context.structuredContext?.constraints?.avoidTopics ?? []).join(', ') || 'none';
   const recentTitles = context.recentItems.titles.slice(0, 40).map((title) => `- ${title}`).join('\n');
-  const regions = ['Singapore', ...(context.structuredContext ? [] : [])].join(', ');
+
+  const tracked = (context.structuredContext?.tracking ?? [])
+    .map((story) => `- ${story.title}`)
+    .join('\n');
 
   return `You are a personal news scout. Based on your knowledge, report current trends, news, and opportunities for this user.
 
 USER PROFILE
-Region: ${regions || 'Singapore'} · Languages: English, Simplified Chinese
+Region: Singapore · Languages: English, Simplified Chinese
 Interests:
 ${interests || '- (none configured)'}
-${naturalLanguage ? `\nFree-form interest notes:\n${naturalLanguage}` : ''}
+${naturalLanguage ? `\nFree-form interest notes (respect nuance and exclusions like "but not X"):\n${naturalLanguage}` : ''}
 Avoid topics: ${avoid}
+${tracked ? `\nSTORIES UNDER ACTIVE TRACKING (highest priority: hunt for the LATEST developments on each):\n${tracked}` : ''}
 
 ALREADY SEEN (do not repeat these stories):
 ${recentTitles || '- (nothing yet)'}
 
 TASK
-1. List up to 8 relevant current trends/news/opportunities you know about. Prefer recent, concrete, actionable items. Chinese-market items are welcome.
+1. List up to 8 relevant current trends/news/opportunities you know about. Updates on actively tracked stories come first. Prefer recent, concrete, actionable items. Chinese-market items are welcome.
 2. Only include a "url" if you are confident it is a real, working link; otherwise omit the field entirely.
 3. Suggest up to 3 data sources (RSS feeds or news sites) we should monitor for these interests, with working URLs.
+4. If the free-form notes explicitly exclude something ("but not X", "不关心 Y"), list those exclusions as short keyword phrases in "derivedAvoid" (max 3); otherwise return an empty array.
 
 Respond with ONLY this JSON shape:
 {
@@ -49,12 +55,13 @@ Respond with ONLY this JSON shape:
   ],
   "suggestedSources": [
     {"name": "...", "kind": "rss", "url": "https://...", "reason": "..."}
-  ]
+  ],
+  "derivedAvoid": ["short keyword phrase"]
 }`;
 }
 
 export function parseAiResponse(text: string, backend: string): AiSearchResult {
-  const empty: AiSearchResult = { items: [], suggestedSources: [] };
+  const empty: AiSearchResult = { items: [], suggestedSources: [], derivedAvoid: [] };
   const jsonText = extractJson(text);
   if (!jsonText) return empty;
 
@@ -62,6 +69,7 @@ export function parseAiResponse(text: string, backend: string): AiSearchResult {
     const parsed = JSON.parse(jsonText) as {
       items?: Array<Record<string, unknown>>;
       suggestedSources?: Array<Record<string, unknown>>;
+      derivedAvoid?: unknown[];
     };
 
     const items: DiscoveredItem[] = (parsed.items ?? [])
@@ -90,7 +98,12 @@ export function parseAiResponse(text: string, backend: string): AiSearchResult {
         reason: String(source.reason ?? '')
       }));
 
-    return { items, suggestedSources };
+    const derivedAvoid = (parsed.derivedAvoid ?? [])
+      .map(String)
+      .filter((phrase) => phrase.length >= 2 && phrase.length <= 60)
+      .slice(0, 3);
+
+    return { items, suggestedSources, derivedAvoid };
   } catch {
     return empty;
   }

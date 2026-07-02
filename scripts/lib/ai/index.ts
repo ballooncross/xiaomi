@@ -11,7 +11,7 @@ import type { AgentContext } from '../types';
  * API backends: chatgpt | deepseek | claude · Local: ollama · Off: none
  */
 export async function runAiSearch(context: AgentContext): Promise<AiSearchResult> {
-  const empty: AiSearchResult = { items: [], suggestedSources: [] };
+  const empty: AiSearchResult = { items: [], suggestedSources: [], derivedAvoid: [] };
   const backend = config.aiBackend;
   if (backend === 'none') return empty;
 

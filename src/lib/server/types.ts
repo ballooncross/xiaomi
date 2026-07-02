@@ -230,6 +230,16 @@ export type AiContextDocument = {
     suggestedQueries: string[];
     preferredSources: string[];
     cadence: AgentFeedCadence;
+    followUp?: boolean;
+  }>;
+  /** Stories the user marked 重点跟踪: the agent actively hunts for updates. */
+  tracking: Array<{
+    itemId: string;
+    title: string;
+    query: string;
+    topics: string[];
+    url?: string;
+    trackedSince?: string;
   }>;
   sources: {
     active: Array<{ id: string; type: string; name: string; saveRate?: number }>;

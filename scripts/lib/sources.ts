@@ -154,6 +154,17 @@ export function buildQueries(context: AgentContext, tier: ScanTier, changedTopic
     queries.push(query);
   };
 
+  // 重点跟踪 stories run at EVERY tier, including 10-minute targeted ticks:
+  // tracking means the user wants continuing updates, not a one-time bookmark
+  for (const story of context.structuredContext?.tracking ?? []) {
+    pushQuery({
+      query: story.query,
+      topic: story.title.slice(0, 60),
+      category: 'general',
+      lang: containsCjk(story.query) ? 'zh' : 'en'
+    });
+  }
+
   const activeTopics = context.watchTopics.filter((topic) => topic.enabled && topic.mode !== 'blacklist');
   const topicsToSearch =
     tier === 'targeted' && changedTopics.length > 0

@@ -1,19 +1,24 @@
 import type { RadarDb } from './db';
-import type { AiContextDocument, PreferenceSignal, WatchTopic } from './types';
+import type { AiContextDocument, PreferenceSignal, RadarItem, WatchTopic } from './types';
 
 export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
-  const [topics, signals, recentFeedback, agentStats, latestContext] = await Promise.all([
+  const [topics, signals, recentFeedback, agentStats, latestContext, allItems] = await Promise.all([
     db.listTopics(),
     db.listPreferenceSignals({ limit: 500 }),
     db.listRecentFeedback(90),
     db.getAgentOutcomeStats(),
-    db.getLatestAiContext()
+    db.getLatestAiContext(),
+    db.listItems(200)
   ]);
 
   const version = (latestContext?.version ?? 0) + 1;
 
+  const tracking = buildTracking(allItems);
   const interestProfile = buildInterestProfile(topics, signals, recentFeedback);
-  const queryStrategies = buildQueryStrategies(topics, signals, recentFeedback);
+  const queryStrategies = [
+    ...buildTrackingStrategies(tracking),
+    ...buildQueryStrategies(topics, signals, recentFeedback)
+  ];
   const activeThemes = detectActiveThemes(recentFeedback);
   const sources = buildSourceConfig(recentFeedback, agentStats, signals);
   const constraints = buildConstraints(signals);
@@ -33,6 +38,7 @@ export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
     },
     interestProfile,
     queryStrategies,
+    tracking,
     sources,
     constraints,
     activeThemes,
@@ -55,6 +61,44 @@ export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
 
 type FeedbackRecord = { itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string };
 
+/** 重点跟踪 items become ongoing stories the agent hunts updates for. */
+function buildTracking(items: RadarItem[]): AiContextDocument['tracking'] {
+  return items
+    .filter((item) => item.status === 'tracking')
+    .slice(0, 10)
+    .map((item) => ({
+      itemId: item.id,
+      title: item.title,
+      query: followUpQueryFromTitle(item.title),
+      topics: item.topics,
+      url: item.url,
+      trackedSince: item.updatedAt
+    }));
+}
+
+function buildTrackingStrategies(tracking: AiContextDocument['tracking']): AiContextDocument['queryStrategies'] {
+  return tracking.map((story) => ({
+    topic: story.title.slice(0, 60),
+    suggestedQueries: [story.query, ...story.topics.slice(0, 2)],
+    preferredSources: ['google_news', 'gdelt'],
+    cadence: 'daily' as const,
+    followUp: true
+  }));
+}
+
+/** "Chinese robot maker Dreame Tech mulling IPO - Bloomberg" -> "Dreame Tech IPO latest" */
+export function followUpQueryFromTitle(title: string): string {
+  const stripped = title
+    .replace(/\s*[-–—|]\s*[^-–—|]{2,45}\s*$/, '')
+    .replace(/&nbsp;|&amp;|&quot;|&#\d+;/g, ' ')
+    .replace(/["“”'‘’]/g, '')
+    .trim();
+  const words = stripped.split(/\s+/);
+  const isCjk = /[一-鿿]/.test(stripped);
+  const core = isCjk ? stripped.slice(0, 20) : words.slice(0, 8).join(' ');
+  return `${core}${isCjk ? ' 最新' : ' latest'}`;
+}
+
 function buildInterestProfile(
   topics: WatchTopic[],
   signals: PreferenceSignal[],
@@ -64,9 +108,11 @@ function buildInterestProfile(
   const dismissesByTopic = new Map<string, number>();
 
   for (const f of feedback) {
+    // track is a stronger commitment than save: double weight
+    const positiveWeight = f.action === 'track' ? 2 : f.action === 'save' || f.action === 'more_like_this' ? 1 : 0;
     for (const t of f.topics) {
-      if (f.action === 'save' || f.action === 'track' || f.action === 'more_like_this') {
-        savesByTopic.set(t, (savesByTopic.get(t) ?? 0) + 1);
+      if (positiveWeight > 0) {
+        savesByTopic.set(t, (savesByTopic.get(t) ?? 0) + positiveWeight);
       }
       if (f.action === 'not_relevant' || f.action === 'less_like_this') {
         dismissesByTopic.set(t, (dismissesByTopic.get(t) ?? 0) + 1);

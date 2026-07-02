@@ -18,7 +18,15 @@ export type AgentContext = {
       declined: Array<{ topic: string }>;
       naturalLanguageInputs: string[];
     };
-    queryStrategies?: Array<{ topic: string; suggestedQueries: string[]; cadence: string }>;
+    queryStrategies?: Array<{ topic: string; suggestedQueries: string[]; cadence: string; followUp?: boolean }>;
+    tracking?: Array<{
+      itemId: string;
+      title: string;
+      query: string;
+      topics: string[];
+      url?: string;
+      trackedSince?: string;
+    }>;
     sources?: {
       active: Array<{ id: string; type: string; name: string }>;
       suggested: Array<{ type: string; name: string; reason: string; config?: unknown }>;

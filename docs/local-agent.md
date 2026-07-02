@@ -63,6 +63,19 @@ All under `/api/agent/`, authenticated with the `x-admin-token` header:
 - `POST /api/agent/context/compile` — force Layer 1 (raw signals) -> Layer 2 (structured context) recompile; also runs after every 5+ new signals and daily at 00:30 UTC
 - `GET /api/agent/feed/outcomes` — how agent submissions performed (save/dismiss rates by topic and source)
 
+## Track vs save
+
+保存 (save) is a bookmark: mild positive signal. 重点跟踪 (track) is a commitment to an ongoing story:
+
+- tracked items appear in the compiled context's `tracking` list with a generated follow-up query ("Dreame Tech mulling IPO latest")
+- the agent searches those queries on EVERY tick, including 10-minute targeted ones
+- the AI prompt lists tracked stories as highest priority ("hunt for the latest developments")
+- track counts double vs save when computing interest strength
+
+## Natural language interests
+
+The 添加关注 card has a free-text box ("我关注追觅 IPO、财务和公司架构新闻，但不关心具体产品发布"). The text is stored verbatim as a Layer 1 `interest` signal via `POST /api/interests` and the context recompiles immediately. The AI backend receives the raw text and respects exclusions when picking items; during full/deep scans it also extracts explicit exclusions into `derivedAvoid`, which come back as `not_interested` signals so the keyword scorer and blacklist learn them too.
+
 ## Dedup
 
 `src/lib/server/dedup.ts` clusters items by title similarity (outlet suffixes stripped, stopwords removed, CJK bigrams) and merges duplicate coverage into one item with `relatedSources` links. Used by the cron trend fetch and the agent feed endpoint. One-time cleanup of stored duplicates:
