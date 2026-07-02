@@ -4,7 +4,8 @@ import { getDb } from './db';
 import { fetchBandsintownConcerts } from './fetchers/bandsintown';
 import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
 import { buildTrendSearchItems } from './fetchers/trends';
-import { sortReminders } from './lunar';
+import { sortReminders, todayInSingapore } from './lunar';
+import { getAllUpcomingMilestones } from './milestones';
 import { scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
 import type { DateReminder, Env, JobResult, RadarItem } from './types';
@@ -73,15 +74,33 @@ export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual
 }
 
 function appendReminderDigest(message: string, reminders: DateReminder[]): string {
-  const upcoming = sortReminders(reminders)
+  const sorted = sortReminders(reminders);
+  const upcoming = sorted
     .filter((reminder) => reminder.remindDaysBefore.includes(reminder.daysLeft))
     .slice(0, 6);
-  if (upcoming.length === 0) return message;
-  const lines = ['', '生日与纪念日'];
+
+  const today = todayInSingapore();
+  const milestones = getAllUpcomingMilestones(sorted, today, 1)
+    .slice(0, 4);
+
+  if (upcoming.length === 0 && milestones.length === 0) return message;
+
+  const lines: string[] = ['', '生日与纪念日'];
   for (const reminder of upcoming) {
     const dayText = reminder.daysLeft === 0 ? '今天' : `${reminder.daysLeft} 天后`;
-    lines.push(`${reminder.title} · ${dayText} · ${reminder.dateLabel}`);
+    const ageText = reminder.ageLabel ? ` · ${reminder.ageLabel}` : '';
+    lines.push(`${reminder.title} · ${dayText} · ${reminder.dateLabel}${ageText}`);
   }
+
+  if (milestones.length > 0) {
+    lines.push('');
+    lines.push('里程碑');
+    for (const m of milestones) {
+      const dayText = m.daysFromNow === 0 ? '今天' : `${m.daysFromNow} 天后`;
+      lines.push(`${m.reminderTitle} · ${m.label} · 第${m.dayNumber}天 · ${dayText}`);
+    }
+  }
+
   return `${message}\n${lines.join('\n')}`;
 }
 

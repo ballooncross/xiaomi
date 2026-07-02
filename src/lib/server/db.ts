@@ -41,6 +41,7 @@ type ReminderRow = {
   id: string;
   title: string;
   calendar_type: DateReminder['calendarType'];
+  category: DateReminder['category'];
   year: number | null;
   month: number;
   day: number;
@@ -322,13 +323,14 @@ class D1RadarDb extends RadarDb {
       await this.db
         .prepare(
           `INSERT INTO date_reminders (
-            id, title, calendar_type, year, month, day, lunar_is_leap_month, repeat, note,
+            id, title, calendar_type, category, year, month, day, lunar_is_leap_month, repeat, note,
             pinned, enabled, remind_days_before, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
           ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             calendar_type = excluded.calendar_type,
+            category = excluded.category,
             year = excluded.year,
             month = excluded.month,
             day = excluded.day,
@@ -344,6 +346,7 @@ class D1RadarDb extends RadarDb {
           reminder.id,
           reminder.title,
           reminder.calendarType,
+          reminder.category,
           reminder.year ?? null,
           reminder.month,
           reminder.day,
@@ -479,11 +482,14 @@ function topicFromRow(row: TopicRow): WatchTopic {
   };
 }
 
+const validCategories = new Set(['birthday', 'child_birthday', 'anniversary', 'memorial', 'other']);
+
 function reminderFromRow(row: ReminderRow): DateReminder {
   return {
     id: row.id,
     title: row.title,
     calendarType: row.calendar_type,
+    category: validCategories.has(row.category) ? row.category : 'birthday',
     year: row.year ?? undefined,
     month: row.month,
     day: row.day,

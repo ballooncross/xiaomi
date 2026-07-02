@@ -1,4 +1,5 @@
 import { Lunar, Solar } from 'lunar-javascript';
+import { enrichDate, type Milestone } from './milestones';
 import type { DateReminder } from './types';
 
 type Ymd = { year: number; month: number; day: number };
@@ -9,16 +10,22 @@ export type ReminderView = DateReminder & {
   nextDate: string;
   daysLeft: number;
   dateLabel: string;
+  daysSince?: number;
+  ageLabel?: string;
+  originDate?: string;
+  upcomingMilestones: Milestone[];
 };
 
 export function enrichReminder(reminder: DateReminder, now = new Date()): ReminderView {
   const today = todayInSingapore(now);
   const nextDate = nextOccurrence(reminder, today);
+  const enrichment = enrichDate(reminder, today);
   return {
     ...reminder,
     nextDate: formatYmd(nextDate),
     daysLeft: diffDays(today, nextDate),
-    dateLabel: formatReminderDate(reminder, nextDate)
+    dateLabel: formatReminderDate(reminder, nextDate),
+    ...enrichment,
   };
 }
 

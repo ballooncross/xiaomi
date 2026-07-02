@@ -3,7 +3,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { getDb } from '$lib/server/db';
 import { mergeLocalEnv } from '$lib/server/env';
 import { sortReminders } from '$lib/server/lunar';
-import type { DateReminder, Env } from '$lib/server/types';
+import type { DateCategory, DateReminder, Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ platform }) => {
@@ -51,15 +51,19 @@ async function parseOptionalJson(request: Request): Promise<{ id?: string }> {
   }
 }
 
+const validCategories = new Set<DateCategory>(['birthday', 'child_birthday', 'anniversary', 'memorial', 'other']);
+
 function reminderFromBody(body: Partial<DateReminder>): DateReminder {
   const title = String(body.title ?? '').trim();
   const calendarType = body.calendarType === 'gregorian' ? 'gregorian' : 'lunar';
   const month = clamp(Number(body.month ?? 1), 1, 12);
   const day = clamp(Number(body.day ?? 1), 1, 31);
+  const category = validCategories.has(body.category as DateCategory) ? body.category as DateCategory : 'birthday';
   return {
     id: body.id || `reminder-${slug(title)}-${crypto.randomUUID().slice(0, 8)}`,
     title,
     calendarType,
+    category,
     year: body.year ? Number(body.year) : undefined,
     month,
     day,

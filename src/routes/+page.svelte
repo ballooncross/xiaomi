@@ -2,7 +2,7 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
-  import type { CronJobStatus, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
+  import type { CronJobStatus, DateCategory, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
@@ -10,7 +10,15 @@
 
   type View = 'home' | 'concerts' | 'trends' | 'dates' | 'me';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
-  type ReminderView = DateReminder & { nextDate: string; daysLeft: number; dateLabel: string };
+  type ReminderView = DateReminder & {
+    nextDate: string;
+    daysLeft: number;
+    dateLabel: string;
+    daysSince?: number;
+    ageLabel?: string;
+    originDate?: string;
+    upcomingMilestones: Array<{ label: string; dayNumber: number; targetDate: string; daysFromNow: number; kind: 'age' | 'day_count' | 'vaccination' | 'tradition' | 'holiday' }>;
+  };
   type IcaToolStatus = PageData['icaTool'];
 
   const viewPaths: Record<View, string> = {
@@ -72,10 +80,13 @@
   let editingReminderId = $state<string | null>(null);
   let reminderTitle = $state('');
   let reminderCalendarType = $state<DateReminder['calendarType']>('lunar');
+  let reminderCategory = $state<DateCategory>('birthday');
+  let reminderDateExact = $state(false);
   let reminderDate = $state(todayInputValue());
   let reminderRepeat = $state<DateReminder['repeat']>('annual');
   let reminderDay0 = $state(true);
   let reminderDay1 = $state(true);
+  let reminderDay3 = $state(false);
   let reminderDay7 = $state(true);
   let reminderDay30 = $state(false);
   let reminderPinned = $state(false);
@@ -530,10 +541,13 @@
       editingReminderId = reminder.id;
       reminderTitle = reminder.title;
       reminderCalendarType = reminder.calendarType;
+      reminderCategory = reminder.category;
+      reminderDateExact = reminder.year != null;
       reminderDate = reminder.nextDate;
       reminderRepeat = reminder.repeat;
       reminderDay0 = reminder.remindDaysBefore.includes(0);
       reminderDay1 = reminder.remindDaysBefore.includes(1);
+      reminderDay3 = reminder.remindDaysBefore.includes(3);
       reminderDay7 = reminder.remindDaysBefore.includes(7);
       reminderDay30 = reminder.remindDaysBefore.includes(30);
       reminderPinned = reminder.pinned;
@@ -542,13 +556,33 @@
     editingReminderId = null;
     reminderTitle = '';
     reminderCalendarType = 'lunar';
+    reminderCategory = 'birthday';
+    reminderDateExact = false;
     reminderDate = todayInputValue();
     reminderRepeat = 'annual';
-    reminderDay0 = true;
-    reminderDay1 = true;
-    reminderDay7 = true;
-    reminderDay30 = false;
+    applyDefaultRemindDays('birthday');
     reminderPinned = false;
+  }
+
+  function applyDefaultRemindDays(category: DateCategory) {
+    if (category === 'child_birthday') {
+      reminderDay0 = true; reminderDay1 = true; reminderDay3 = true; reminderDay7 = true; reminderDay30 = true;
+      reminderDateExact = true;
+    } else if (category === 'anniversary') {
+      reminderDay0 = true; reminderDay1 = true; reminderDay3 = false; reminderDay7 = true; reminderDay30 = true;
+      reminderDateExact = true;
+    } else if (category === 'memorial') {
+      reminderDay0 = true; reminderDay1 = false; reminderDay3 = false; reminderDay7 = true; reminderDay30 = false;
+      reminderDateExact = false;
+    } else {
+      reminderDay0 = true; reminderDay1 = true; reminderDay3 = false; reminderDay7 = true; reminderDay30 = false;
+      reminderDateExact = false;
+    }
+  }
+
+  function onCategoryChange(category: DateCategory) {
+    reminderCategory = category;
+    if (!editingReminderId) applyDefaultRemindDays(category);
   }
 
   async function saveReminder() {
@@ -564,7 +598,8 @@
       id: editingReminderId ?? undefined,
       title,
       calendarType: reminderCalendarType,
-      year: reminderRepeat === 'none' ? dateParts.year : undefined,
+      category: reminderCategory,
+      year: reminderDateExact ? dateParts.year : undefined,
       month: dateParts.month,
       day: dateParts.day,
       lunarIsLeapMonth: dateParts.lunarIsLeapMonth,
@@ -634,6 +669,7 @@
     const days: number[] = [];
     if (reminderDay0) days.push(0);
     if (reminderDay1) days.push(1);
+    if (reminderDay3) days.push(3);
     if (reminderDay7) days.push(7);
     if (reminderDay30) days.push(30);
     return days;
@@ -785,9 +821,9 @@
     }
     if (view === 'dates') {
       return {
-        eyebrow: '日期簿 · 农历生日',
-        title: '生日和纪念日。',
-        body: '农历日期会按每年同月同日计算下一次提醒，接近日期会出现在首页和每日摘要里。'
+        eyebrow: '日期簿 · 生日 · 纪念日 · 里程碑',
+        title: '生日、纪念日和里程碑。',
+        body: '支持宝宝成长追踪（满月、百天、疫苗提醒）、婚恋纪念（520天、千日、银婚）等自动里程碑。选择日期时包含年份可启用天数计算和里程碑追踪。'
       };
     }
     return {
@@ -1032,27 +1068,52 @@
             <div class="action-card">
               <div class="action-card-head">
                 <div>
-                  <strong>{editingReminderId ? '编辑生日提醒' : '添加生日提醒'}</strong>
-                  <span>默认按农历每年提醒，适合生日和重要纪念日</span>
+                  <strong>{editingReminderId ? '编辑日期提醒' : '添加日期提醒'}</strong>
+                  <span>设置类型可自动追踪里程碑（满月、百天、千日纪念等）</span>
                 </div>
-                <button class="close-button" type="button" aria-label="关闭生日提醒" onclick={() => (reminderFormOpen = false)}>
+                <button class="close-button" type="button" aria-label="关闭日期提醒" onclick={() => (reminderFormOpen = false)}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18"></path>
                   </svg>
                 </button>
               </div>
               <div class="watch-form reminder-form">
-                <input bind:value={reminderTitle} placeholder="例如：老妈生日、纪念日" />
-                <select bind:value={reminderCalendarType} aria-label="日期类型">
+                <input bind:value={reminderTitle} placeholder="例如：老妈生日、结婚纪念日" />
+                <select value={reminderCategory} onchange={(e) => onCategoryChange(e.currentTarget.value as DateCategory)} aria-label="日期类型">
+                  <option value="birthday">生日</option>
+                  <option value="child_birthday">宝宝生日</option>
+                  <option value="anniversary">纪念日</option>
+                  <option value="memorial">纪念</option>
+                  <option value="other">其他</option>
+                </select>
+                <select bind:value={reminderCalendarType} aria-label="历法">
                   <option value="lunar">农历</option>
                   <option value="gregorian">公历</option>
                 </select>
-                <input use:datepicker bind:value={reminderDate} placeholder="选择目标日期" />
-                <label class="check-row">
-                  <input type="checkbox" bind:checked={reminderPinned} />
-                  置顶
-                </label>
+                <input use:datepicker bind:value={reminderDate} placeholder="选择日期" />
+                <div class="reminder-checks">
+                  <label class="check-row">
+                    <input type="checkbox" bind:checked={reminderDateExact} />
+                    日期准确
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" bind:checked={reminderPinned} />
+                    置顶
+                  </label>
+                </div>
+                {#if !reminderDateExact}
+                  <span class="date-hint">年份未知时只提醒周期，不计算天数和里程碑</span>
+                {/if}
                 <span class="date-preview">{selectedDateLabel(reminderDate, reminderCalendarType)}</span>
+                <span class="date-preview">{dualDateLabel(reminderDate)}</span>
+                <div class="reminder-checks remind-days-row">
+                  <span>提前提醒</span>
+                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay0} /> 当天</label>
+                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay1} /> 1天</label>
+                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay3} /> 3天</label>
+                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay7} /> 7天</label>
+                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay30} /> 30天</label>
+                </div>
                 <button class="small-button primary" disabled={reminderPending} onclick={saveReminder}>
                   {reminderPending ? '保存中...' : '保存提醒'}
                 </button>
@@ -1266,14 +1327,14 @@
       {#if activeView === 'home' && upcomingReminders.length > 0}
         <section class="reminder-strip" aria-label="临近日期">
           <div>
-            <strong>临近日期</strong>
-            <span>进入日期 tab 管理农历生日和纪念日</span>
+            <strong>临近日期与里程碑</strong>
+            <span>进入日期 tab 管理生日、纪念日和里程碑</span>
           </div>
           <div class="reminder-strip-list">
             {#each upcomingReminders as reminder}
               <button type="button" onclick={() => setView('dates')}>
                 <strong>{reminder.daysLeft}</strong>
-                <span>{reminder.title}</span>
+                <span>{reminder.title}{reminder.ageLabel ? ` · ${reminder.ageLabel}` : ''}</span>
               </button>
             {/each}
           </div>
@@ -2061,6 +2122,28 @@
     background: #fff8eb;
     color: var(--ink);
     padding: 0 10px;
+  }
+
+  .reminder-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .remind-days-row > span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+    margin-right: 4px;
+  }
+
+  .date-hint {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    font-style: italic;
   }
 
   .form-error {
