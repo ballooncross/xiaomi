@@ -44,8 +44,8 @@
   const categoryLabels: Record<string, string> = {
     birthday: '生日',
     child_birthday: '宝宝生日',
-    anniversary: '纪念日',
-    memorial: '纪念',
+    anniversary: '恋爱/婚姻',
+    memorial: '逝世纪念',
     other: '其他'
   };
 
