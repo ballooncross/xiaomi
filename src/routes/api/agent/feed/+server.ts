@@ -30,6 +30,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
   const db = getDb(env);
   const topics = await db.listTopics();
+  const existingItems = await db.getRecentItemSummaries(14);
+  const existingTitles = new Set(existingItems.map(i => normalizeTitle(i.title)));
+  const existingUrls = new Set(existingItems.filter(i => i.url).map(i => i.url!));
   const results: Array<{ id: string; status: string; promotedItemId: string | null }> = [];
   let duplicates = 0;
   let promoted = 0;
@@ -37,10 +40,25 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   for (const input of body.items) {
     if (!input.title || !input.source) continue;
 
-    // Dedup by URL
+    // Dedup by URL against agent_feeds, retry promotion for pending
     if (input.url) {
       const existing = await db.findAgentFeedByUrl(input.url);
-      if (existing) { duplicates++; continue; }
+      if (existing) {
+        if (existing.status === 'pending' && !existing.promotedItemId) {
+          if (!isDuplicateOfExisting(existing.title, existing.url, existingTitles, existingUrls)) {
+            const didPromote = await tryPromote(existing, topics, db);
+            if (didPromote) promoted++;
+          }
+        }
+        duplicates++;
+        continue;
+      }
+    }
+
+    // Dedup by title similarity against existing items in the main table
+    if (isDuplicateOfExisting(input.title, input.url, existingTitles, existingUrls)) {
+      duplicates++;
+      continue;
     }
 
     const feed: AgentFeedItem = {
@@ -60,7 +78,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
     await db.insertAgentFeed(feed);
 
-    // Record agent_suggestion signal
     await db.insertPreferenceSignal({
       id: crypto.randomUUID(),
       signalType: 'agent_suggestion',
@@ -68,9 +85,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       source: 'agent',
     });
 
-    // Auto-promote high-confidence items that match active watch topics
     const shouldPromote = feed.confidence >= 0.45 && matchesAnyTopic(feed, topics);
     if (shouldPromote) {
+      const imageUrl = feed.url ? await fetchPageImage(feed.url) : undefined;
       const item: RadarItem = {
         id: crypto.randomUUID(),
         sourceId: `agent-${feed.source}`,
@@ -81,6 +98,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
         summary: feed.summary,
         description: feed.relevanceReason,
         url: feed.url,
+        imageUrl,
         artists: [],
         topics: feed.topics,
         raw: feed.metadata,
@@ -91,6 +109,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       const scored = scoreItem(item, topics);
       await db.upsertItem(scored);
       await db.updateAgentFeedStatus(feed.id, 'promoted', item.id);
+      existingTitles.add(normalizeTitle(feed.title));
+      if (feed.url) existingUrls.add(feed.url);
       feed.status = 'promoted';
       feed.promotedItemId = item.id;
       promoted++;
@@ -99,13 +119,90 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     results.push({ id: feed.id, status: feed.status, promotedItemId: feed.promotedItemId ?? null });
   }
 
-  return json({
-    accepted: results.length,
-    duplicates,
-    promoted,
-    items: results,
-  });
+  return json({ accepted: results.length, duplicates, promoted, items: results });
 };
+
+async function tryPromote(
+  existing: AgentFeedItem,
+  topics: Awaited<ReturnType<ReturnType<typeof getDb>['listTopics']>>,
+  db: ReturnType<typeof getDb>
+): Promise<boolean> {
+  const shouldPromote = existing.confidence >= 0.45 && matchesAnyTopic(existing, topics);
+  if (!shouldPromote) return false;
+
+  const imageUrl = existing.url ? await fetchPageImage(existing.url) : undefined;
+  const item: RadarItem = {
+    id: crypto.randomUUID(),
+    sourceId: `agent-${existing.source}`,
+    sourceType: 'agent',
+    externalId: existing.id,
+    kind: existing.kind,
+    title: existing.title,
+    summary: existing.summary,
+    description: existing.relevanceReason,
+    url: existing.url,
+    imageUrl,
+    artists: [],
+    topics: existing.topics,
+    raw: existing.metadata,
+    score: 0,
+    status: 'new',
+  };
+  const scored = scoreItem(item, topics);
+  await db.upsertItem(scored);
+  await db.updateAgentFeedStatus(existing.id, 'promoted', item.id);
+  return true;
+}
+
+function isDuplicateOfExisting(title: string, url: string | undefined, existingTitles: Set<string>, existingUrls: Set<string>): boolean {
+  if (url && existingUrls.has(url)) return true;
+  const normalized = normalizeTitle(title);
+  for (const existing of existingTitles) {
+    if (titleSimilarity(normalized, existing) > 0.7) return true;
+  }
+  return false;
+}
+
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\s*[-–—|]\s*[^-–—|]+$/, '') // strip " - Source Name" suffix
+    .replace(/&nbsp;/g, ' ')
+    .replace(/[^\w\s一-鿿]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function titleSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const wordsA = new Set(a.split(' ').filter(w => w.length > 2));
+  const wordsB = new Set(b.split(' ').filter(w => w.length > 2));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let overlap = 0;
+  for (const w of wordsA) { if (wordsB.has(w)) overlap++; }
+  return overlap / Math.min(wordsA.size, wordsB.size);
+}
+
+async function fetchPageImage(url: string): Promise<string | undefined> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok || !(resp.headers.get('content-type') ?? '').includes('text/html')) return undefined;
+    const html = await resp.text();
+    return metaContent(html, 'property', 'og:image')
+      ?? metaContent(html, 'name', 'twitter:image')
+      ?? metaContent(html, 'name', 'twitter:image:src');
+  } catch { return undefined; }
+}
+
+function metaContent(html: string, key: string, value: string): string | undefined {
+  const esc = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const p1 = new RegExp(`<meta[^>]+${key}=["']${esc}["'][^>]+content=["']([^"']+)["']`, 'i');
+  const p2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${key}=["']${esc}["']`, 'i');
+  return html.match(p1)?.[1] || html.match(p2)?.[1] || undefined;
+}
 
 function isAuthorized(request: Request, env?: Env): boolean {
   if (!env?.ADMIN_TOKEN) return true;

@@ -145,7 +145,6 @@
       })
       .filter((item) => matchesSearch(item, searchQuery))
       .sort(sortRadarItemsForDisplay)
-      .slice(0, 8)
   );
 
   const topItem = $derived(visibleItems[0]);
@@ -154,7 +153,6 @@
     items
       .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed')
       .sort(sortRadarItemsForDisplay)
-      .slice(0, 6)
   );
   const timelineItems = $derived(
     items
