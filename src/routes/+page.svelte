@@ -565,19 +565,8 @@
   }
 
   function applyDefaultRemindDays(category: DateCategory) {
-    if (category === 'child_birthday') {
-      reminderDay0 = true; reminderDay1 = true; reminderDay3 = true; reminderDay7 = true; reminderDay30 = true;
-      reminderDateExact = true;
-    } else if (category === 'anniversary') {
-      reminderDay0 = true; reminderDay1 = true; reminderDay3 = false; reminderDay7 = true; reminderDay30 = true;
-      reminderDateExact = true;
-    } else if (category === 'memorial') {
-      reminderDay0 = true; reminderDay1 = false; reminderDay3 = false; reminderDay7 = true; reminderDay30 = false;
-      reminderDateExact = false;
-    } else {
-      reminderDay0 = true; reminderDay1 = true; reminderDay3 = false; reminderDay7 = true; reminderDay30 = false;
-      reminderDateExact = false;
-    }
+    reminderDay0 = true; reminderDay1 = false; reminderDay3 = false; reminderDay7 = true; reminderDay30 = false;
+    reminderDateExact = category === 'child_birthday' || category === 'anniversary';
   }
 
   function onCategoryChange(category: DateCategory) {
