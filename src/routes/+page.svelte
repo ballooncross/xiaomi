@@ -1719,11 +1719,23 @@
           <input bind:value={reminderTitle} placeholder="日期名称" />
         </label>
 
+        <div class="sheet-row sheet-control-row">
+          <span>📋</span>
+          <strong>类型</strong>
+          <select value={reminderCategory} onchange={(e) => onCategoryChange(e.currentTarget.value as DateCategory)} aria-label="日期类型">
+            <option value="birthday">生日</option>
+            <option value="child_birthday">宝宝生日</option>
+            <option value="anniversary">纪念日</option>
+            <option value="memorial">纪念</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+
         <div class="sheet-group">
           <div class="sheet-label">目标日</div>
           <div class="date-picker-row">
             <input use:datepicker bind:value={reminderDate} aria-label="目标日期" />
-            <select bind:value={reminderCalendarType} aria-label="日期类型">
+            <select bind:value={reminderCalendarType} aria-label="历法">
               <option value="lunar">农历</option>
               <option value="gregorian">公历</option>
             </select>
@@ -1734,6 +1746,15 @@
               : '公历每年提醒'}
           </p>
         </div>
+
+        <label class="sheet-row">
+          <span>📌</span>
+          <strong>日期准确</strong>
+          <input type="checkbox" bind:checked={reminderDateExact} />
+        </label>
+        {#if !reminderDateExact}
+          <p class="sheet-hint">年份未知时只提醒周期，不计算天数和里程碑</p>
+        {/if}
 
         <div class="sheet-row sheet-control-row">
           <span>↻</span>
@@ -1750,6 +1771,7 @@
           <div class="reminder-days" aria-label="提醒时间">
             <label><input type="checkbox" bind:checked={reminderDay0} />当天</label>
             <label><input type="checkbox" bind:checked={reminderDay1} />1 天前</label>
+            <label><input type="checkbox" bind:checked={reminderDay3} />3 天前</label>
             <label><input type="checkbox" bind:checked={reminderDay7} />7 天前</label>
             <label><input type="checkbox" bind:checked={reminderDay30} />30 天前</label>
           </div>
@@ -2369,6 +2391,14 @@
     margin: 8px 0 0;
     color: var(--muted);
     font-weight: 850;
+  }
+
+  .sheet-hint {
+    margin: -4px 0 6px 52px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    font-style: italic;
   }
 
   :global(.datepicker) {
