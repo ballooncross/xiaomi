@@ -185,7 +185,8 @@ export type SignalType =
   | 'more_like_this'
   | 'region_hint'
   | 'free_text'
-  | 'agent_suggestion';
+  | 'agent_suggestion'
+  | 'source_suggestion';
 
 export type PreferenceSignal = {
   id: string;
@@ -232,7 +233,7 @@ export type AiContextDocument = {
   }>;
   sources: {
     active: Array<{ id: string; type: string; name: string; saveRate?: number }>;
-    suggested: Array<{ type: string; name: string; reason: string }>;
+    suggested: Array<{ type: string; name: string; reason: string; config?: unknown }>;
   };
   constraints: {
     maxItemsPerDay: number;

@@ -15,7 +15,7 @@ export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
   const interestProfile = buildInterestProfile(topics, signals, recentFeedback);
   const queryStrategies = buildQueryStrategies(topics, signals, recentFeedback);
   const activeThemes = detectActiveThemes(recentFeedback);
-  const sources = buildSourceConfig(recentFeedback, agentStats);
+  const sources = buildSourceConfig(recentFeedback, agentStats, signals);
   const constraints = buildConstraints(signals);
 
   const regionHints = signals
@@ -114,8 +114,14 @@ function buildInterestProfile(
     reason: `Explicitly marked as not interested (${s.source})`
   }));
 
+  // Agent free_text entries are run logs, not interests; only user free text counts
   const naturalLanguageInterests = signals
-    .filter((s) => s.signalType === 'interest' || s.signalType === 'note' || s.signalType === 'free_text')
+    .filter(
+      (s) =>
+        s.signalType === 'interest' ||
+        s.signalType === 'note' ||
+        (s.signalType === 'free_text' && s.source === 'ui')
+    )
     .map((s) => s.signalValue);
 
   return { primary, emerging, declined, naturalLanguageInputs: naturalLanguageInterests };
@@ -184,7 +190,8 @@ function detectActiveThemes(feedback: FeedbackRecord[]): AiContextDocument['acti
 
 function buildSourceConfig(
   feedback: FeedbackRecord[],
-  agentStats: AgentOutcomeStats
+  agentStats: AgentOutcomeStats,
+  signals: PreferenceSignal[]
 ): AiContextDocument['sources'] {
   const sourceSaveCounts = new Map<string, number>();
   const sourceTotalCounts = new Map<string, number>();
@@ -203,13 +210,33 @@ function buildSourceConfig(
     saveRate: (sourceSaveCounts.get(type) ?? 0) / total
   }));
 
-  const suggested: Array<{ type: string; name: string; reason: string }> = [];
+  const suggested: Array<{ type: string; name: string; reason: string; config?: unknown }> = [];
   if (agentStats.total > 0 && agentStats.saved / agentStats.total > 0.2) {
     suggested.push({
       type: 'agent',
       name: 'Expand AI agent searches',
       reason: `Agent items have a ${Math.round((agentStats.saved / agentStats.total) * 100)}% save rate`
     });
+  }
+
+  // Sources the AI proposed via source_suggestion signals; the agent pulls
+  // these back through the context and merges valid ones into its fetch list
+  const seenUrls = new Set<string>();
+  for (const signal of signals) {
+    if (signal.signalType !== 'source_suggestion') continue;
+    try {
+      const parsed = JSON.parse(signal.signalValue) as { name?: string; kind?: string; url?: string; reason?: string };
+      if (!parsed.url || seenUrls.has(parsed.url)) continue;
+      seenUrls.add(parsed.url);
+      suggested.push({
+        type: 'learned',
+        name: parsed.name ?? parsed.url,
+        reason: parsed.reason ?? 'Suggested by agent AI search',
+        config: parsed
+      });
+    } catch {
+      /* not JSON, skip */
+    }
   }
 
   return { active, suggested };
