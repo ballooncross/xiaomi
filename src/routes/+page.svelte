@@ -1071,8 +1071,8 @@
                 <select value={reminderCategory} onchange={(e) => onCategoryChange(e.currentTarget.value as DateCategory)} aria-label="日期类型">
                   <option value="birthday">生日</option>
                   <option value="child_birthday">宝宝生日</option>
-                  <option value="anniversary">纪念日</option>
-                  <option value="memorial">纪念</option>
+                  <option value="anniversary">恋爱/婚姻</option>
+                  <option value="memorial">逝世纪念</option>
                   <option value="other">其他</option>
                 </select>
                 <select bind:value={reminderCalendarType} aria-label="历法">
@@ -1725,8 +1725,8 @@
           <select value={reminderCategory} onchange={(e) => onCategoryChange(e.currentTarget.value as DateCategory)} aria-label="日期类型">
             <option value="birthday">生日</option>
             <option value="child_birthday">宝宝生日</option>
-            <option value="anniversary">纪念日</option>
-            <option value="memorial">纪念</option>
+            <option value="anniversary">恋爱/婚姻</option>
+            <option value="memorial">逝世纪念</option>
             <option value="other">其他</option>
           </select>
         </div>
