@@ -17,6 +17,8 @@
 
 import { runAiSearch } from './lib/ai/index';
 import { config } from './lib/config';
+import { processDevRequests } from './lib/dev-agent';
+import { hydrateImageForUrl } from './lib/images';
 import { runSource } from './lib/fetch-engine';
 import { fetchContext, submitFeeds, submitSignals } from './lib/radar-api';
 import { scoreRelevance } from './lib/scoring';
@@ -68,6 +70,20 @@ async function tick() {
   items.sort((a, b) => b.confidence - a.confidence);
   const toSubmit = items.slice(0, maxItems);
 
+  // Hydrate images locally (works from Mac; fails on Cloudflare Workers)
+  let hydrated = 0;
+  for (const item of toSubmit) {
+    if (item.url && !item.imageUrl && hydrated < 6) {
+      hydrated++;
+      try {
+        const { imageUrl, resolvedUrl } = await hydrateImageForUrl(item.url);
+        if (imageUrl) item.imageUrl = imageUrl;
+        if (resolvedUrl && resolvedUrl !== item.url) item.url = resolvedUrl;
+      } catch { /* skip */ }
+    }
+  }
+  if (hydrated > 0) log(`Hydrated images for ${hydrated} items`);
+
   if (toSubmit.length === 0) {
     log('No new items to submit.');
   } else if (config.dryRun) {
@@ -82,6 +98,13 @@ async function tick() {
 
   saveState(updateStateAfterScan(state, context, decision.tier));
   log(`State saved (run #${state.runCount + 1})`);
+
+  // Process pending dev requests (feature/bug requests from the UI)
+  try {
+    await processDevRequests();
+  } catch (error) {
+    log(`Dev request error: ${error}`);
+  }
 }
 
 async function runScan(context: AgentContext, decision: ScanDecision): Promise<DiscoveredItem[]> {

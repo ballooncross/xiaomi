@@ -227,7 +227,22 @@
     background: #7ea79d;
   }
 
-  .dates-hero button,
+  .dates-hero button {
+    min-height: 42px;
+    border: 2px solid #7ea79d;
+    border-radius: 999px;
+    padding: 0 18px;
+    background: transparent;
+    color: #4d8976;
+    font-weight: 950;
+    transition: background 150ms ease, color 150ms ease;
+  }
+
+  .dates-hero button:hover {
+    background: #7ea79d;
+    color: #fff8eb;
+  }
+
   .date-empty button {
     min-height: 42px;
     border: 0;

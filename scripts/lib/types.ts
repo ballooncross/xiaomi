@@ -46,6 +46,7 @@ export type DiscoveredItem = {
   title: string;
   summary: string;
   url?: string;
+  imageUrl?: string;
   kind: string;
   confidence: number;
   relevanceReason: string;
