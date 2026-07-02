@@ -9,3 +9,4 @@ build
 .dev.vars
 dist
 coverage
+scripts/.agent-state.json
