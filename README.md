@@ -46,6 +46,8 @@ npm run db:migrate:local    # apply D1 migrations locally
 npm run db:seed:local       # seed local D1
 npm run deploy              # deploy Pages app
 npm run deploy:cron         # deploy scheduled worker
+npm run agent -- --once     # run the local AI agent once
+npm run agent:dry           # local AI agent dry run (no submissions)
 ```
 
 ## Deployment Rule
@@ -60,3 +62,4 @@ Run `npm run db:migrate:local` after pulling schema changes. The birthday notebo
 - [Cloudflare deployment](docs/cloudflare-deployment.md)
 - [Telegram setup](docs/telegram-setup.md)
 - [AI configuration](docs/ai.md)
+- [Local AI agent](docs/local-agent.md)
