@@ -1,8 +1,17 @@
 <script lang="ts">
   import { Solar } from 'lunar-javascript';
   import type { DateReminder } from '$lib/server/types';
+  import type { Milestone } from '$lib/server/milestones';
 
-  type ReminderView = DateReminder & { nextDate: string; daysLeft: number; dateLabel: string };
+  type ReminderView = DateReminder & {
+    nextDate: string;
+    daysLeft: number;
+    dateLabel: string;
+    daysSince?: number;
+    ageLabel?: string;
+    originDate?: string;
+    upcomingMilestones: Milestone[];
+  };
 
   let {
     reminders,
@@ -32,8 +41,27 @@
   ) + 1;
   const yearLength = new Date(today.getFullYear(), 1, 29).getMonth() === 1 ? 366 : 365;
 
+  const categoryLabels: Record<string, string> = {
+    birthday: '生日',
+    child_birthday: '宝宝生日',
+    anniversary: '纪念日',
+    memorial: '纪念',
+    other: '其他'
+  };
+
+  const allMilestones = $derived(
+    reminders
+      .flatMap((r) => r.upcomingMilestones.map((m) => ({ ...m, reminderTitle: r.title })))
+      .sort((a, b) => a.daysFromNow - b.daysFromNow)
+      .slice(0, 6)
+  );
+
   function calendarLabel(reminder: ReminderView) {
     return reminder.dateLabel.replace(/\s·\s.*/, '');
+  }
+
+  function categoryLabel(reminder: ReminderView) {
+    return categoryLabels[reminder.category] ?? categoryLabels.other;
   }
 </script>
 
@@ -56,13 +84,42 @@
 
   {#if nextReminder}
     <section class="date-feature">
-      <span>最近提醒</span>
+      <span>最近提醒 · {categoryLabel(nextReminder)}</span>
       <h1>{nextReminder.title}</h1>
       <div class="feature-count">
         <strong>{nextReminder.daysLeft}</strong>
         <em>天</em>
       </div>
       <p>{nextReminder.dateLabel}</p>
+      {#if nextReminder.ageLabel}
+        <p class="feature-age">已过 {nextReminder.daysSince} 天 · {nextReminder.ageLabel}</p>
+      {/if}
+    </section>
+  {/if}
+
+  {#if allMilestones.length > 0}
+    <section class="milestone-strip">
+      <div class="milestone-head">
+        <strong>即将到来的里程碑</strong>
+        <span>近60天内</span>
+      </div>
+      <div class="milestone-list">
+        {#each allMilestones as milestone}
+          <article class="milestone-card" class:milestone-today={milestone.daysFromNow === 0}>
+            <div class="milestone-days">
+              <strong>{milestone.daysFromNow === 0 ? '今天' : milestone.daysFromNow}</strong>
+              {#if milestone.daysFromNow > 0}<em>天后</em>{/if}
+            </div>
+            <div class="milestone-info">
+              <strong>{milestone.label}</strong>
+              <span>{milestone.reminderTitle} · 第{milestone.dayNumber}天</span>
+            </div>
+            <span class="milestone-kind milestone-kind-{milestone.kind}">
+              {milestone.kind === 'vaccination' ? '疫苗' : milestone.kind === 'tradition' ? '传统' : milestone.kind === 'age' ? '成长' : milestone.kind === 'holiday' ? '节日' : '纪念'}
+            </span>
+          </article>
+        {/each}
+      </div>
     </section>
   {/if}
 
@@ -77,7 +134,10 @@
         </div>
         <div class="date-main">
           <strong>{reminder.title}</strong>
-          <span>{calendarLabel(reminder)} · 每年</span>
+          <span>{calendarLabel(reminder)} · {categoryLabel(reminder)}{reminder.repeat === 'annual' ? ' · 每年' : ''}</span>
+          {#if reminder.ageLabel}
+            <span class="date-age">{reminder.ageLabel} · 已过 {reminder.daysSince} 天</span>
+          {/if}
         </div>
         <div class="date-count">
           <span>剩余</span>
@@ -216,6 +276,124 @@
     font-size: 34px;
   }
 
+  .feature-age {
+    margin-top: 4px;
+    font-size: 14px;
+    color: #6d9f99;
+    font-weight: 700;
+  }
+
+  .milestone-strip {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    background: rgba(255, 253, 247, 0.92);
+    box-shadow: 0 18px 48px rgba(38, 29, 20, 0.08);
+  }
+
+  .milestone-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+
+  .milestone-head strong {
+    color: #2d6382;
+    font-size: 18px;
+  }
+
+  .milestone-head span {
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .milestone-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .milestone-card {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(45, 99, 130, 0.04);
+  }
+
+  .milestone-card.milestone-today {
+    background: linear-gradient(105deg, rgba(126, 167, 157, 0.18), rgba(244, 223, 189, 0.3));
+  }
+
+  .milestone-days {
+    text-align: center;
+    color: #6d9f99;
+  }
+
+  .milestone-days strong {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .milestone-days em {
+    display: block;
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .milestone-info strong {
+    display: block;
+    color: #2d6382;
+    font-size: 15px;
+  }
+
+  .milestone-info span {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .milestone-kind {
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .milestone-kind-vaccination {
+    background: rgba(109, 159, 153, 0.15);
+    color: #4d8a7e;
+  }
+
+  .milestone-kind-tradition {
+    background: rgba(195, 155, 100, 0.18);
+    color: #9a7540;
+  }
+
+  .milestone-kind-age {
+    background: rgba(45, 99, 130, 0.1);
+    color: #2d6382;
+  }
+
+  .milestone-kind-day_count {
+    background: rgba(126, 167, 157, 0.15);
+    color: #5a8f85;
+  }
+
+  .milestone-kind-holiday {
+    background: rgba(200, 100, 100, 0.14);
+    color: #b04040;
+  }
+
+  .date-age {
+    color: #6d9f99 !important;
+    font-weight: 700;
+    font-size: 12px;
+  }
+
   .date-list {
     display: grid;
     gap: 14px;
@@ -311,6 +489,29 @@
   }
 
   @media (max-width: 760px) {
+    .milestone-card {
+      grid-template-columns: 56px minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 10px 12px;
+    }
+
+    .milestone-days strong {
+      font-size: 18px;
+    }
+
+    .milestone-info strong {
+      font-size: 13px;
+    }
+
+    .milestone-info span {
+      font-size: 11px;
+    }
+
+    .milestone-kind {
+      font-size: 10px;
+      padding: 2px 6px;
+    }
+
     .dates-hero {
       min-height: 152px;
       grid-template-columns: auto minmax(0, 1fr);

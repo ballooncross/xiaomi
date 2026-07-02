@@ -5,6 +5,7 @@ export type ItemStatus = 'new' | 'saved' | 'tracking' | 'dismissed';
 export type FeedbackAction = 'save' | 'track' | 'not_relevant' | 'more_like_this' | 'less_like_this';
 export type CalendarType = 'gregorian' | 'lunar';
 export type ReminderRepeat = 'none' | 'annual';
+export type DateCategory = 'birthday' | 'child_birthday' | 'anniversary' | 'memorial' | 'other';
 
 export type WatchTopic = {
   id: string;
@@ -46,6 +47,7 @@ export type DateReminder = {
   id: string;
   title: string;
   calendarType: CalendarType;
+  category: DateCategory;
   year?: number;
   month: number;
   day: number;

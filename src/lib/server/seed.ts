@@ -214,6 +214,7 @@ function lunarReminder(
     id,
     title,
     calendarType: 'lunar',
+    category: 'birthday',
     month,
     day,
     lunarIsLeapMonth: false,
