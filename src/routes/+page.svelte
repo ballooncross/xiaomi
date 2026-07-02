@@ -74,6 +74,10 @@
   let icaJobMessage = $state('尚未手动检查。');
   let addWatchError = $state('');
   let editWatchError = $state('');
+  let devRequestText = $state('');
+  let devRequestPending = $state(false);
+  let devRequestMessage = $state('');
+  let devRequests = $state<Array<{id: string; text: string; status: string; response: string; createdAt?: string}>>([]);
   let nlInterestText = $state('');
   let nlInterestPending = $state(false);
   let nlInterestMessage = $state('');
@@ -101,6 +105,7 @@
 
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
+    loadDevRequests();
   });
 
   $effect(() => {
@@ -239,6 +244,41 @@
       nlInterestMessage = '提交失败,请重试。';
     }
     nlInterestPending = false;
+  }
+
+  async function loadDevRequests() {
+    try {
+      const response = await fetch('/api/dev-requests');
+      if (response.ok) {
+        const result = (await response.json()) as { requests: typeof devRequests };
+        devRequests = result.requests;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function submitDevRequest() {
+    devRequestPending = true;
+    devRequestMessage = '';
+    try {
+      const response = await fetch('/api/dev-requests', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: devRequestText.trim(), token: manualJobToken })
+      });
+      if (response.ok) {
+        devRequestText = '';
+        devRequestMessage = '已提交，本地 AI Agent 会自动处理。';
+        await loadDevRequests();
+      } else {
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
+        devRequestMessage = result.error || '提交失败，请重试。';
+      }
+    } catch {
+      devRequestMessage = '提交失败，请重试。';
+    }
+    devRequestPending = false;
   }
 
   async function sendTelegramSummary() {
@@ -1297,6 +1337,34 @@
                 <p>{manualJobMessage}{manualJobLastRun ? ` · ${manualJobLastRun}` : ''}</p>
               </div>
             </section>
+          </section>
+
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>开发请求</span>
+              <strong>功能/Bug 请求</strong>
+              <p>提交后本地 AI Agent 会自动处理：评估、实现、部署，或回复评估结果。</p>
+            </div>
+            <div class="job-run-controls">
+              <textarea bind:value={devRequestText} rows="3" placeholder="描述功能需求或 Bug..."></textarea>
+              <button class="small-button primary" type="button"
+                disabled={devRequestPending || devRequestText.trim().length < 4 || !manualJobToken}
+                onclick={submitDevRequest}>
+                {devRequestPending ? '提交中...' : '提交请求'}
+              </button>
+              {#if !manualJobToken}<span style="font-size:12px;color:var(--muted)">需要先填写上方 ADMIN_TOKEN</span>{/if}
+              {#if devRequestMessage}<span style="font-size:12px;color:var(--jade)">{devRequestMessage}</span>{/if}
+            </div>
+            {#if devRequests.length > 0}
+              <div style="padding:12px 14px 0;display:grid;gap:8px">
+                {#each devRequests.slice(0, 5) as req}
+                  <div style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px">
+                    <strong style="color:var(--ink)">{req.text.slice(0, 80)}</strong>
+                    <div style="margin-top:4px;color:var(--muted)">{req.status}{req.response ? ` · ${req.response.slice(0, 100)}` : ''}</div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           </section>
 
           <section class="notebook-card">
@@ -2774,13 +2842,13 @@
   }
 
   .chip {
-    border: 1px solid rgba(179, 58, 43, 0.26);
-    background: color-mix(in srgb, var(--mint) 72%, white);
-    color: color-mix(in srgb, var(--accent) 78%, var(--ink));
+    border: 1px solid rgba(45, 99, 130, 0.14);
+    background: rgba(215, 242, 220, 0.42);
+    color: var(--muted);
     border-radius: 999px;
-    padding: 5px 8px;
+    padding: 4px 9px;
     font-size: 11px;
-    font-weight: 950;
+    font-weight: 800;
   }
 
   .chip.hot {
@@ -2790,13 +2858,14 @@
   }
 
   .small-button {
-    border: 1px solid var(--line);
+    border: 1px solid color-mix(in srgb, var(--line) 70%, var(--ink));
     background: #fff8eb;
     border-radius: 8px;
     padding: 8px 10px;
     font-size: 12px;
     font-weight: 900;
     color: var(--ink);
+    transition: background 120ms ease, border-color 120ms ease;
   }
 
   .small-button.primary {
@@ -3838,12 +3907,43 @@
     }
 
     .timeline-item {
-      grid-template-columns: 56px 64px 1fr;
+      grid-template-columns: 48px minmax(0, 1fr);
     }
 
     .timeline-image {
-      width: 64px;
-      height: 56px;
+      display: none;
+    }
+
+    .chips,
+    .story-actions,
+    .timeline-actions,
+    .timeline-links {
+      gap: 5px;
+    }
+
+    .chip {
+      padding: 3px 6px;
+      font-size: 10px;
+    }
+
+    .small-button {
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+
+    .date {
+      width: 48px;
+      height: 48px;
+    }
+
+    .hero-story {
+      grid-template-columns: 1fr;
+    }
+
+    .story-media {
+      min-height: 160px;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
     }
 
   }

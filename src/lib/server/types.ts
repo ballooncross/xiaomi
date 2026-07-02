@@ -265,6 +265,18 @@ export type AiContextDocument = {
   };
 };
 
+export type DevRequestStatus = 'pending' | 'in_progress' | 'completed' | 'rejected' | 'replied';
+
+export type DevRequest = {
+  id: string;
+  text: string;
+  status: DevRequestStatus;
+  response: string;
+  branch?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type AgentOutcomeStats = {
   total: number;
   saved: number;

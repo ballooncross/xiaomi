@@ -5,6 +5,7 @@ import type {
   AgentOutcomeStats,
   AiContextDocument,
   DateReminder,
+  DevRequest,
   Env,
   FeedbackAction,
   JobRun,
@@ -128,6 +129,11 @@ type JobRunRow = {
   detail: string;
 };
 
+type DevRequestRow = {
+  id: string; text: string; status: string; response: string;
+  branch: string | null; created_at: string; updated_at: string;
+};
+
 const memory = {
   topics: [...defaultWatchTopics],
   items: [...demoItems],
@@ -138,7 +144,8 @@ const memory = {
   preferenceSignals: [] as PreferenceSignal[],
   aiContextSnapshots: [] as (AiContextDocument & { id: string })[],
   agentOutcomes: [] as Array<{ id: string; agentFeedId: string; outcome: string; createdAt: string }>,
-  impressions: [] as Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>
+  impressions: [] as Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>,
+  devRequests: [] as DevRequest[]
 };
 
 export function getDb(env?: Env): RadarDb {
@@ -194,6 +201,11 @@ export abstract class RadarDb {
   abstract listItemsForDedup(days: number, limit?: number): Promise<DedupExisting[]>;
   abstract applyItemMerge(merge: MergeAction): Promise<void>;
   abstract deleteItemsByIds(ids: string[]): Promise<void>;
+
+  // Dev request methods
+  abstract insertDevRequest(request: DevRequest): Promise<void>;
+  abstract listDevRequests(options?: { status?: string; limit?: number }): Promise<DevRequest[]>;
+  abstract updateDevRequest(id: string, updates: { status?: string; response?: string; branch?: string }): Promise<void>;
 }
 
 class MemoryRadarDb extends RadarDb {
@@ -392,6 +404,26 @@ class MemoryRadarDb extends RadarDb {
     const remove = new Set(ids);
     for (let i = memory.items.length - 1; i >= 0; i--) {
       if (remove.has(memory.items[i].id)) memory.items.splice(i, 1);
+    }
+  }
+
+  async insertDevRequest(request: DevRequest): Promise<void> {
+    memory.devRequests.push(request);
+  }
+
+  async listDevRequests(options?: { status?: string; limit?: number }): Promise<DevRequest[]> {
+    let requests = [...memory.devRequests];
+    if (options?.status) requests = requests.filter((r) => r.status === options.status);
+    return requests.slice(0, options?.limit ?? 50);
+  }
+
+  async updateDevRequest(id: string, updates: { status?: string; response?: string; branch?: string }): Promise<void> {
+    const request = memory.devRequests.find((r) => r.id === id);
+    if (request) {
+      if (updates.status) request.status = updates.status as DevRequest['status'];
+      if (updates.response !== undefined) request.response = updates.response;
+      if (updates.branch !== undefined) request.branch = updates.branch ?? undefined;
+      request.updatedAt = new Date().toISOString();
     }
   }
 }
@@ -1050,6 +1082,55 @@ class D1RadarDb extends RadarDb {
       throw error;
     }
   }
+
+  async insertDevRequest(request: DevRequest): Promise<void> {
+    try {
+      await this.db
+        .prepare('INSERT INTO dev_requests (id, text, status, response, branch) VALUES (?, ?, ?, ?, ?)')
+        .bind(request.id, request.text, request.status, request.response, request.branch ?? null)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().insertDevRequest(request);
+      throw error;
+    }
+  }
+
+  async listDevRequests(options?: { status?: string; limit?: number }): Promise<DevRequest[]> {
+    try {
+      let sql = 'SELECT * FROM dev_requests';
+      const binds: unknown[] = [];
+      if (options?.status) {
+        sql += ' WHERE status = ?';
+        binds.push(options.status);
+      }
+      sql += ' ORDER BY created_at DESC LIMIT ?';
+      binds.push(options?.limit ?? 50);
+      const stmt = this.db.prepare(sql);
+      const { results } = await (binds.length === 1 ? stmt.bind(binds[0]) : stmt.bind(...binds)).all<DevRequestRow>();
+      return results.map(devRequestFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async updateDevRequest(id: string, updates: { status?: string; response?: string; branch?: string }): Promise<void> {
+    try {
+      const setClauses: string[] = ['updated_at = CURRENT_TIMESTAMP'];
+      const binds: unknown[] = [];
+      if (updates.status !== undefined) { setClauses.push('status = ?'); binds.push(updates.status); }
+      if (updates.response !== undefined) { setClauses.push('response = ?'); binds.push(updates.response); }
+      if (updates.branch !== undefined) { setClauses.push('branch = ?'); binds.push(updates.branch); }
+      binds.push(id);
+      await this.db
+        .prepare(`UPDATE dev_requests SET ${setClauses.join(', ')} WHERE id = ?`)
+        .bind(...binds)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
 }
 
 function itemFromRow(row: ItemRow): RadarItem {
@@ -1163,6 +1244,18 @@ function preferenceSignalFromRow(row: PreferenceSignalRow): PreferenceSignal {
     relatedTopicId: row.related_topic_id ?? undefined,
     source: row.source,
     createdAt: row.created_at
+  };
+}
+
+function devRequestFromRow(row: DevRequestRow): DevRequest {
+  return {
+    id: row.id,
+    text: row.text,
+    status: row.status as DevRequest['status'],
+    response: row.response,
+    branch: row.branch ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
