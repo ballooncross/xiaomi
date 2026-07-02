@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { hydrateImageForUrl } from '../images';
 import type { RadarItem, WatchTopic } from '../types';
 
 type GdeltArticle = {
@@ -115,12 +116,14 @@ async function fetchGoogleNewsItems(topic: WatchTopic): Promise<RadarItem[]> {
   });
   const response = await fetchWithTimeout(`https://news.google.com/rss/search?${params}`);
   if (!response?.ok) return [];
-  return (await parseRssItems(await response.text(), {
+  const items = (await parseRssItems(await response.text(), {
     sourceId: 'google-news',
     sourceType: 'google_news',
     topic,
     sourceName: 'Google News'
   })).slice(0, 4);
+  // Google News links are redirects; resolve the top ones for a real image + URL
+  return Promise.all(items.map((item, index) => (index < 2 ? hydrateItemImage(item) : item)));
 }
 
 async function fetchCuratedRssItems(topics: WatchTopic[]): Promise<RadarItem[]> {
@@ -184,7 +187,7 @@ async function rssEntryToItem(
   if (!title || !url) return undefined;
 
   const description = stripHtml(textValue(entry.description) || textValue(entry.summary) || textValue(entry.content) || title);
-  const imageUrl = imageValue(entry) || (options.hydrateImages ? await fetchPageImage(url) : undefined);
+  const imageUrl = imageValue(entry) || (options.hydrateImages ? (await hydrateImageForUrl(url)).imageUrl : undefined);
   const publishedAt = dateValue(entry.pubDate) || dateValue(entry.published) || dateValue(entry.updated);
 
   return articleToItem(options.topic, {
@@ -305,8 +308,9 @@ function imageValue(entry: Record<string, unknown>): string | undefined {
 
 async function hydrateItemImage(item: RadarItem): Promise<RadarItem> {
   if (item.imageUrl || !item.url) return item;
-  const imageUrl = await fetchPageImage(item.url);
-  return imageUrl ? { ...item, imageUrl } : item;
+  const { imageUrl, resolvedUrl } = await hydrateImageForUrl(item.url);
+  if (!imageUrl && !resolvedUrl) return item;
+  return { ...item, imageUrl: imageUrl ?? item.imageUrl, url: resolvedUrl ?? item.url };
 }
 
 function firstRecord(value: unknown): Record<string, unknown> | undefined {
@@ -314,30 +318,7 @@ function firstRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof first === 'object' && first ? (first as Record<string, unknown>) : undefined;
 }
 
-async function fetchPageImage(url: string): Promise<string | undefined> {
-  const response = await fetchWithTimeout(url);
-  const contentType = response?.headers.get('content-type') ?? '';
-  if (!response?.ok || !contentType.includes('text/html')) return undefined;
-  const html = await response.text().catch(() => '');
-  if (!html) return undefined;
-  const image =
-    metaContent(html, 'property', 'og:image') ||
-    metaContent(html, 'property', 'og:image:url') ||
-    metaContent(html, 'name', 'twitter:image') ||
-    metaContent(html, 'name', 'twitter:image:src');
-  if (!image) return undefined;
-  try {
-    return new URL(image, url).toString();
-  } catch {
-    return image;
-  }
-}
 
-function metaContent(html: string, key: 'name' | 'property', value: string): string | undefined {
-  const pattern = new RegExp(`<meta[^>]+${key}=["']${escapeRegExp(value)}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i');
-  const reversed = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${key}=["']${escapeRegExp(value)}["'][^>]*>`, 'i');
-  return html.match(pattern)?.[1] || html.match(reversed)?.[1];
-}
 
 function dateValue(value: unknown): string | undefined {
   const raw = textValue(value);
@@ -362,9 +343,6 @@ function truncate(value: string, length: number): string {
   return `${value.slice(0, length - 3).trim()}...`;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function decodeHtmlEntities(value: string): string {
   return value

@@ -1,4 +1,5 @@
 import { enhanceItemWithAi, generateDigestWithAi } from './ai';
+import { clusterForBackfill, dedupeBatch } from './dedup';
 import { buildTemplateDigest, renderTelegramDigest } from './digest';
 import { getDb } from './db';
 import { fetchBandsintownConcerts } from './fetchers/bandsintown';
@@ -38,19 +39,41 @@ export async function runTrendFetchJob(env: Env): Promise<JobResult> {
   const db = getDb(env);
   const topics = await db.listTopics();
   const fetched = await buildTrendSearchItems(topics);
+  const scored = fetched.map((item) => scoreItem(item, topics));
+
+  // Pull recent items once, dedup the whole batch locally before writing
+  const existing = await db.listItemsForDedup(14);
+  const { toInsert, merges, duplicateCount } = dedupeBatch(scored, existing);
+
   let inserted = 0;
   let updated = 0;
-
-  for (const item of fetched) {
-    const scored = scoreItem(item, topics);
-    const result = await db.upsertItem(scored);
+  for (const item of toInsert) {
+    const result = await db.upsertItem(item);
     if (result === 'inserted') inserted += 1;
     else updated += 1;
   }
+  for (const merge of merges) {
+    await db.applyItemMerge(merge);
+  }
 
-  const detail = `trend fetch considered ${fetched.length} topic search items`;
+  const detail = `trend fetch considered ${fetched.length} items; ${duplicateCount} merged as duplicate coverage`;
   await db.logJob({ jobName: 'fetch-trends', status: 'ok', detail });
-  return { inserted, updated, considered: fetched.length, notified: 0, detail };
+  return { inserted, updated: updated + merges.length, considered: fetched.length, notified: 0, detail };
+}
+
+export async function runItemDedupJob(env: Env): Promise<JobResult> {
+  const db = getDb(env);
+  const items = await db.listItemsForDedup(90, 1000);
+  const { merges, deleteIds } = clusterForBackfill(items);
+
+  for (const merge of merges) {
+    await db.applyItemMerge(merge);
+  }
+  await db.deleteItemsByIds(deleteIds);
+
+  const detail = `dedup backfill scanned ${items.length} items, merged ${merges.length} clusters, removed ${deleteIds.length} duplicates`;
+  await db.logJob({ jobName: 'dedup-items', status: 'ok', detail });
+  return { inserted: 0, updated: merges.length, considered: items.length, notified: 0, detail };
 }
 
 export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual_digest' = 'daily_digest'): Promise<JobResult> {

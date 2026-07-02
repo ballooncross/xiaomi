@@ -1,3 +1,4 @@
+import type { DedupExisting, MergeAction } from './dedup';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
 import type {
   AgentFeedItem,
@@ -32,6 +33,7 @@ type ItemRow = {
   score: number;
   status: RadarItem['status'];
   related_item_id: string | null;
+  related_sources?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -187,6 +189,11 @@ export abstract class RadarDb {
 
   // Recent items for dedup context
   abstract getRecentItemSummaries(days: number): Promise<Array<{ title: string; url?: string; externalId: string }>>;
+
+  // Batch dedup support
+  abstract listItemsForDedup(days: number, limit?: number): Promise<DedupExisting[]>;
+  abstract applyItemMerge(merge: MergeAction): Promise<void>;
+  abstract deleteItemsByIds(ids: string[]): Promise<void>;
 }
 
 class MemoryRadarDb extends RadarDb {
@@ -359,6 +366,34 @@ class MemoryRadarDb extends RadarDb {
   async getRecentItemSummaries(days: number): Promise<Array<{ title: string; url?: string; externalId: string }>> {
     return memory.items.map((i) => ({ title: i.title, url: i.url, externalId: i.externalId }));
   }
+
+  async listItemsForDedup(_days: number, limit = 300): Promise<DedupExisting[]> {
+    return memory.items.slice(0, limit).map((i) => ({
+      id: i.id,
+      title: i.title,
+      url: i.url,
+      imageUrl: i.imageUrl,
+      summary: i.summary,
+      score: i.score,
+      createdAt: i.createdAt,
+      relatedSources: i.relatedSources ?? []
+    }));
+  }
+
+  async applyItemMerge(merge: MergeAction): Promise<void> {
+    const item = memory.items.find((i) => i.id === merge.itemId);
+    if (!item) return;
+    item.relatedSources = merge.relatedSources;
+    if (merge.imageUrl && !item.imageUrl) item.imageUrl = merge.imageUrl;
+    item.updatedAt = new Date().toISOString();
+  }
+
+  async deleteItemsByIds(ids: string[]): Promise<void> {
+    const remove = new Set(ids);
+    for (let i = memory.items.length - 1; i >= 0; i--) {
+      if (remove.has(memory.items[i].id)) memory.items.splice(i, 1);
+    }
+  }
 }
 
 class D1RadarDb extends RadarDb {
@@ -447,15 +482,15 @@ class D1RadarDb extends RadarDb {
         .prepare(
           `INSERT INTO items (
           id, source_id, source_type, external_id, kind, title, summary, description, url, image_url,
-          location, starts_at, published_at, artists, topics, raw_json, score, status, updated_at
+          location, starts_at, published_at, artists, topics, raw_json, score, status, related_sources, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(source_type, external_id) DO UPDATE SET
           title = excluded.title,
           summary = excluded.summary,
           description = excluded.description,
           url = excluded.url,
-          image_url = excluded.image_url,
+          image_url = COALESCE(excluded.image_url, items.image_url),
           location = excluded.location,
           starts_at = excluded.starts_at,
           published_at = excluded.published_at,
@@ -463,6 +498,8 @@ class D1RadarDb extends RadarDb {
           topics = excluded.topics,
           raw_json = excluded.raw_json,
           score = excluded.score,
+          related_sources = CASE WHEN excluded.related_sources != '[]'
+            THEN excluded.related_sources ELSE items.related_sources END,
           updated_at = CURRENT_TIMESTAMP`
         )
         .bind(
@@ -483,7 +520,8 @@ class D1RadarDb extends RadarDb {
           JSON.stringify(item.topics),
           JSON.stringify(item.raw ?? {}),
           item.score,
-          item.status
+          item.status,
+          JSON.stringify(item.relatedSources ?? [])
         )
         .run();
 
@@ -951,6 +989,67 @@ class D1RadarDb extends RadarDb {
       throw error;
     }
   }
+
+  async listItemsForDedup(days: number, limit = 300): Promise<DedupExisting[]> {
+    try {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const { results } = await this.db
+        .prepare(
+          `SELECT id, title, url, image_url, summary, score, related_sources, created_at
+           FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?`
+        )
+        .bind(cutoff, limit)
+        .all<{
+          id: string;
+          title: string;
+          url: string | null;
+          image_url: string | null;
+          summary: string | null;
+          score: number;
+          related_sources: string | null;
+          created_at: string;
+        }>();
+      return results.map((r) => ({
+        id: r.id,
+        title: r.title,
+        url: r.url ?? undefined,
+        imageUrl: r.image_url ?? undefined,
+        summary: r.summary ?? undefined,
+        score: r.score,
+        createdAt: r.created_at,
+        relatedSources: parseJson(r.related_sources ?? '[]', [])
+      }));
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async applyItemMerge(merge: MergeAction): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `UPDATE items SET related_sources = ?, image_url = COALESCE(image_url, ?), updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        )
+        .bind(JSON.stringify(merge.relatedSources), merge.imageUrl ?? null, merge.itemId)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async deleteItemsByIds(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    try {
+      const placeholders = ids.map(() => '?').join(',');
+      await this.db.prepare(`DELETE FROM items WHERE id IN (${placeholders})`).bind(...ids).run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
 }
 
 function itemFromRow(row: ItemRow): RadarItem {
@@ -973,6 +1072,7 @@ function itemFromRow(row: ItemRow): RadarItem {
     raw: parseJson(row.raw_json, {}),
     score: row.score,
     status: row.status,
+    relatedSources: parseJson(row.related_sources ?? '[]', []),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

@@ -17,6 +17,7 @@ type SignalInput = {
 const VALID_TYPES = new Set<SignalType>([
   'feedback', 'topic_added', 'topic_removed', 'note', 'interest',
   'not_interested', 'more_like_this', 'region_hint', 'free_text', 'agent_suggestion',
+  'source_suggestion',
 ]);
 
 export const POST: RequestHandler = async ({ request, platform }) => {

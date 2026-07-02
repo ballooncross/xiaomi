@@ -74,6 +74,9 @@
   let icaJobMessage = $state('尚未手动检查。');
   let addWatchError = $state('');
   let editWatchError = $state('');
+  let nlInterestText = $state('');
+  let nlInterestPending = $state(false);
+  let nlInterestMessage = $state('');
   let reminderFormOpen = $state(false);
   let reminderPending = $state(false);
   let reminderError = $state('');
@@ -145,7 +148,6 @@
       })
       .filter((item) => matchesSearch(item, searchQuery))
       .sort(sortRadarItemsForDisplay)
-      .slice(0, 8)
   );
 
   const topItem = $derived(visibleItems[0]);
@@ -154,7 +156,6 @@
     items
       .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed')
       .sort(sortRadarItemsForDisplay)
-      .slice(0, 6)
   );
   const timelineItems = $derived(
     items
@@ -217,6 +218,27 @@
       });
     }
     feedbackPending = null;
+  }
+
+  async function submitNlInterest() {
+    nlInterestPending = true;
+    nlInterestMessage = '';
+    try {
+      const response = await fetch('/api/interests', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: nlInterestText.trim() })
+      });
+      if (response.ok) {
+        nlInterestText = '';
+        nlInterestMessage = '已记录，本地 AI 会在下次扫描时使用这个描述。';
+      } else {
+        nlInterestMessage = '提交失败，请重试。';
+      }
+    } catch {
+      nlInterestMessage = '提交失败,请重试。';
+    }
+    nlInterestPending = false;
   }
 
   async function sendTelegramSummary() {
@@ -1004,6 +1026,21 @@
                 </button>
               </div>
               {#if addWatchError}<p class="form-error">{addWatchError}</p>{/if}
+              <div class="nl-interest">
+                <label for="nl-interest-input">或者直接用自然语言描述（AI 会理解细节和例外）</label>
+                <textarea
+                  id="nl-interest-input"
+                  bind:value={nlInterestText}
+                  rows="2"
+                  placeholder="例如：我关注追觅 IPO、财务和公司架构新闻，但不关心具体产品发布。"
+                ></textarea>
+                <div class="nl-interest-actions">
+                  <button class="small-button primary" disabled={nlInterestPending || nlInterestText.trim().length < 4} onclick={submitNlInterest}>
+                    {nlInterestPending ? '提交中...' : '提交兴趣'}
+                  </button>
+                  {#if nlInterestMessage}<span class="nl-interest-note">{nlInterestMessage}</span>{/if}
+                </div>
+              </div>
             </div>
           {/if}
 
@@ -1383,6 +1420,9 @@
                 {#if topItem.url}
                   <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">来源 · {sourceLabel(topItem)}</a>
                 {/if}
+                {#each (topItem.relatedSources ?? []).slice(0, 3) as related}
+                  <a class="source-link related-source" href={related.url} target="_blank" rel="noreferrer">{related.source}</a>
+                {/each}
               </div>
             </div>
           </article>
@@ -1406,6 +1446,11 @@
                     来源 · {sourceLabel(item)}
                   </a>
                 {/if}
+                {#each (item.relatedSources ?? []).slice(0, 2) as related}
+                  <a class="source-link inline-source related-source" href={related.url} target="_blank" rel="noreferrer">
+                    {related.source}
+                  </a>
+                {/each}
               </div>
             </article>
           {/each}
@@ -1432,11 +1477,46 @@
               <div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
-                {#if item.url}
-                  <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
-                    来源 · {sourceLabel(item)}
-                  </a>
-                {/if}
+                <div class="timeline-links">
+                  {#if item.url}
+                    <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
+                      来源 · {sourceLabel(item)}
+                    </a>
+                  {/if}
+                  {#each (item.relatedSources ?? []).slice(0, 4) as related}
+                    <a class="source-link inline-source related-source" href={related.url} target="_blank" rel="noreferrer">
+                      {related.source}
+                    </a>
+                  {/each}
+                </div>
+                <div class="story-actions timeline-actions">
+                  <button
+                    class="small-button primary"
+                    disabled={feedbackPending === `${item.id}:track`}
+                    onclick={() => sendFeedback(item.id, 'track')}
+                  >
+                    重点跟踪
+                  </button>
+                  <button
+                    class="small-button"
+                    disabled={feedbackPending === `${item.id}:save`}
+                    onclick={() => sendFeedback(item.id, 'save')}
+                  >
+                    保存
+                  </button>
+                  <button
+                    class="small-button"
+                    disabled={feedbackPending === `${item.id}:not_relevant`}
+                    onclick={() => sendFeedback(item.id, 'not_relevant')}
+                  >
+                    不相关
+                  </button>
+                  {#if item.status === 'tracking'}
+                    <span class="chip hot">重点跟踪</span>
+                  {:else if item.status === 'saved'}
+                    <span class="chip hot">已保存</span>
+                  {/if}
+                </div>
               </div>
             </article>
           {/each}
@@ -2747,6 +2827,66 @@
 
   .inline-source {
     margin-top: 12px;
+  }
+
+  .nl-interest {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .nl-interest label {
+    font-size: 12px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--ink) 68%, var(--line));
+  }
+
+  .nl-interest textarea {
+    width: 100%;
+    resize: vertical;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: inherit;
+    background: color-mix(in srgb, var(--paper) 60%, white);
+  }
+
+  .nl-interest-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .nl-interest-note {
+    font-size: 12px;
+    color: var(--jade);
+  }
+
+  .related-source {
+    background: color-mix(in srgb, var(--paper) 70%, white);
+    border-color: var(--line);
+    color: color-mix(in srgb, var(--ink) 60%, var(--line));
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .timeline-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .timeline-actions {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
   }
 
   .timeline {

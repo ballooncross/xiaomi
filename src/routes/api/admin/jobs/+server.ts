@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
-import { runAllFetchJobs, runConcertFetchJob, runDailyDigestJob, runTrendFetchJob } from '$lib/server/jobs';
+import { runAllFetchJobs, runConcertFetchJob, runDailyDigestJob, runItemDedupJob, runTrendFetchJob } from '$lib/server/jobs';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -15,6 +15,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   if (job === 'trends') return json(await runTrendFetchJob(env ?? {}));
   if (job === 'daily-digest') return json(await runDailyDigestJob(env ?? {}));
   if (job === 'all-fetch') return json(await runAllFetchJobs(env ?? {}));
+  if (job === 'dedup-items') return json(await runItemDedupJob(env ?? {}));
   return json({ error: 'Unknown job' }, { status: 400 });
 };
 
