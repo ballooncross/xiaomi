@@ -15,8 +15,10 @@
     "db:migrate:remote": "wrangler d1 migrations apply personal-radar --remote",
     "db:seed:local": "wrangler d1 execute personal-radar --local --file ./scripts/seed.sql",
     "db:seed:remote": "wrangler d1 execute personal-radar --remote --file ./scripts/seed.sql",
-    "deploy": "npm run build && wrangler pages deploy .svelte-kit/cloudflare --project-name personal-radar",
-    "deploy:cron": "wrangler deploy --config wrangler.cron.toml"
+    "deploy": "npm run build && wrangler pages deploy .svelte-kit/cloudflare --project-name personal-radar --branch main",
+    "deploy:cron": "wrangler deploy --config wrangler.cron.toml",
+    "agent": "npx tsx scripts/agent.ts",
+    "agent:dry": "npx tsx scripts/agent.ts --dry-run"
   },
   "devDependencies": {
     "@cloudflare/puppeteer": "^1.1.0",
