@@ -20,6 +20,8 @@ export type WatchTopic = {
   updatedAt?: string;
 };
 
+export type RelatedSource = { source: string; url: string };
+
 export type RadarItem = {
   id: string;
   sourceId: string;
@@ -39,6 +41,7 @@ export type RadarItem = {
   raw: unknown;
   score: number;
   status: ItemStatus;
+  relatedSources?: RelatedSource[];
   createdAt?: string;
   updatedAt?: string;
 };

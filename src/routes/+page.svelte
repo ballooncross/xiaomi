@@ -1381,6 +1381,9 @@
                 {#if topItem.url}
                   <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">来源 · {sourceLabel(topItem)}</a>
                 {/if}
+                {#each (topItem.relatedSources ?? []).slice(0, 3) as related}
+                  <a class="source-link related-source" href={related.url} target="_blank" rel="noreferrer">{related.source}</a>
+                {/each}
               </div>
             </div>
           </article>
@@ -1404,6 +1407,11 @@
                     来源 · {sourceLabel(item)}
                   </a>
                 {/if}
+                {#each (item.relatedSources ?? []).slice(0, 2) as related}
+                  <a class="source-link inline-source related-source" href={related.url} target="_blank" rel="noreferrer">
+                    {related.source}
+                  </a>
+                {/each}
               </div>
             </article>
           {/each}
@@ -1430,11 +1438,46 @@
               <div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
-                {#if item.url}
-                  <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
-                    来源 · {sourceLabel(item)}
-                  </a>
-                {/if}
+                <div class="timeline-links">
+                  {#if item.url}
+                    <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
+                      来源 · {sourceLabel(item)}
+                    </a>
+                  {/if}
+                  {#each (item.relatedSources ?? []).slice(0, 4) as related}
+                    <a class="source-link inline-source related-source" href={related.url} target="_blank" rel="noreferrer">
+                      {related.source}
+                    </a>
+                  {/each}
+                </div>
+                <div class="story-actions timeline-actions">
+                  <button
+                    class="small-button primary"
+                    disabled={feedbackPending === `${item.id}:track`}
+                    onclick={() => sendFeedback(item.id, 'track')}
+                  >
+                    重点跟踪
+                  </button>
+                  <button
+                    class="small-button"
+                    disabled={feedbackPending === `${item.id}:save`}
+                    onclick={() => sendFeedback(item.id, 'save')}
+                  >
+                    保存
+                  </button>
+                  <button
+                    class="small-button"
+                    disabled={feedbackPending === `${item.id}:not_relevant`}
+                    onclick={() => sendFeedback(item.id, 'not_relevant')}
+                  >
+                    不相关
+                  </button>
+                  {#if item.status === 'tracking'}
+                    <span class="chip hot">重点跟踪</span>
+                  {:else if item.status === 'saved'}
+                    <span class="chip hot">已保存</span>
+                  {/if}
+                </div>
               </div>
             </article>
           {/each}
@@ -2745,6 +2788,30 @@
 
   .inline-source {
     margin-top: 12px;
+  }
+
+  .related-source {
+    background: color-mix(in srgb, var(--paper) 70%, white);
+    border-color: var(--line);
+    color: color-mix(in srgb, var(--ink) 60%, var(--line));
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .timeline-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .timeline-actions {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
   }
 
   .timeline {
