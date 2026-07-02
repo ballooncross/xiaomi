@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { config } from '../config';
 import { log } from '../utils';
 import { buildTrendPrompt, parseAiResponse, type AiSearchResult } from './prompts';
@@ -5,7 +6,9 @@ import type { AgentContext } from '../types';
 
 /**
  * Ask the configured AI backend for trends from its own knowledge.
- * Backends: chatgpt (default) | deepseek | ollama | claude | none.
+ * CLI backends reuse existing subscription logins (no API key):
+ *   codex (default, ChatGPT/enterprise login) | claude-code (Claude login)
+ * API backends: chatgpt | deepseek | claude · Local: ollama · Off: none
  */
 export async function runAiSearch(context: AgentContext): Promise<AiSearchResult> {
   const empty: AiSearchResult = { items: [], suggestedSources: [] };
@@ -16,7 +19,10 @@ export async function runAiSearch(context: AgentContext): Promise<AiSearchResult
   let text: string | undefined;
 
   try {
-    if (backend === 'chatgpt') text = await callOpenAiCompatible('https://api.openai.com/v1/chat/completions', config.openaiApiKey, config.openaiModel, prompt);
+    if (backend === 'codex')
+      text = await callCli('codex', ['exec', '--skip-git-repo-check', '-c', 'model_reasoning_effort=low', prompt]);
+    else if (backend === 'claude-code') text = await callCli('claude', ['-p', prompt]);
+    else if (backend === 'chatgpt') text = await callOpenAiCompatible('https://api.openai.com/v1/chat/completions', config.openaiApiKey, config.openaiModel, prompt);
     else if (backend === 'deepseek') text = await callOpenAiCompatible('https://api.deepseek.com/chat/completions', config.deepseekApiKey, config.deepseekModel, prompt);
     else if (backend === 'claude') text = await callClaude(prompt);
     else if (backend === 'ollama') text = await callOllama(prompt);
@@ -33,6 +39,27 @@ export async function runAiSearch(context: AgentContext): Promise<AiSearchResult
   const result = parseAiResponse(text, backend);
   log(`AI search (${backend}): ${result.items.length} items, ${result.suggestedSources.length} source suggestions`);
   return result;
+}
+
+/** Run a logged-in CLI (codex / claude) non-interactively and capture stdout. */
+function callCli(command: string, args: string[], timeoutMs = 300000): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const child = execFile(
+      command,
+      args,
+      { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 },
+      (error, stdout) => {
+        if (error) {
+          log(`${command} CLI failed: ${String(error).split('\n')[0]}`);
+          resolve(undefined);
+          return;
+        }
+        resolve(stdout);
+      }
+    );
+    // codex exec blocks reading stdin from a pipe; close it so it proceeds
+    child.stdin?.end();
+  });
 }
 
 async function callOpenAiCompatible(url: string, apiKey: string, model: string, prompt: string): Promise<string | undefined> {

@@ -25,8 +25,10 @@ export const config = {
   radarUrl: process.env.RADAR_URL || 'https://personal-radar.pages.dev',
   radarToken: process.env.RADAR_TOKEN || '',
 
-  // AI backend for trend discovery: chatgpt | deepseek | ollama | claude | none
-  aiBackend: (process.env.AI_BACKEND || 'chatgpt').toLowerCase(),
+  // AI backend for trend discovery:
+  // codex (ChatGPT login, no API key) | claude-code (Claude login) |
+  // chatgpt | deepseek | claude (API keys) | ollama (local) | none
+  aiBackend: (process.env.AI_BACKEND || 'codex').toLowerCase(),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   deepseekApiKey: process.env.DEEPSEEK_API_KEY || '',
