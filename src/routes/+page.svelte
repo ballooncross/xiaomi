@@ -2914,7 +2914,6 @@
   }
 
   .chip {
-    border: 1px solid rgba(45, 99, 130, 0.14);
     background: rgba(215, 242, 220, 0.42);
     color: var(--muted);
     border-radius: 999px;
@@ -2925,7 +2924,6 @@
 
   .chip.hot {
     background: var(--accent);
-    border-color: var(--accent);
     color: var(--accent-text);
   }
 
