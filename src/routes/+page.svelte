@@ -1538,7 +1538,7 @@
 
       <div class="section-title">
         <h2>{activeView === 'trends' ? '全部趋势分类' : '未来关注时间线'}</h2>
-        <span>{activeView === 'trends' ? '职业 · 商业 · 地缘政治' : '演出优先视图'}</span>
+        <span>{activeView === 'trends' ? '职业 · 商业 · 生活 · 地缘政治' : '演出优先视图'}</span>
       </div>
       {#if activeView === 'trends'}
         <section class="timeline">
@@ -1780,6 +1780,7 @@
         <select bind:value={newWatchCategory} aria-label="关注分类">
           <option value="business">商业</option>
           <option value="career">职业</option>
+          <option value="life">生活</option>
           <option value="geopolitics">地缘政治</option>
           <option value="concerts">演出</option>
         </select>
@@ -1828,6 +1829,7 @@
         <select bind:value={editWatchCategory} aria-label="关注分类">
           <option value="business">商业</option>
           <option value="career">职业</option>
+          <option value="life">生活</option>
           <option value="geopolitics">地缘政治</option>
           <option value="concerts">演出</option>
         </select>
