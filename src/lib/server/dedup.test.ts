@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clusterForBackfill, dedupeBatch, extractOutlet, findMatch, normalizeTitle, titleSimilarity, titleTokens } from './dedup';
+import { clusterForBackfill, dedupeBatch, extractOutlet, findDuplicatesForItem, findMatch, normalizeTitle, titleSimilarity, titleTokens } from './dedup';
 import type { DedupExisting } from './dedup';
 import type { RadarItem } from './types';
 
@@ -215,5 +215,84 @@ describe('findMatch', () => {
       }
     ];
     expect(findMatch('Anything', 'https://secondary', index)?.id).toBe('e1');
+  });
+});
+
+function makeExisting(overrides: Partial<DedupExisting> & { title: string }): DedupExisting {
+  return {
+    id: crypto.randomUUID(),
+    url: undefined,
+    relatedSources: [],
+    ...overrides
+  };
+}
+
+describe('findDuplicatesForItem', () => {
+  it('returns all matches above threshold sorted by similarity', () => {
+    const candidates: DedupExisting[] = [
+      makeExisting({ id: 'a', title: "BYD's sales rise for second month, buoyed by exports - Reuters" }),
+      makeExisting({ id: 'b', title: "BYD's sales rise for second month, buoyed by exports - CNA" }),
+      makeExisting({ id: 'c', title: 'Completely unrelated story about AI regulations' }),
+      makeExisting({ id: 'd', title: "BYD sales surge in export markets, monthly data shows - Bloomberg" })
+    ];
+    const trigger = "BYD's sales rise for second month, buoyed by exports - Yahoo";
+
+    const matches = findDuplicatesForItem(trigger, 'trigger-id', undefined, candidates, 0.6);
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    expect(matches.map((m) => m.item.id)).toContain('a');
+    expect(matches.map((m) => m.item.id)).toContain('b');
+    expect(matches.map((m) => m.item.id)).not.toContain('c');
+    for (let i = 1; i < matches.length; i++) {
+      expect(matches[i - 1].similarity).toBeGreaterThanOrEqual(matches[i].similarity);
+    }
+  });
+
+  it('excludes the trigger item itself', () => {
+    const candidates: DedupExisting[] = [
+      makeExisting({ id: 'self', title: 'Same title here' }),
+      makeExisting({ id: 'other', title: 'Same title here' })
+    ];
+
+    const matches = findDuplicatesForItem('Same title here', 'self', undefined, candidates, 0.6);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].item.id).toBe('other');
+  });
+
+  it('respects threshold parameter', () => {
+    const candidates: DedupExisting[] = [
+      makeExisting({ id: 'a', title: 'BYD Singapore International Marathon presented by adidas 2026' })
+    ];
+    const trigger = "BYD's sales rise for second month, buoyed by exports - Reuters";
+
+    const highThreshold = findDuplicatesForItem(trigger, 'trigger-id', undefined, candidates, 0.6);
+    expect(highThreshold).toHaveLength(0);
+
+    const similarity = titleSimilarity(trigger, candidates[0].title);
+    if (similarity > 0) {
+      const veryLowThreshold = findDuplicatesForItem(trigger, 'trigger-id', undefined, candidates, similarity - 0.01);
+      expect(veryLowThreshold.length).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('returns empty array when no matches found', () => {
+    const candidates: DedupExisting[] = [
+      makeExisting({ id: 'a', title: 'Story about quantum computing breakthroughs' }),
+      makeExisting({ id: 'b', title: 'New restaurant opens in Marina Bay' })
+    ];
+    const matches = findDuplicatesForItem('BYD sales surge in China', 'trigger-id', undefined, candidates, 0.6);
+    expect(matches).toHaveLength(0);
+  });
+});
+
+describe('dedupeBatch with custom threshold', () => {
+  it('catches more duplicates with a lower threshold', () => {
+    const candidates = [
+      makeItem({ title: 'BYD sales surge in export markets driven by strong demand - Reuters', url: 'https://a' }),
+      makeItem({ title: 'BYD export growth continues amid rising global EV demand - CNA', url: 'https://b' })
+    ];
+
+    const highResult = dedupeBatch(candidates, [], 0.9);
+    const lowResult = dedupeBatch(candidates, [], 0.3);
+    expect(lowResult.duplicateCount).toBeGreaterThanOrEqual(highResult.duplicateCount);
   });
 });

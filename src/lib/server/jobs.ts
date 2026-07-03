@@ -43,7 +43,8 @@ export async function runTrendFetchJob(env: Env): Promise<JobResult> {
 
   // Pull recent items once, dedup the whole batch locally before writing
   const existing = await db.listItemsForDedup(14);
-  const { toInsert, merges, duplicateCount } = dedupeBatch(scored, existing);
+  const adaptiveThreshold = await db.getAdaptiveDedupThreshold();
+  const { toInsert, merges, duplicateCount } = dedupeBatch(scored, existing, adaptiveThreshold);
 
   let inserted = 0;
   let updated = 0;
