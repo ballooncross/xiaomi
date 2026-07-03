@@ -78,6 +78,8 @@
   let devRequestPending = $state(false);
   let devRequestMessage = $state('');
   let devRequests = $state<Array<{id: string; text: string; status: string; response: string; createdAt?: string}>>([]);
+  let dedupPending = $state<string | null>(null);
+  let dedupResult = $state<{ itemId: string; found: number } | null>(null);
   let nlInterestText = $state('');
   let nlInterestPending = $state(false);
   let nlInterestMessage = $state('');
@@ -227,6 +229,31 @@
       });
     }
     feedbackPending = null;
+  }
+
+  async function markDuplicate(itemId: string) {
+    dedupPending = itemId;
+    dedupResult = null;
+    try {
+      const response = await fetch('/api/dedup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ itemId })
+      });
+      const result = await response.json() as { found: number; matches?: Array<{ id: string }>; keeperId?: string; mergedSources?: Array<{ source: string; url: string }> };
+      if (response.ok && result.found > 0 && result.matches && result.keeperId) {
+        const dismissedIds = new Set(result.matches.map((m) => m.id));
+        items = items.map((item) => {
+          if (dismissedIds.has(item.id)) return { ...item, status: 'dismissed' as const };
+          if (item.id === result.keeperId) return { ...item, relatedSources: result.mergedSources };
+          return item;
+        });
+      }
+      dedupResult = { itemId, found: result.found };
+    } catch {
+      dedupResult = { itemId, found: 0 };
+    }
+    dedupPending = null;
   }
 
   async function submitNlInterest() {
@@ -1501,6 +1528,14 @@
                   onclick={() => sendFeedback(topItem.id, 'viewed')}
                 >已读</button>
                 <button class="small-button" onclick={() => sendFeedback(topItem.id, 'not_relevant')}>不相关</button>
+                <button
+                  class="small-button"
+                  disabled={dedupPending === topItem.id}
+                  onclick={() => markDuplicate(topItem.id)}
+                >{dedupPending === topItem.id ? '查找中...' : '重复'}</button>
+                {#if dedupResult?.itemId === topItem.id}
+                  <span class="chip">{dedupResult.found > 0 ? `合并了 ${dedupResult.found} 个重复` : '未找到重复'}</span>
+                {/if}
                 {#if topItem.url}
                   <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">来源 · {sourceLabel(topItem)}</a>
                 {/if}
@@ -1602,6 +1637,16 @@
                   >
                     不相关
                   </button>
+                  <button
+                    class="small-button"
+                    disabled={dedupPending === item.id}
+                    onclick={() => markDuplicate(item.id)}
+                  >
+                    {dedupPending === item.id ? '查找中...' : '重复'}
+                  </button>
+                  {#if dedupResult?.itemId === item.id}
+                    <span class="chip">{dedupResult.found > 0 ? `合并了 ${dedupResult.found} 个重复` : '未找到重复'}</span>
+                  {/if}
                   {#if item.status === 'tracking'}
                     <span class="chip hot">重点跟踪</span>
                   {:else if item.status === 'saved'}

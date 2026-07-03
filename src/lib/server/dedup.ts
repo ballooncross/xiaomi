@@ -34,13 +34,13 @@ export type DedupResult = {
 
 const SIMILARITY_THRESHOLD = 0.6;
 
-export function dedupeBatch(candidates: RadarItem[], existing: DedupExisting[]): DedupResult {
+export function dedupeBatch(candidates: RadarItem[], existing: DedupExisting[], threshold: number = SIMILARITY_THRESHOLD): DedupResult {
   const merges = new Map<string, MergeAction>();
   const toInsert: RadarItem[] = [];
   let duplicateCount = 0;
 
   // Pass 1: merge candidates among themselves
-  const clusters = clusterItems(candidates);
+  const clusters = clusterItems(candidates, threshold);
   const mergedCandidates = clusters.map(mergeCandidateCluster);
   duplicateCount += candidates.length - mergedCandidates.length;
 
@@ -48,7 +48,7 @@ export function dedupeBatch(candidates: RadarItem[], existing: DedupExisting[]):
   const existingIndex = existing.map((e) => ({ item: e, tokens: titleTokens(e.title) }));
 
   for (const candidate of mergedCandidates) {
-    const match = findMatch(candidate.title, candidate.url, existingIndex);
+    const match = findMatch(candidate.title, candidate.url, existingIndex, threshold);
     if (!match) {
       toInsert.push(candidate);
       // Newly inserted items become match targets for the rest of the batch
@@ -119,15 +119,42 @@ export function clusterForBackfill(items: DedupExisting[]): {
 export function findMatch(
   title: string,
   url: string | undefined,
-  index: Array<{ item: DedupExisting; tokens: Set<string> }>
+  index: Array<{ item: DedupExisting; tokens: Set<string> }>,
+  threshold: number = SIMILARITY_THRESHOLD
 ): DedupExisting | undefined {
   const tokens = titleTokens(title);
   for (const entry of index) {
     if (url && entry.item.url === url) return entry.item;
     if (url && entry.item.relatedSources.some((rs) => rs.url === url)) return entry.item;
-    if (tokenSimilarity(tokens, entry.tokens) >= SIMILARITY_THRESHOLD) return entry.item;
+    if (tokenSimilarity(tokens, entry.tokens) >= threshold) return entry.item;
   }
   return undefined;
+}
+
+export type DedupMatch = {
+  item: DedupExisting;
+  similarity: number;
+};
+
+export function findDuplicatesForItem(
+  triggerTitle: string,
+  triggerId: string,
+  triggerUrl: string | undefined,
+  candidates: DedupExisting[],
+  threshold: number
+): DedupMatch[] {
+  const triggerTokens = titleTokens(triggerTitle);
+  const matches: DedupMatch[] = [];
+
+  for (const candidate of candidates) {
+    if (candidate.id === triggerId) continue;
+    const similarity = tokenSimilarity(triggerTokens, titleTokens(candidate.title));
+    if (similarity >= threshold) {
+      matches.push({ item: candidate, similarity });
+    }
+  }
+
+  return matches.sort((a, b) => b.similarity - a.similarity);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +206,7 @@ function stem(word: string): string {
   return word;
 }
 
-function tokenSimilarity(a: Set<string>, b: Set<string>): number {
+export function tokenSimilarity(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   let overlap = 0;
   for (const token of a) if (b.has(token)) overlap += 1;
@@ -202,15 +229,15 @@ function decodeEntities(value: string): string {
 // Clustering and merge helpers
 // ---------------------------------------------------------------------------
 
-function clusterItems(items: RadarItem[]): RadarItem[][] {
-  return clusterGeneric(items, (i) => i.title);
+function clusterItems(items: RadarItem[], threshold: number = SIMILARITY_THRESHOLD): RadarItem[][] {
+  return clusterGeneric(items, (i) => i.title, threshold);
 }
 
-function clusterGeneric<T>(items: T[], titleOf: (item: T) => string): T[][] {
+function clusterGeneric<T>(items: T[], titleOf: (item: T) => string, threshold: number = SIMILARITY_THRESHOLD): T[][] {
   const clusters: Array<{ tokens: Set<string>; members: T[] }> = [];
   for (const item of items) {
     const tokens = titleTokens(titleOf(item));
-    const home = clusters.find((c) => tokenSimilarity(tokens, c.tokens) >= SIMILARITY_THRESHOLD);
+    const home = clusters.find((c) => tokenSimilarity(tokens, c.tokens) >= threshold);
     if (home) {
       home.members.push(item);
     } else {

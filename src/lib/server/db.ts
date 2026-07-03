@@ -206,6 +206,11 @@ export abstract class RadarDb {
   abstract insertDevRequest(request: DevRequest): Promise<void>;
   abstract listDevRequests(options?: { status?: string; limit?: number }): Promise<DevRequest[]>;
   abstract updateDevRequest(id: string, updates: { status?: string; response?: string; branch?: string }): Promise<void>;
+
+  // User-initiated dedup
+  abstract getItemById(itemId: string): Promise<RadarItem | null>;
+  abstract recordDedupFeedback(triggerId: string, matchedId: string, similarity: number, thresholdUsed: number): Promise<void>;
+  abstract getAdaptiveDedupThreshold(): Promise<number>;
 }
 
 class MemoryRadarDb extends RadarDb {
@@ -429,6 +434,16 @@ class MemoryRadarDb extends RadarDb {
       if (updates.branch !== undefined) request.branch = updates.branch ?? undefined;
       request.updatedAt = new Date().toISOString();
     }
+  }
+
+  async getItemById(itemId: string): Promise<RadarItem | null> {
+    return memory.items.find((item) => item.id === itemId) ?? null;
+  }
+
+  async recordDedupFeedback(): Promise<void> {}
+
+  async getAdaptiveDedupThreshold(): Promise<number> {
+    return 0.6;
   }
 }
 
@@ -1134,6 +1149,49 @@ class D1RadarDb extends RadarDb {
         .run();
     } catch (error) {
       if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getItemById(itemId: string): Promise<RadarItem | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT * FROM items WHERE id = ?')
+        .bind(itemId)
+        .first<ItemRow>();
+      return row ? itemFromRow(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().getItemById(itemId);
+      throw error;
+    }
+  }
+
+  async recordDedupFeedback(triggerId: string, matchedId: string, similarity: number, thresholdUsed: number): Promise<void> {
+    try {
+      await this.db
+        .prepare('INSERT INTO dedup_feedback (id, trigger_item_id, matched_item_id, similarity, threshold_used) VALUES (?, ?, ?, ?, ?)')
+        .bind(crypto.randomUUID(), triggerId, matchedId, similarity, thresholdUsed)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getAdaptiveDedupThreshold(): Promise<number> {
+    const DEFAULT_THRESHOLD = 0.6;
+    try {
+      const row = await this.db
+        .prepare(
+          `SELECT MIN(similarity) as min_sim, COUNT(*) as cnt
+           FROM dedup_feedback
+           WHERE created_at >= datetime('now', '-30 days')`
+        )
+        .first<{ min_sim: number | null; cnt: number }>();
+      if (!row || row.cnt < 3 || row.min_sim == null) return DEFAULT_THRESHOLD;
+      return Math.max(0.35, Math.min(row.min_sim - 0.05, DEFAULT_THRESHOLD));
+    } catch (error) {
+      if (isMissingTableError(error)) return DEFAULT_THRESHOLD;
       throw error;
     }
   }
