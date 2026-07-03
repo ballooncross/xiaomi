@@ -225,7 +225,10 @@ class MemoryRadarDb extends RadarDb {
   }
 
   async listItems(limit = 30): Promise<RadarItem[]> {
-    return [...memory.items].sort((a, b) => b.score - a.score).slice(0, limit);
+    return [...memory.items]
+      .filter((item) => item.status !== 'dismissed' && item.status !== 'viewed')
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
   }
 
   async upsertItem(item: RadarItem): Promise<'inserted' | 'updated'> {
@@ -260,6 +263,7 @@ class MemoryRadarDb extends RadarDb {
     if (action === 'save') await this.updateItemStatus(itemId, 'saved');
     if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
     if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
+    if (action === 'viewed') await this.updateItemStatus(itemId, 'viewed');
   }
 
   async updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void> {
@@ -493,7 +497,8 @@ class D1RadarDb extends RadarDb {
   async listItems(limit = 30): Promise<RadarItem[]> {
     try {
       const { results } = await this.db
-        .prepare('SELECT * FROM items ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?')
+        .prepare(`SELECT * FROM items WHERE status NOT IN ('dismissed', 'viewed')
+           ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?`)
         .bind(limit)
         .all<ItemRow>();
       return results.map(itemFromRow);
@@ -644,6 +649,7 @@ class D1RadarDb extends RadarDb {
       if (action === 'save') await this.updateItemStatus(itemId, 'saved');
       if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
       if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
+      if (action === 'viewed') await this.updateItemStatus(itemId, 'viewed');
 
       // Also record as preference signal
       await this.insertPreferenceSignal({

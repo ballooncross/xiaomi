@@ -5,7 +5,7 @@ import { mergeLocalEnv } from '$lib/server/env';
 import type { Env, FeedbackAction } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
-const actions = new Set<FeedbackAction>(['save', 'track', 'not_relevant', 'more_like_this', 'less_like_this']);
+const actions = new Set<FeedbackAction>(['save', 'track', 'not_relevant', 'more_like_this', 'less_like_this', 'viewed']);
 
 export const POST: RequestHandler = async ({ request, platform }) => {
   const body = (await request.json()) as { itemId?: string; action?: FeedbackAction; reason?: string };
