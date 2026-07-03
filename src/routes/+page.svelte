@@ -143,11 +143,13 @@
   const visibleItems = $derived(
     items
       .filter((item) => {
-        if (activeView === 'concerts') return item.kind === 'concert' && item.status !== 'dismissed';
-        if (activeView === 'trends') return item.kind !== 'concert' && item.status !== 'dismissed';
+        const hidden = item.status === 'dismissed' || item.status === 'viewed';
+        const searching = searchQuery.trim().length > 0;
+        if (activeView === 'concerts') return item.kind === 'concert' && (searching || !hidden);
+        if (activeView === 'trends') return item.kind !== 'concert' && (searching || !hidden);
         if (activeView === 'dates') return false;
         if (activeView === 'me') return item.status === 'saved' || item.status === 'tracking';
-        if (activeFilter === 'for-you') return item.status !== 'dismissed';
+        if (activeFilter === 'for-you') return searching || !hidden;
         if (activeFilter === 'saved') return item.status === 'saved' || item.status === 'tracking';
         return item.topics.some((topic) => topic.toLowerCase().includes(activeFilter));
       })
@@ -159,12 +161,12 @@
   const secondaryItems = $derived(visibleItems.slice(1, 3));
   const trendItems = $derived(
     items
-      .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed')
+      .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed' && item.status !== 'viewed')
       .sort(sortRadarItemsForDisplay)
   );
   const timelineItems = $derived(
     items
-      .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed')
+      .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed' && item.status !== 'viewed')
       .slice(0, 4)
   );
   const watchTopics = $derived(topics.filter((topic) => topic.type === 'artist' && topic.mode !== 'blacklist'));
@@ -219,6 +221,7 @@
         if (action === 'save') return { ...item, status: 'saved' };
         if (action === 'track') return { ...item, status: 'tracking' };
         if (action === 'not_relevant' || action === 'less_like_this') return { ...item, status: 'dismissed' };
+        if (action === 'viewed') return { ...item, status: 'viewed' };
         return item;
       });
     }
@@ -801,7 +804,7 @@
   }
 
   function buildDigestPreview(sourceItems: RadarItem[]) {
-    const activeItems = sourceItems.filter((item) => item.status !== 'dismissed').slice(0, 6);
+    const activeItems = sourceItems.filter((item) => item.status !== 'dismissed' && item.status !== 'viewed').slice(0, 6);
     const lines = ['个人雷达 · 每日摘要', ''];
     for (const item of activeItems) {
       lines.push(`• ${item.title}`);
@@ -1473,6 +1476,8 @@
                   <span class="chip hot">重点跟踪</span>
                 {:else if topItem.status === 'saved'}
                   <span class="chip hot">已保存</span>
+                {:else if topItem.status === 'viewed'}
+                  <span class="chip">已读</span>
                 {/if}
               </div>
               <div class="story-actions">
@@ -1484,6 +1489,11 @@
                   重点跟踪
                 </button>
                 <button class="small-button" onclick={() => sendFeedback(topItem.id, 'save')}>保存</button>
+                <button
+                  class="small-button"
+                  disabled={feedbackPending === `${topItem.id}:viewed`}
+                  onclick={() => sendFeedback(topItem.id, 'viewed')}
+                >已读</button>
                 <button class="small-button" onclick={() => sendFeedback(topItem.id, 'not_relevant')}>不相关</button>
                 {#if topItem.url}
                   <a class="source-link" href={topItem.url} target="_blank" rel="noreferrer">来源 · {sourceLabel(topItem)}</a>
@@ -1574,6 +1584,13 @@
                   </button>
                   <button
                     class="small-button"
+                    disabled={feedbackPending === `${item.id}:viewed`}
+                    onclick={() => sendFeedback(item.id, 'viewed')}
+                  >
+                    已读
+                  </button>
+                  <button
+                    class="small-button"
                     disabled={feedbackPending === `${item.id}:not_relevant`}
                     onclick={() => sendFeedback(item.id, 'not_relevant')}
                   >
@@ -1583,6 +1600,8 @@
                     <span class="chip hot">重点跟踪</span>
                   {:else if item.status === 'saved'}
                     <span class="chip hot">已保存</span>
+                  {:else if item.status === 'viewed'}
+                    <span class="chip">已读</span>
                   {/if}
                 </div>
               </div>

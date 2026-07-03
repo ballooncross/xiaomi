@@ -42,6 +42,13 @@ export function scoreItem(item: RadarItem, topics: WatchTopic[], ctx?: ScoringCo
   if (haystack.includes('past event') || haystack.includes('already passed')) score -= 35;
   if (item.url) score += 4;
 
+  // Freshness: boost recent items, penalize stale ones
+  // Concerts with future dates are exempt (relevance is event-date-driven)
+  const hasFutureEvent = item.startsAt && new Date(item.startsAt).getTime() > Date.now();
+  if (!hasFutureEvent) {
+    score += freshnessDecay(item.publishedAt ?? item.createdAt);
+  }
+
   // Context-based boosts from compiled preferences
   if (ctx?.contextBoosts) {
     for (const topic of item.topics) {
@@ -72,12 +79,28 @@ export function statusForFeedback(action: FeedbackAction): RadarItem['status'] |
   if (action === 'save') return 'saved';
   if (action === 'track') return 'tracking';
   if (action === 'not_relevant' || action === 'less_like_this') return 'dismissed';
+  if (action === 'viewed') return 'viewed';
   return undefined;
 }
 
 export function fallbackSummary(item: RadarItem): string {
   const text = item.description || item.title;
   return text.length <= 180 ? text : `${text.slice(0, 177).trim()}...`;
+}
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+
+function freshnessDecay(dateStr: string | undefined): number {
+  if (!dateStr) return 0;
+  const age = Date.now() - new Date(dateStr).getTime();
+  if (age < 0 || !Number.isFinite(age)) return 0;
+  if (age < DAY) return 15;
+  if (age < 3 * DAY) return 8;
+  if (age < 7 * DAY) return 0;
+  if (age < 14 * DAY) return -10;
+  if (age < 28 * DAY) return -25;
+  return -40;
 }
 
 function impressionDecay(impressionCount: number, currentScore: number): number {
