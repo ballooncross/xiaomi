@@ -257,24 +257,19 @@
   }
 
   async function submitNlInterest() {
-    nlInterestPending = true;
-    nlInterestMessage = '';
-    try {
-      const response = await fetch('/api/interests', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: nlInterestText.trim() })
-      });
-      if (response.ok) {
-        nlInterestText = '';
-        nlInterestMessage = '已记录，本地 AI 会在下次扫描时使用这个描述。';
-      } else {
-        nlInterestMessage = '提交失败，请重试。';
-      }
-    } catch {
-      nlInterestMessage = '提交失败,请重试。';
-    }
-    nlInterestPending = false;
+    const text = nlInterestText.trim();
+    nlInterestText = '';
+    nlInterestMessage = '已记录，本地 AI 会在下次扫描时使用这个描述。';
+
+    fetch('/api/interests', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text })
+    }).then((response) => {
+      if (!response.ok) nlInterestMessage = '提交失败，请重试。';
+    }).catch(() => {
+      nlInterestMessage = '提交失败，请重试。';
+    });
   }
 
   async function loadDevRequests() {
@@ -522,8 +517,21 @@
       return;
     }
 
-    addWatchPending = true;
-    const response = await fetch('/api/watchlist', {
+    const optimisticTopic: WatchTopic = {
+      id: `${newWatchType}-${name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-')}`,
+      type: newWatchType,
+      name,
+      aliases: [],
+      category: newWatchCategory,
+      priority: newWatchPriority,
+      mode: newWatchMode,
+      enabled: true
+    };
+    topics = [optimisticTopic, ...topics.filter((t) => t.id !== optimisticTopic.id)];
+    newWatchName = '';
+    addWatchOpen = false;
+
+    fetch('/api/watchlist', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -533,18 +541,13 @@
         priority: newWatchPriority,
         mode: newWatchMode
       })
+    }).then(async (response) => {
+      if (response.ok) {
+        const result = (await response.json()) as { topic: WatchTopic; topics?: WatchTopic[]; items?: RadarItem[] };
+        topics = result.topics ?? topics.map((t) => (t.id === optimisticTopic.id ? result.topic : t));
+        if (result.items) items = result.items;
+      }
     });
-
-    if (response.ok) {
-      const result = (await response.json()) as { topic: WatchTopic; topics?: WatchTopic[]; items?: RadarItem[] };
-      topics = result.topics ?? [result.topic, ...topics.filter((topic) => topic.id !== result.topic.id)];
-      if (result.items) items = result.items;
-      newWatchName = '';
-      addWatchOpen = false;
-    } else {
-      addWatchError = '无法添加这个关注，请重试。';
-    }
-    addWatchPending = false;
   }
 
   function startEditTopic(topic: WatchTopic) {
@@ -568,12 +571,25 @@
       return;
     }
 
-    topicPending = editingTopicId;
-    const response = await fetch('/api/watchlist', {
+    const editId = editingTopicId;
+    const optimisticTopic: WatchTopic = {
+      id: editId,
+      type: editWatchType,
+      name,
+      aliases: topics.find((t) => t.id === editId)?.aliases ?? [],
+      category: editWatchCategory,
+      priority: editWatchPriority,
+      mode: editWatchMode,
+      enabled: true
+    };
+    topics = topics.map((t) => (t.id === editId ? optimisticTopic : t));
+    editingTopicId = null;
+
+    fetch('/api/watchlist', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        id: editingTopicId,
+        id: editId,
         name,
         type: editWatchType,
         category: editWatchCategory,
@@ -581,47 +597,45 @@
         mode: editWatchMode,
         enabled: true
       })
+    }).then(async (response) => {
+      if (response.ok) {
+        const result = (await response.json()) as { topic: WatchTopic; topics?: WatchTopic[]; items?: RadarItem[] };
+        topics = result.topics ?? topics.map((t) => (t.id === editId ? result.topic : t));
+        if (result.items) items = result.items;
+      }
     });
-
-    if (response.ok) {
-      const result = (await response.json()) as { topic: WatchTopic; topics?: WatchTopic[]; items?: RadarItem[] };
-      topics = result.topics ?? topics.map((topic) => (topic.id === result.topic.id ? result.topic : topic));
-      if (result.items) items = result.items;
-      editingTopicId = null;
-    } else {
-      editWatchError = '无法保存这个偏好，请重试。';
-    }
-    topicPending = null;
   }
 
   async function updateTopicMode(topic: WatchTopic, mode: WatchTopic['mode']) {
-    topicPending = topic.id;
-    const response = await fetch('/api/watchlist', {
+    topics = topics.map((t) => (t.id === topic.id ? { ...t, mode } : t));
+
+    fetch('/api/watchlist', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ...topic, mode })
+    }).then(async (response) => {
+      if (response.ok) {
+        const result = (await response.json()) as { topic: WatchTopic };
+        topics = topics.map((t) => (t.id === topic.id ? result.topic : t));
+      }
     });
-    if (response.ok) {
-      const result = (await response.json()) as { topic: WatchTopic };
-      topics = topics.map((candidate) => (candidate.id === topic.id ? result.topic : candidate));
-    }
-    topicPending = null;
   }
 
   async function removeTopic(topic: WatchTopic) {
-    topicPending = topic.id;
-    const response = await fetch('/api/watchlist', {
+    topics = topics.filter((t) => t.id !== topic.id);
+    if (editingTopicId === topic.id) editingTopicId = null;
+
+    fetch('/api/watchlist', {
       method: 'DELETE',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id: topic.id })
+    }).then(async (response) => {
+      if (response.ok) {
+        const result = (await response.json().catch(() => ({}))) as { topics?: WatchTopic[]; items?: RadarItem[] };
+        if (result.topics) topics = result.topics;
+        if (result.items) items = result.items;
+      }
     });
-    if (response.ok) {
-      const result = (await response.json().catch(() => ({}))) as { topics?: WatchTopic[]; items?: RadarItem[] };
-      topics = result.topics ?? topics.filter((candidate) => candidate.id !== topic.id);
-      if (result.items) items = result.items;
-      if (editingTopicId === topic.id) editingTopicId = null;
-    }
-    topicPending = null;
   }
 
   function openReminderForm(reminder?: ReminderView) {
