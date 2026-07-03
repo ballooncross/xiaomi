@@ -26,6 +26,14 @@ export const defaultWatchTopics: WatchTopic[] = [
     ['BYD', 'electric vehicles', 'EV market', 'Chinese EV', 'EV price war', 'battery market'],
     'business',
     5
+  ),
+  topic(
+    'topic-sg-local-life',
+    'topic',
+    '新加坡本地生活动态',
+    ['Singapore local news', 'HDB policy', 'COE price', 'Singapore food', 'home appliance import', 'hawker', 'MRT'],
+    'life',
+    4
   )
 ];
 
