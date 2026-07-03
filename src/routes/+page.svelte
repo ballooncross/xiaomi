@@ -128,6 +128,7 @@
     { id: 'for-you', label: '推荐' },
     { id: 'career', label: '职业' },
     { id: 'business', label: '商业' },
+    { id: 'life', label: '生活' },
     { id: 'geopolitics', label: '地缘政治' },
     { id: 'saved', label: '已保存' }
   ];
@@ -824,6 +825,7 @@
     if (type === 'source') return '跟踪可信网站、博客或官方账号';
     if (category === 'business') return '跟踪公司、产品、市场或创业机会信号';
     if (category === 'career') return '跟踪岗位市场、技能和招聘信号';
+    if (category === 'life') return '跟踪本地生活、政策变化、消费和日常实用信号';
     return '在每日趋势流中跟踪这个主题';
   }
 
@@ -833,6 +835,7 @@
     if (type === 'source') return '例如：JYPETWICE 官方 X、CNA、Music Matters';
     if (category === 'business') return '例如：Dreame、追觅、消费硬件风险';
     if (category === 'career') return '例如：新加坡 AI 产品岗位';
+    if (category === 'life') return '例如：新加坡 HDB 政策、COE 价格、本地餐饮变化';
     return '例如：中美 AI 政策、东南亚融资';
   }
 
@@ -842,6 +845,7 @@
     const categories: Record<string, string> = {
       business: '商业',
       career: '职业',
+      life: '生活',
       geopolitics: '地缘政治',
       concerts: '演出'
     };
@@ -858,9 +862,9 @@
     }
     if (view === 'trends') {
       return {
-        eyebrow: '趋势雷达 · 职业、商业、地缘政治',
+        eyebrow: '趋势雷达 · 职业、商业、生活、地缘政治',
         title: `${count} 条趋势信号待查看。`,
-        body: '职业、市场、地缘政治和商业机会会集中在这里，避免被演出关注淹没。'
+        body: '职业、市场、生活、地缘政治和商业机会会集中在这里，避免被演出关注淹没。'
       };
     }
     if (view === 'me') {
@@ -1047,6 +1051,7 @@
                 <select bind:value={newWatchCategory} aria-label="关注分类">
                   <option value="business">商业</option>
                   <option value="career">职业</option>
+                  <option value="life">生活</option>
                   <option value="geopolitics">地缘政治</option>
                   <option value="concerts">演出</option>
                 </select>
@@ -1107,6 +1112,7 @@
                 <select bind:value={editWatchCategory} aria-label="关注分类">
                   <option value="business">商业</option>
                   <option value="career">职业</option>
+                  <option value="life">生活</option>
                   <option value="geopolitics">地缘政治</option>
                   <option value="concerts">演出</option>
                 </select>
