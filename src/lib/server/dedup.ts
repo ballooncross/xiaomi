@@ -148,6 +148,13 @@ export function findDuplicatesForItem(
 
   for (const candidate of candidates) {
     if (candidate.id === triggerId) continue;
+
+    // URL match: same URL or trigger URL appears in candidate's related sources
+    if (triggerUrl && (candidate.url === triggerUrl || candidate.relatedSources.some((rs) => rs.url === triggerUrl))) {
+      matches.push({ item: candidate, similarity: 1.0 });
+      continue;
+    }
+
     const similarity = tokenSimilarity(triggerTokens, titleTokens(candidate.title));
     if (similarity >= threshold) {
       matches.push({ item: candidate, similarity });

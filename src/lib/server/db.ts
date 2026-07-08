@@ -1049,7 +1049,7 @@ class D1RadarDb extends RadarDb {
       const { results } = await this.db
         .prepare(
           `SELECT id, title, url, image_url, summary, score, related_sources, created_at
-           FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?`
+           FROM items WHERE created_at >= ? AND status != 'dismissed' ORDER BY created_at DESC LIMIT ?`
         )
         .bind(cutoff, limit)
         .all<{
