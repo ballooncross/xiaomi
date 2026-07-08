@@ -55,6 +55,9 @@ async function handleRequest(request: DevRequest): Promise<void> {
   log(`Processing dev request: "${request.text.slice(0, 60)}..."`);
   await updateRequest(request.id, { status: 'in_progress' });
 
+  const originalBranch = git('rev-parse --abbrev-ref HEAD');
+  const restoreBranch = () => { try { git(`checkout ${originalBranch}`); } catch { /* best effort */ } };
+
   try {
     // First: ask the AI to assess whether this is safe to auto-implement
     const assessment = await assessRequest(request.text);
@@ -78,7 +81,7 @@ async function handleRequest(request: DevRequest): Promise<void> {
 
     const cliResult = runImplementation(request.text);
     if (!cliResult.success) {
-      git('checkout main');
+      restoreBranch();
       await updateRequest(request.id, { status: 'rejected', response: `Implementation failed: ${cliResult.error}` });
       return;
     }
@@ -87,13 +90,13 @@ async function handleRequest(request: DevRequest): Promise<void> {
     const diffStat = git('diff --stat HEAD');
     const changedFiles = diffStat.split('\n').filter((line) => line.includes('|')).length;
     if (changedFiles === 0) {
-      git('checkout main');
+      restoreBranch();
       await updateRequest(request.id, { status: 'completed', response: 'No changes needed (codex made no modifications).' });
       return;
     }
 
     if (changedFiles > MAX_CHANGED_FILES) {
-      git('checkout main');
+      restoreBranch();
       await updateRequest(request.id, {
         status: 'replied',
         response: `Change touches ${changedFiles} files (limit: ${MAX_CHANGED_FILES}). Too large for auto-deploy. Review the branch "${branch}" manually.`
@@ -106,7 +109,7 @@ async function handleRequest(request: DevRequest): Promise<void> {
       execSync('npx tsc --noEmit', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
       execSync('npm run build', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });
     } catch (buildError) {
-      git('checkout main');
+      restoreBranch();
       await updateRequest(request.id, {
         status: 'rejected',
         response: `Build failed after implementation: ${String(buildError).slice(0, 200)}`
@@ -114,12 +117,13 @@ async function handleRequest(request: DevRequest): Promise<void> {
       return;
     }
 
-    // Commit, merge to main, deploy
+    // Commit and push directly to origin/main (avoids checking out main locally,
+    // which fails when another worktree already has main checked out)
     git('add -A');
     git(`commit -m "auto: ${request.text.slice(0, 60).replace(/"/g, "'")}"`);
-    git('checkout main');
-    git(`merge ${branch} --no-edit`);
-    git('push origin main');
+    git(`push origin ${branch}:main`);
+    restoreBranch();
+    git(`branch -D ${branch}`);
 
     log('  Deploying...');
     execSync('npm run deploy', { cwd: projectRoot, timeout: 180000, stdio: 'pipe' });
@@ -133,7 +137,7 @@ async function handleRequest(request: DevRequest): Promise<void> {
     log(`  Request completed and deployed.`);
   } catch (error) {
     log(`  Request failed: ${error}`);
-    try { git('checkout main'); } catch { /* best effort */ }
+    restoreBranch();
     await updateRequest(request.id, {
       status: 'rejected',
       response: `Error: ${String(error).slice(0, 300)}`
