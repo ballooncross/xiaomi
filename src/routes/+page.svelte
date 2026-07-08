@@ -78,6 +78,7 @@
   let devRequestPending = $state(false);
   let devRequestMessage = $state('');
   let devRequests = $state<Array<{id: string; text: string; status: string; response: string; createdAt?: string}>>([]);
+  let expandedDevRequest = $state<string | null>(null);
   let dedupPending = $state<string | null>(null);
   let dedupResult = $state<{ itemId: string; found: number } | null>(null);
   let nlInterestText = $state('');
@@ -1408,10 +1409,11 @@
             {#if devRequests.length > 0}
               <div style="padding:12px 14px 0;display:grid;gap:8px">
                 {#each devRequests.slice(0, 5) as req}
-                  <div style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px">
-                    <strong style="color:var(--ink)">{req.text.slice(0, 80)}</strong>
-                    <div style="margin-top:4px;color:var(--muted)">{req.status}{req.response ? ` · ${req.response.slice(0, 100)}` : ''}</div>
-                  </div>
+                  <button type="button" style="all:unset;cursor:pointer;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:left;display:block;width:100%;box-sizing:border-box"
+                    onclick={() => { expandedDevRequest = expandedDevRequest === req.id ? null : req.id }}>
+                    <strong style="color:var(--ink)">{expandedDevRequest === req.id ? req.text : req.text.slice(0, 80)}{expandedDevRequest !== req.id && req.text.length > 80 ? '…' : ''}</strong>
+                    <div style="margin-top:4px;color:var(--muted)">{req.status}{req.response ? ` · ${expandedDevRequest === req.id ? req.response : req.response.slice(0, 100)}${expandedDevRequest !== req.id && req.response.length > 100 ? '…' : ''}` : ''}</div>
+                  </button>
                 {/each}
               </div>
             {/if}
