@@ -58,6 +58,13 @@ async function tick() {
     return;
   }
 
+  // Process pending dev requests every tick, regardless of scan tier
+  try {
+    await processDevRequests();
+  } catch (error) {
+    log(`Dev request error: ${error}`);
+  }
+
   const decision = decideScanTier(state, context);
   log(`Decision: ${decision.tier.toUpperCase()} (${decision.reason})`);
   if (decision.tier === 'skip') return;
@@ -99,12 +106,6 @@ async function tick() {
   saveState(updateStateAfterScan(state, context, decision.tier));
   log(`State saved (run #${state.runCount + 1})`);
 
-  // Process pending dev requests (feature/bug requests from the UI)
-  try {
-    await processDevRequests();
-  } catch (error) {
-    log(`Dev request error: ${error}`);
-  }
 }
 
 async function runScan(context: AgentContext, decision: ScanDecision): Promise<DiscoveredItem[]> {
