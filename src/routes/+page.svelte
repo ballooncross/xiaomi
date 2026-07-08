@@ -1835,7 +1835,7 @@
     </aside>
     {/if}
   </div>
-
+  <div style="text-align:center;padding:16px 0 24px;font-size:11px;color:var(--muted)">v{__APP_VERSION__}</div>
 </main>
 
 {#if addWatchOpen}
