@@ -109,6 +109,21 @@
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
     loadDevRequests();
+
+    const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+    const timer = setInterval(() => {
+      if (!document.hidden) invalidateAll();
+    }, REFRESH_INTERVAL_MS);
+
+    const onVisible = () => {
+      if (!document.hidden) { invalidateAll(); loadDevRequests(); }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   });
 
   $effect(() => {
