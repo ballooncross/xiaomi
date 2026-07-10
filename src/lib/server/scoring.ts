@@ -105,9 +105,11 @@ function freshnessDecay(dateStr: string | undefined): number {
 
 export function isStaleItem(item: RadarItem): boolean {
   if (item.startsAt && new Date(item.startsAt).getTime() > Date.now()) return false;
-  const dateStr = item.publishedAt ?? item.createdAt;
-  if (!dateStr) return false;
+  const requiresPublicationDate = ['trend', 'news', 'opportunity'].includes(item.kind);
+  const dateStr = requiresPublicationDate ? item.publishedAt : item.publishedAt ?? item.createdAt;
+  if (!dateStr) return requiresPublicationDate;
   const age = Date.now() - new Date(dateStr).getTime();
+  if (!Number.isFinite(age)) return requiresPublicationDate;
   return age > MAX_TREND_AGE_DAYS * DAY;
 }
 

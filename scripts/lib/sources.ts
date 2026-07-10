@@ -31,7 +31,7 @@ export const seedSources: SourceConfig[] = [
     url: 'https://api.gdeltproject.org/api/v2/doc/doc?query={query}&mode=ArtList&format=json&maxrecords=6&sort=hybridrel&timespan=3d',
     lang: 'any',
     itemsPath: 'articles',
-    fields: { title: 'title', url: 'url' },
+    fields: { title: 'title', url: 'url', publishedAt: 'seendate' },
     baseConfidence: 0.45,
     maxItems: 6,
     tiers: ['full', 'deep']

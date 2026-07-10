@@ -47,6 +47,7 @@ export type DiscoveredItem = {
   summary: string;
   url?: string;
   imageUrl?: string;
+  publishedAt?: string;
   kind: string;
   confidence: number;
   relevanceReason: string;
@@ -76,7 +77,7 @@ export type SourceConfig = {
   /** json only: dot-path to the item array, e.g. "data.realtime" */
   itemsPath?: string;
   /** json only: dot-paths into each entry */
-  fields?: { title: string; url?: string; summary?: string; id?: string };
+  fields?: { title: string; url?: string; summary?: string; id?: string; publishedAt?: string };
   /** json only: build the link from extracted fields, e.g. "https://x/{id}" */
   urlTemplate?: string;
   /** rss without {query}: keep only entries matching the query terms */
