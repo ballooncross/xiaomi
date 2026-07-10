@@ -7,7 +7,7 @@ import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
 import { buildTrendSearchItems } from './fetchers/trends';
 import { sortReminders, todayInSingapore } from './lunar';
 import { getAllUpcomingMilestones } from './milestones';
-import { scoreItem } from './scoring';
+import { isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
 import type { DateReminder, Env, JobResult, RadarItem } from './types';
 
@@ -39,7 +39,7 @@ export async function runTrendFetchJob(env: Env): Promise<JobResult> {
   const db = getDb(env);
   const topics = await db.listTopics();
   const fetched = await buildTrendSearchItems(topics);
-  const scored = fetched.map((item) => scoreItem(item, topics));
+  const scored = fetched.map((item) => scoreItem(item, topics)).filter((item) => !isStaleItem(item));
 
   // Pull recent items once, dedup the whole batch locally before writing
   const existing = await db.listItemsForDedup(14);
