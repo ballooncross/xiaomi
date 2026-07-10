@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { hydrateImageForUrl } from '../images';
+import { MAX_TREND_AGE_DAYS } from '../scoring';
 import type { RadarItem, WatchTopic } from '../types';
 
 type GdeltArticle = {
@@ -69,7 +70,13 @@ export async function buildTrendSearchItems(topics: WatchTopic[]): Promise<Radar
   const trendTopics = topics.filter((topic) => topic.enabled && topic.type === 'topic' && topic.category !== 'concerts');
   const topicItems = await Promise.all(trendTopics.slice(0, 8).map(fetchTopicItems));
   const rssItems = await fetchCuratedRssItems(trendTopics);
-  return dedupeItems([...topicItems.flat(), ...rssItems]).slice(0, 40);
+  const cutoff = Date.now() - MAX_TREND_AGE_DAYS * 24 * 60 * 60 * 1000;
+  return dedupeItems([...topicItems.flat(), ...rssItems])
+    .filter((item) => {
+      if (!item.publishedAt) return true;
+      return new Date(item.publishedAt).getTime() > cutoff;
+    })
+    .slice(0, 40);
 }
 
 async function fetchTopicItems(topic: WatchTopic): Promise<RadarItem[]> {

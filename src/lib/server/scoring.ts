@@ -1,5 +1,7 @@
 import type { FeedbackAction, RadarItem, WatchTopic } from './types';
 
+export const MAX_TREND_AGE_DAYS = 28;
+
 const sourceWeight: Record<string, number> = {
   ticketmaster: 24,
   bandsintown: 20,
@@ -42,8 +44,6 @@ export function scoreItem(item: RadarItem, topics: WatchTopic[], ctx?: ScoringCo
   if (haystack.includes('past event') || haystack.includes('already passed')) score -= 35;
   if (item.url) score += 4;
 
-  // Freshness: boost recent items, penalize stale ones
-  // Concerts with future dates are exempt (relevance is event-date-driven)
   const hasFutureEvent = item.startsAt && new Date(item.startsAt).getTime() > Date.now();
   if (!hasFutureEvent) {
     score += freshnessDecay(item.publishedAt ?? item.createdAt);
@@ -95,12 +95,20 @@ function freshnessDecay(dateStr: string | undefined): number {
   if (!dateStr) return 0;
   const age = Date.now() - new Date(dateStr).getTime();
   if (age < 0 || !Number.isFinite(age)) return 0;
-  if (age < DAY) return 15;
-  if (age < 3 * DAY) return 8;
-  if (age < 7 * DAY) return 0;
-  if (age < 14 * DAY) return -10;
-  if (age < 28 * DAY) return -25;
-  return -40;
+  if (age < DAY) return 20;
+  if (age < 3 * DAY) return 12;
+  if (age < 7 * DAY) return 4;
+  if (age < 14 * DAY) return -15;
+  if (age < MAX_TREND_AGE_DAYS * DAY) return -35;
+  return -100;
+}
+
+export function isStaleItem(item: RadarItem): boolean {
+  if (item.startsAt && new Date(item.startsAt).getTime() > Date.now()) return false;
+  const dateStr = item.publishedAt ?? item.createdAt;
+  if (!dateStr) return false;
+  const age = Date.now() - new Date(dateStr).getTime();
+  return age > MAX_TREND_AGE_DAYS * DAY;
 }
 
 function impressionDecay(impressionCount: number, currentScore: number): number {

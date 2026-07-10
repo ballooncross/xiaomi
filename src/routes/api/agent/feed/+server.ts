@@ -4,7 +4,7 @@ import { mergeLocalEnv } from '$lib/server/env';
 import { getDb } from '$lib/server/db';
 import { dedupeBatch } from '$lib/server/dedup';
 import { hydrateImageForUrl } from '$lib/server/images';
-import { scoreItem } from '$lib/server/scoring';
+import { isStaleItem, scoreItem } from '$lib/server/scoring';
 import type { AgentFeedItem, Env, RadarItem, WatchTopic } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -78,8 +78,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     });
     accepted += 1;
 
-    if (feed.confidence >= PROMOTE_CONFIDENCE && matchesAnyTopic(feed, topics)) {
-      promotable.push({ feed, item: feedToRadarItem(feed, topics, input.imageUrl) });
+    const candidate = feedToRadarItem(feed, topics, input.imageUrl);
+    if (feed.confidence >= PROMOTE_CONFIDENCE && matchesAnyTopic(feed, topics) && !isStaleItem(candidate)) {
+      promotable.push({ feed, item: candidate });
     } else {
       results.push({ id: feed.id, status: feed.status, promotedItemId: null });
     }

@@ -1,4 +1,5 @@
 import type { DedupExisting, MergeAction } from './dedup';
+import { MAX_TREND_AGE_DAYS } from './scoring';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
 import type {
   AgentFeedItem,
@@ -230,8 +231,15 @@ class MemoryRadarDb extends RadarDb {
   }
 
   async listItems(limit = 30): Promise<RadarItem[]> {
+    const cutoff = Date.now() - MAX_TREND_AGE_DAYS * 24 * 60 * 60 * 1000;
     return [...memory.items]
-      .filter((item) => item.status !== 'dismissed' && item.status !== 'viewed')
+      .filter((item) => {
+        if (item.status === 'dismissed' || item.status === 'viewed') return false;
+        if (item.status === 'saved' || item.status === 'tracking') return true;
+        if (item.startsAt && new Date(item.startsAt).getTime() > Date.now()) return true;
+        const date = new Date(item.publishedAt ?? item.createdAt ?? 0).getTime();
+        return date > cutoff;
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   }
@@ -513,6 +521,11 @@ class D1RadarDb extends RadarDb {
     try {
       const { results } = await this.db
         .prepare(`SELECT * FROM items WHERE status NOT IN ('dismissed', 'viewed')
+           AND (
+             status IN ('saved', 'tracking')
+             OR (starts_at IS NOT NULL AND starts_at > datetime('now'))
+             OR COALESCE(published_at, created_at) > datetime('now', '-${MAX_TREND_AGE_DAYS} days')
+           )
            ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?`)
         .bind(limit)
         .all<ItemRow>();
