@@ -15,6 +15,7 @@ type FeedInput = {
   summary?: string;
   url?: string;
   imageUrl?: string;
+  publishedAt?: string;
   kind?: string;
   confidence?: number;
   relevanceReason?: string;
@@ -78,7 +79,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     });
     accepted += 1;
 
-    const candidate = feedToRadarItem(feed, topics, input.imageUrl);
+    const candidate = feedToRadarItem(feed, topics, input.imageUrl, normalizeDate(input.publishedAt));
     if (feed.confidence >= PROMOTE_CONFIDENCE && matchesAnyTopic(feed, topics) && !isStaleItem(candidate)) {
       promotable.push({ feed, item: candidate });
     } else {
@@ -130,7 +131,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   });
 };
 
-function feedToRadarItem(feed: AgentFeedItem, topics: WatchTopic[], imageUrl?: string): RadarItem {
+function feedToRadarItem(feed: AgentFeedItem, topics: WatchTopic[], imageUrl?: string, publishedAt?: string): RadarItem {
   const item: RadarItem = {
     id: crypto.randomUUID(),
     sourceId: `agent-${feed.source}`,
@@ -142,6 +143,7 @@ function feedToRadarItem(feed: AgentFeedItem, topics: WatchTopic[], imageUrl?: s
     description: feed.relevanceReason,
     url: feed.url,
     imageUrl,
+    publishedAt,
     artists: [],
     topics: feed.topics,
     raw: feed.metadata,
@@ -150,6 +152,12 @@ function feedToRadarItem(feed: AgentFeedItem, topics: WatchTopic[], imageUrl?: s
     relatedSources: []
   };
   return scoreItem(item, topics);
+}
+
+function normalizeDate(value?: string): string | undefined {
+  if (!value) return undefined;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
 }
 
 function isAuthorized(request: Request, env?: Env): boolean {

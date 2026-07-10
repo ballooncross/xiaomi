@@ -237,6 +237,7 @@ class MemoryRadarDb extends RadarDb {
         if (item.status === 'dismissed' || item.status === 'viewed') return false;
         if (item.status === 'saved' || item.status === 'tracking') return true;
         if (item.startsAt && new Date(item.startsAt).getTime() > Date.now()) return true;
+        if (['trend', 'news', 'opportunity'].includes(item.kind) && !item.publishedAt) return false;
         const date = new Date(item.publishedAt ?? item.createdAt ?? 0).getTime();
         return date > cutoff;
       })
@@ -524,7 +525,10 @@ class D1RadarDb extends RadarDb {
            AND (
              status IN ('saved', 'tracking')
              OR (starts_at IS NOT NULL AND starts_at > datetime('now'))
-             OR COALESCE(published_at, created_at) > datetime('now', '-${MAX_TREND_AGE_DAYS} days')
+             OR (
+               (kind NOT IN ('trend', 'news', 'opportunity') OR published_at IS NOT NULL)
+               AND COALESCE(published_at, created_at) > datetime('now', '-${MAX_TREND_AGE_DAYS} days')
+             )
            )
            ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?`)
         .bind(limit)

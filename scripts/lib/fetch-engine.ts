@@ -40,7 +40,7 @@ export async function runSource(source: SourceConfig, query: SearchQuery | undef
   return results.slice(0, source.maxItems ?? 6);
 }
 
-type RawItem = Pick<DiscoveredItem, 'title' | 'summary' | 'url'>;
+type RawItem = Pick<DiscoveredItem, 'title' | 'summary' | 'url' | 'publishedAt'>;
 
 async function fetchRssSource(source: SourceConfig, url: string): Promise<RawItem[]> {
   const response = await fetchWithTimeout(url);
@@ -57,7 +57,8 @@ async function fetchRssSource(source: SourceConfig, url: string): Promise<RawIte
       return {
         title: stripHtml(textValue(record.title)),
         summary: stripHtml(textValue(record.description) || textValue(record.summary) || ''),
-        url: linkValue(record.link) || textValue(record.guid) || textValue(record.id) || undefined
+        url: linkValue(record.link) || textValue(record.guid) || textValue(record.id) || undefined,
+        publishedAt: dateValue(record.pubDate, record.published, record.updated)
       };
     })
     .filter((item) => item.title && item.url);
@@ -76,13 +77,14 @@ async function fetchJsonSource(source: SourceConfig, url: string): Promise<RawIt
     .map((entry) => {
       const title = stripHtml(String(getPath(entry, fields.title) ?? ''));
       const summary = fields.summary ? stripHtml(String(getPath(entry, fields.summary) ?? '')) : '';
+      const publishedAt = fields.publishedAt ? dateValue(getPath(entry, fields.publishedAt)) : undefined;
       let itemUrl = fields.url ? String(getPath(entry, fields.url) ?? '') : '';
       if (!itemUrl && source.urlTemplate) {
         itemUrl = source.urlTemplate
           .replace('{id}', String(fields.id ? getPath(entry, fields.id) ?? '' : ''))
           .replace('{title}', encodeURIComponent(title));
       }
-      return { title, summary: summary.slice(0, 220), url: itemUrl || undefined };
+      return { title, summary: summary.slice(0, 220), url: itemUrl || undefined, publishedAt };
     })
     .filter((item) => item.title);
 }
@@ -95,7 +97,7 @@ async function fetchHackerNews(source: SourceConfig): Promise<DiscoveredItem[]> 
     ids.map(async (id) => {
       const storyResponse = await fetchWithTimeout(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
       if (!storyResponse?.ok) return null;
-      return (await storyResponse.json().catch(() => null)) as { title?: string; url?: string; score?: number } | null;
+      return (await storyResponse.json().catch(() => null)) as { title?: string; url?: string; score?: number; time?: number } | null;
     })
   );
   return stories
@@ -106,6 +108,7 @@ async function fetchHackerNews(source: SourceConfig): Promise<DiscoveredItem[]> 
       title: story.title!,
       summary: `HN score: ${story.score ?? 0}`,
       url: story.url,
+      publishedAt: story.time ? new Date(story.time * 1000).toISOString() : undefined,
       kind: 'trend',
       confidence: source.baseConfidence ?? 0.35,
       relevanceReason: 'Hacker News frontpage',
@@ -122,4 +125,18 @@ function linkValue(value: unknown): string {
     return textValue(record.href) || textValue(record['@_href']) || textValue(record['#text']);
   }
   return '';
+}
+
+function dateValue(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const raw = textValue(value);
+    if (!raw) continue;
+    const compact = raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+    const normalized = compact
+      ? `${compact[1]}-${compact[2]}-${compact[3]}T${compact[4]}:${compact[5]}:${compact[6]}Z`
+      : raw;
+    const timestamp = Date.parse(normalized);
+    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
+  }
+  return undefined;
 }
