@@ -77,11 +77,6 @@ type AiContextRow = {
   created_at: string;
 };
 
-type AgentOutcomeRow = {
-  agent_feed_id: string;
-  outcome: string;
-};
-
 type FeedbackJoinRow = {
   action: string;
   topics: string;
@@ -928,59 +923,53 @@ class D1RadarDb extends RadarDb {
 
   async getAgentOutcomeStats(): Promise<AgentOutcomeStats> {
     try {
-      const { results: outcomes } = await this.db
-        .prepare('SELECT agent_feed_id, outcome FROM agent_suggestion_outcomes')
-        .all<AgentOutcomeRow>();
+      // JOIN instead of `IN (...)` — D1 caps bound parameters at 100, and
+      // production already has 160+ distinct outcome feed ids.
+      const { results: rows } = await this.db
+        .prepare(
+          `SELECT o.agent_feed_id, o.outcome, f.source, f.topics
+           FROM agent_suggestion_outcomes o
+           LEFT JOIN agent_feeds f ON f.id = o.agent_feed_id`
+        )
+        .all<{ agent_feed_id: string; outcome: string; source: string | null; topics: string | null }>();
 
       const stats: AgentOutcomeStats = {
-        total: outcomes.length,
-        saved: outcomes.filter((o) => o.outcome === 'saved').length,
-        tracked: outcomes.filter((o) => o.outcome === 'tracked').length,
-        dismissed: outcomes.filter((o) => o.outcome === 'dismissed').length,
-        ignored: outcomes.filter((o) => o.outcome === 'ignored').length,
+        total: rows.length,
+        saved: rows.filter((o) => o.outcome === 'saved').length,
+        tracked: rows.filter((o) => o.outcome === 'tracked').length,
+        dismissed: rows.filter((o) => o.outcome === 'dismissed').length,
+        ignored: rows.filter((o) => o.outcome === 'ignored').length,
         byTopic: [],
         bySource: {}
       };
 
-      // Compute by-source stats
-      const feedIds = [...new Set(outcomes.map((o) => o.agent_feed_id))];
-      if (feedIds.length > 0) {
-        const placeholders = feedIds.map(() => '?').join(',');
-        const { results: feeds } = await this.db
-          .prepare(`SELECT id, source, topics FROM agent_feeds WHERE id IN (${placeholders})`)
-          .bind(...feedIds)
-          .all<{ id: string; source: string; topics: string }>();
+      const bySource: Record<string, { total: number; saved: number; dismissed: number }> = {};
+      const byTopic: Record<string, { total: number; saved: number; dismissed: number }> = {};
 
-        const feedMap = new Map(feeds.map((f) => [f.id, f]));
-        const bySource: Record<string, { total: number; saved: number; dismissed: number }> = {};
-        const byTopic: Record<string, { total: number; saved: number; dismissed: number }> = {};
+      for (const row of rows) {
+        if (!row.source) continue;
 
-        for (const o of outcomes) {
-          const feed = feedMap.get(o.agent_feed_id);
-          if (!feed) continue;
+        if (!bySource[row.source]) bySource[row.source] = { total: 0, saved: 0, dismissed: 0 };
+        bySource[row.source].total++;
+        if (row.outcome === 'saved') bySource[row.source].saved++;
+        if (row.outcome === 'dismissed') bySource[row.source].dismissed++;
 
-          if (!bySource[feed.source]) bySource[feed.source] = { total: 0, saved: 0, dismissed: 0 };
-          bySource[feed.source].total++;
-          if (o.outcome === 'saved') bySource[feed.source].saved++;
-          if (o.outcome === 'dismissed') bySource[feed.source].dismissed++;
-
-          const topics = parseJson<string[]>(feed.topics, []);
-          for (const t of topics) {
-            if (!byTopic[t]) byTopic[t] = { total: 0, saved: 0, dismissed: 0 };
-            byTopic[t].total++;
-            if (o.outcome === 'saved') byTopic[t].saved++;
-            if (o.outcome === 'dismissed') byTopic[t].dismissed++;
-          }
+        const topics = parseJson<string[]>(row.topics ?? '[]', []);
+        for (const t of topics) {
+          if (!byTopic[t]) byTopic[t] = { total: 0, saved: 0, dismissed: 0 };
+          byTopic[t].total++;
+          if (row.outcome === 'saved') byTopic[t].saved++;
+          if (row.outcome === 'dismissed') byTopic[t].dismissed++;
         }
-
-        stats.bySource = bySource;
-        stats.byTopic = Object.entries(byTopic).map(([topic, s]) => ({
-          topic,
-          saveRate: s.total > 0 ? s.saved / s.total : 0,
-          dismissRate: s.total > 0 ? s.dismissed / s.total : 0,
-          count: s.total
-        }));
       }
+
+      stats.bySource = bySource;
+      stats.byTopic = Object.entries(byTopic).map(([topic, s]) => ({
+        topic,
+        saveRate: s.total > 0 ? s.saved / s.total : 0,
+        dismissRate: s.total > 0 ? s.dismissed / s.total : 0,
+        count: s.total
+      }));
 
       return stats;
     } catch (error) {
