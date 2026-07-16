@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
-import { findDuplicatesForItem } from '$lib/server/dedup';
+import { findDuplicatesForItem, isProtectedItem, protectedItemRank } from '$lib/server/dedup';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
 import type { Env, RelatedSource } from '$lib/server/types';
@@ -42,12 +42,17 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       url: triggerItem.url,
       imageUrl: triggerItem.imageUrl,
       score: triggerItem.score,
+      status: triggerItem.status,
+      savedAt: triggerItem.savedAt,
+      trackingAt: triggerItem.trackingAt,
       relatedSources: triggerItem.relatedSources ?? []
     },
     ...matches.map((m) => m.item)
   ];
 
   const keeper = [...allItems].sort((a, b) => {
+    const protectedDiff = protectedItemRank(b) - protectedItemRank(a);
+    if (protectedDiff !== 0) return protectedDiff;
     const imageDiff = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
     if (imageDiff !== 0) return imageDiff;
     return (b.score ?? 0) - (a.score ?? 0);
@@ -58,7 +63,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
   for (const item of allItems) {
     if (item.id === keeper.id) continue;
-    loserIds.push(item.id);
+    if (!isProtectedItem(item)) loserIds.push(item.id);
     if (item.url && item.url !== keeper.url && !mergedSources.some((rs) => rs.url === item.url)) {
       const label = extractHostname(item.url);
       mergedSources.push({ source: label, url: item.url });
@@ -84,6 +89,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     found: matches.length,
     matches: matches.map((m) => ({ id: m.item.id, title: m.item.title, similarity: m.similarity })),
     keeperId: keeper.id,
+    dismissedIds: loserIds,
     mergedSources
   });
 };

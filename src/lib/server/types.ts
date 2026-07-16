@@ -41,6 +41,9 @@ export type RadarItem = {
   raw: unknown;
   score: number;
   status: ItemStatus;
+  savedAt?: string;
+  trackingAt?: string;
+  viewedAt?: string;
   relatedSources?: RelatedSource[];
   createdAt?: string;
   updatedAt?: string;

@@ -16,6 +16,9 @@ export type DedupExisting = {
   imageUrl?: string;
   summary?: string;
   score?: number;
+  status?: RadarItem['status'];
+  savedAt?: string;
+  trackingAt?: string;
   createdAt?: string;
   relatedSources: RelatedSource[];
 };
@@ -107,7 +110,7 @@ export function clusterForBackfill(items: DedupExisting[]): {
       }
       for (const rs of loser.relatedSources) addRelatedSource(relatedSources, rs, keeper.url);
       if (!keeper.imageUrl && !imageUpgrade && loser.imageUrl) imageUpgrade = loser.imageUrl;
-      deleteIds.push(loser.id);
+      if (!isProtectedItem(loser)) deleteIds.push(loser.id);
     }
 
     merges.push({ itemId: keeper.id, relatedSources, imageUrl: imageUpgrade });
@@ -304,9 +307,21 @@ function candidateKeeperRank(a: RadarItem, b: RadarItem): number {
 }
 
 function backfillKeeperRank(a: DedupExisting, b: DedupExisting): number {
+  const protectedDiff = protectedItemRank(b) - protectedItemRank(a);
+  if (protectedDiff !== 0) return protectedDiff;
   const imageDiff = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
   if (imageDiff !== 0) return imageDiff;
   return (b.score ?? 0) - (a.score ?? 0);
+}
+
+export function protectedItemRank(item: DedupExisting): number {
+  if (item.trackingAt || item.status === 'tracking') return 2;
+  if (item.savedAt || item.status === 'saved') return 1;
+  return 0;
+}
+
+export function isProtectedItem(item: DedupExisting): boolean {
+  return protectedItemRank(item) > 0;
 }
 
 function isDirectUrl(url?: string): boolean {

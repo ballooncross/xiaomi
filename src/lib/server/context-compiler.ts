@@ -2,18 +2,18 @@ import type { RadarDb } from './db';
 import type { AiContextDocument, PreferenceSignal, RadarItem, WatchTopic } from './types';
 
 export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
-  const [topics, signals, recentFeedback, agentStats, latestContext, allItems] = await Promise.all([
+  const [topics, signals, recentFeedback, agentStats, latestContext, savedItems] = await Promise.all([
     db.listTopics(),
     db.listPreferenceSignals({ limit: 500 }),
     db.listRecentFeedback(90),
     db.getAgentOutcomeStats(),
     db.getLatestAiContext(),
-    db.listItems(200)
+    db.listSavedItems()
   ]);
 
   const version = (latestContext?.version ?? 0) + 1;
 
-  const tracking = buildTracking(allItems);
+  const tracking = buildTracking(savedItems);
   const interestProfile = buildInterestProfile(topics, signals, recentFeedback);
   const queryStrategies = [
     ...buildTrackingStrategies(tracking),

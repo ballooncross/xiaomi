@@ -199,6 +199,42 @@ describe('clusterForBackfill', () => {
     expect(merges[0].itemId).toBe('b');
     expect(merges[0].relatedSources.map((rs) => rs.url)).toContain('https://a');
   });
+
+  it('keeps saved items and never deletes protected duplicate copies', () => {
+    const items: DedupExisting[] = [
+      {
+        id: 'saved',
+        title: 'Dreame Tech mulling IPO - The Edge',
+        url: 'https://saved',
+        score: 20,
+        status: 'saved',
+        savedAt: '2026-07-01T00:00:00.000Z',
+        relatedSources: []
+      },
+      {
+        id: 'higher-score',
+        title: 'Dreame Tech mulling IPO - Yahoo Finance',
+        url: 'https://higher-score',
+        score: 95,
+        imageUrl: 'https://higher-score/image.jpg',
+        status: 'new',
+        relatedSources: []
+      }
+    ];
+
+    const { merges, deleteIds } = clusterForBackfill(items);
+    expect(merges[0].itemId).toBe('saved');
+    expect(deleteIds).toEqual(['higher-score']);
+  });
+
+  it('does not delete either item when both duplicate copies are saved', () => {
+    const items: DedupExisting[] = [
+      { id: 'a', title: 'Same saved story - A', status: 'saved', savedAt: '2026-07-01', relatedSources: [] },
+      { id: 'b', title: 'Same saved story - B', status: 'tracking', trackingAt: '2026-07-02', relatedSources: [] }
+    ];
+
+    expect(clusterForBackfill(items).deleteIds).toEqual([]);
+  });
 });
 
 describe('findMatch', () => {

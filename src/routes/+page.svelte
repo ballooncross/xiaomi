@@ -166,7 +166,7 @@
   const visibleItems = $derived(
     items
       .filter((item) => {
-        const hidden = item.status === 'dismissed' || item.status === 'viewed';
+        const hidden = item.status === 'dismissed' || item.status === 'viewed' || Boolean(item.viewedAt);
         const searching = searchQuery.trim().length > 0;
         if (activeView === 'concerts') return item.kind === 'concert' && (searching || !hidden);
         if (activeView === 'trends') return item.kind !== 'concert' && (searching || !hidden);
@@ -183,20 +183,20 @@
   const secondaryItems = $derived(visibleItems.slice(1, 3));
   const trendItems = $derived(
     items
-      .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed' && item.status !== 'viewed')
+      .filter((item) => item.kind !== 'concert' && item.status !== 'dismissed' && item.status !== 'viewed' && !item.viewedAt)
       .sort(sortRadarItemsForDisplay)
   );
   const timelineItems = $derived(
     items
-      .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed' && item.status !== 'viewed')
+      .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed' && item.status !== 'viewed' && !item.viewedAt)
       .slice(0, 4)
   );
   const savedViewItems = $derived(
     savedItems
-      .filter((item) => item.status === 'saved' || item.status === 'tracking')
+      .filter(isSavedItem)
       .filter((item) => matchesSearch(item, searchQuery))
   );
-  const savedItemCount = $derived(savedItems.filter((item) => item.status === 'saved' || item.status === 'tracking').length);
+  const savedItemCount = $derived(savedItems.filter(isSavedItem).length);
   const watchTopics = $derived(topics.filter((topic) => topic.type === 'artist' && topic.mode !== 'blacklist'));
   const interestTopics = $derived(topics.filter((topic) => topic.type !== 'artist' && topic.mode !== 'blacklist'));
   const blacklistTopics = $derived(topics.filter((topic) => topic.mode === 'blacklist'));
@@ -244,17 +244,29 @@
     });
 
     if (response.ok) {
+      const now = new Date().toISOString();
+      const sourceItem = items.find((item) => item.id === itemId) ?? savedItems.find((item) => item.id === itemId);
       const updateItemStatus = (item: RadarItem): RadarItem => {
         if (item.id !== itemId) return item;
-        if (action === 'save') return { ...item, status: 'saved' };
-        if (action === 'track') return { ...item, status: 'tracking' };
-        if (action === 'unsave') return { ...item, status: 'new' };
-        if (action === 'not_relevant' || action === 'less_like_this') return { ...item, status: 'dismissed' };
-        if (action === 'viewed') return { ...item, status: 'viewed' };
+        if (action === 'save') return { ...item, status: 'saved', savedAt: now, trackingAt: undefined };
+        if (action === 'track') return { ...item, status: 'tracking', savedAt: item.savedAt ?? now, trackingAt: now };
+        if (action === 'unsave') {
+          return { ...item, status: item.viewedAt ? 'viewed' : 'new', savedAt: undefined, trackingAt: undefined };
+        }
+        if (action === 'not_relevant' || action === 'less_like_this') {
+          return { ...item, status: 'dismissed', savedAt: undefined, trackingAt: undefined };
+        }
+        if (action === 'viewed') {
+          const status = isSavedItem(item) ? item.status : 'viewed';
+          return { ...item, status, viewedAt: now };
+        }
         return item;
       };
       items = items.map(updateItemStatus);
       savedItems = savedItems.map(updateItemStatus);
+      if ((action === 'save' || action === 'track') && sourceItem && !savedItems.some((item) => item.id === itemId)) {
+        savedItems = [updateItemStatus(sourceItem), ...savedItems];
+      }
     }
     feedbackPending = null;
   }
@@ -268,14 +280,24 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ itemId })
       });
-      const result = await response.json() as { found: number; matches?: Array<{ id: string }>; keeperId?: string; mergedSources?: Array<{ source: string; url: string }> };
+      const result = await response.json() as {
+        found: number;
+        matches?: Array<{ id: string }>;
+        keeperId?: string;
+        dismissedIds?: string[];
+        mergedSources?: Array<{ source: string; url: string }>;
+      };
       if (response.ok && result.found > 0 && result.matches && result.keeperId) {
-        const dismissedIds = new Set(result.matches.map((m) => m.id));
-        items = items.map((item) => {
-          if (dismissedIds.has(item.id)) return { ...item, status: 'dismissed' as const };
+        const dismissedIds = new Set(result.dismissedIds ?? []);
+        const updateDedupedItem = (item: RadarItem): RadarItem => {
+          if (dismissedIds.has(item.id)) {
+            return { ...item, status: 'dismissed', savedAt: undefined, trackingAt: undefined };
+          }
           if (item.id === result.keeperId) return { ...item, relatedSources: result.mergedSources };
           return item;
-        });
+        };
+        items = items.map(updateDedupedItem);
+        savedItems = savedItems.map(updateDedupedItem);
       }
       dedupResult = { itemId, found: result.found };
     } catch {
@@ -780,6 +802,10 @@
       .join(' ')
       .toLowerCase();
     return haystack.includes(normalized);
+  }
+
+  function isSavedItem(item: RadarItem) {
+    return Boolean(item.savedAt || item.trackingAt || item.status === 'saved' || item.status === 'tracking');
   }
 
   function sortRadarItemsForDisplay(a: RadarItem, b: RadarItem) {
@@ -1340,6 +1366,7 @@
                         取消保存
                       </button>
                       <span class="chip hot">{item.status === 'tracking' ? '重点跟踪' : '已保存'}</span>
+                      {#if item.viewedAt}<span class="chip">已读</span>{/if}
                     </div>
                   </div>
                 </article>

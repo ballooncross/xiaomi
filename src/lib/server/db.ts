@@ -34,6 +34,9 @@ type ItemRow = {
   raw_json: string;
   score: number;
   status: RadarItem['status'];
+  saved_at: string | null;
+  tracking_at: string | null;
+  viewed_at: string | null;
   related_item_id: string | null;
   related_sources?: string | null;
   created_at: string;
@@ -134,7 +137,7 @@ const memory = {
   topics: [...defaultWatchTopics],
   items: [...demoItems],
   reminders: [...defaultDateReminders],
-  feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string }>,
+  feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string; createdAt: string }>,
   jobs: [] as JobRun[],
   agentFeeds: [] as AgentFeedItem[],
   preferenceSignals: [] as PreferenceSignal[],
@@ -230,7 +233,7 @@ class MemoryRadarDb extends RadarDb {
     const cutoff = Date.now() - MAX_TREND_AGE_DAYS * 24 * 60 * 60 * 1000;
     return [...memory.items]
       .filter((item) => {
-        if (item.status === 'dismissed' || item.status === 'viewed') return false;
+        if (item.status === 'dismissed' || item.status === 'viewed' || item.viewedAt) return false;
         if (item.status === 'saved' || item.status === 'tracking') return true;
         if (item.startsAt && new Date(item.startsAt).getTime() > Date.now()) return true;
         if (['trend', 'news', 'opportunity'].includes(item.kind) && !item.publishedAt) return false;
@@ -243,8 +246,11 @@ class MemoryRadarDb extends RadarDb {
 
   async listSavedItems(): Promise<RadarItem[]> {
     return [...memory.items]
-      .filter((item) => item.status === 'saved' || item.status === 'tracking')
-      .sort((a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime());
+      .filter((item) => item.savedAt || item.trackingAt || item.status === 'saved' || item.status === 'tracking')
+      .sort((a, b) =>
+        new Date(b.trackingAt ?? b.savedAt ?? b.updatedAt ?? b.createdAt ?? 0).getTime()
+        - new Date(a.trackingAt ?? a.savedAt ?? a.updatedAt ?? a.createdAt ?? 0).getTime()
+      );
   }
 
   async upsertItem(item: RadarItem): Promise<'inserted' | 'updated'> {
@@ -252,10 +258,19 @@ class MemoryRadarDb extends RadarDb {
       (existing) => existing.sourceType === item.sourceType && existing.externalId === item.externalId
     );
     if (index >= 0) {
-      memory.items[index] = { ...memory.items[index], ...item, updatedAt: new Date().toISOString() };
+      const existing = memory.items[index];
+      memory.items[index] = {
+        ...existing,
+        ...item,
+        status: existing.status,
+        savedAt: existing.savedAt,
+        trackingAt: existing.trackingAt,
+        viewedAt: existing.viewedAt,
+        updatedAt: new Date().toISOString()
+      };
       return 'updated';
     }
-    memory.items.push(item);
+    memory.items.push(withInitialEngagementState(item));
     return 'inserted';
   }
 
@@ -275,17 +290,24 @@ class MemoryRadarDb extends RadarDb {
   }
 
   async recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void> {
-    memory.feedback.push({ id: crypto.randomUUID(), itemId, action, reason });
-    if (action === 'save') await this.updateItemStatus(itemId, 'saved');
-    if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
-    if (action === 'unsave') await this.updateItemStatus(itemId, 'new');
-    if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
-    if (action === 'viewed') await this.updateItemStatus(itemId, 'viewed');
+    memory.feedback.push({ id: crypto.randomUUID(), itemId, action, reason, createdAt: new Date().toISOString() });
+    const index = memory.items.findIndex((item) => item.id === itemId);
+    if (index >= 0) memory.items[index] = applyFeedbackState(memory.items[index], action);
   }
 
   async updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void> {
     const item = memory.items.find((candidate) => candidate.id === itemId);
-    if (item) item.status = status;
+    if (!item) return;
+    if (status === 'dismissed') {
+      item.status = status;
+      item.savedAt = undefined;
+      item.trackingAt = undefined;
+    } else if (status === 'viewed') {
+      Object.assign(item, applyFeedbackState(item, 'viewed'));
+    } else {
+      item.status = status;
+    }
+    item.updatedAt = new Date().toISOString();
   }
 
   async logNotification(): Promise<void> {
@@ -373,11 +395,16 @@ class MemoryRadarDb extends RadarDb {
 
   async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    return memory.feedback
-      .filter(() => true)
+    const latestByItem = new Map<string, (typeof memory.feedback)[number]>();
+    for (const feedback of memory.feedback) {
+      if (feedback.createdAt < cutoff || !isEffectivePreferenceAction(feedback.action)) continue;
+      latestByItem.set(feedback.itemId, feedback);
+    }
+    return [...latestByItem.values()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((f) => {
         const item = memory.items.find((i) => i.id === f.itemId);
-        return { itemId: f.itemId, action: f.action, topics: item?.topics ?? [], sourceType: item?.sourceType ?? '', createdAt: cutoff };
+        return { itemId: f.itemId, action: f.action, topics: item?.topics ?? [], sourceType: item?.sourceType ?? '', createdAt: f.createdAt };
       });
   }
 
@@ -408,6 +435,9 @@ class MemoryRadarDb extends RadarDb {
       imageUrl: i.imageUrl,
       summary: i.summary,
       score: i.score,
+      status: i.status,
+      savedAt: i.savedAt,
+      trackingAt: i.trackingAt,
       createdAt: i.createdAt,
       relatedSources: i.relatedSources ?? []
     }));
@@ -525,6 +555,7 @@ class D1RadarDb extends RadarDb {
     try {
       const { results } = await this.db
         .prepare(`SELECT * FROM items WHERE status NOT IN ('dismissed', 'viewed')
+           AND viewed_at IS NULL
            AND (
              status IN ('saved', 'tracking')
              OR (starts_at IS NOT NULL AND starts_at > datetime('now'))
@@ -547,8 +578,8 @@ class D1RadarDb extends RadarDb {
     try {
       const { results } = await this.db
         .prepare(`SELECT * FROM items
-          WHERE status IN ('saved', 'tracking')
-          ORDER BY updated_at DESC, created_at DESC`)
+          WHERE saved_at IS NOT NULL OR tracking_at IS NOT NULL OR status IN ('saved', 'tracking')
+          ORDER BY COALESCE(tracking_at, saved_at, updated_at, created_at) DESC`)
         .all<ItemRow>();
       return results.map(itemFromRow);
     } catch (error) {
@@ -564,13 +595,15 @@ class D1RadarDb extends RadarDb {
         .bind(item.sourceType, item.externalId)
         .first<{ id: string }>();
 
+      const initialItem = withInitialEngagementState(item);
       await this.db
         .prepare(
           `INSERT INTO items (
           id, source_id, source_type, external_id, kind, title, summary, description, url, image_url,
-          location, starts_at, published_at, artists, topics, raw_json, score, status, related_sources, updated_at
+          location, starts_at, published_at, artists, topics, raw_json, score, status,
+          saved_at, tracking_at, viewed_at, related_sources, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(source_type, external_id) DO UPDATE SET
           title = excluded.title,
           summary = excluded.summary,
@@ -589,25 +622,28 @@ class D1RadarDb extends RadarDb {
           updated_at = CURRENT_TIMESTAMP`
         )
         .bind(
-          item.id,
-          item.sourceId,
-          item.sourceType,
-          item.externalId,
-          item.kind,
-          item.title,
-          item.summary,
-          item.description,
-          item.url ?? null,
-          item.imageUrl ?? null,
-          item.location ?? null,
-          item.startsAt ?? null,
-          item.publishedAt ?? null,
-          JSON.stringify(item.artists),
-          JSON.stringify(item.topics),
-          JSON.stringify(item.raw ?? {}),
-          item.score,
-          item.status,
-          JSON.stringify(item.relatedSources ?? [])
+          initialItem.id,
+          initialItem.sourceId,
+          initialItem.sourceType,
+          initialItem.externalId,
+          initialItem.kind,
+          initialItem.title,
+          initialItem.summary,
+          initialItem.description,
+          initialItem.url ?? null,
+          initialItem.imageUrl ?? null,
+          initialItem.location ?? null,
+          initialItem.startsAt ?? null,
+          initialItem.publishedAt ?? null,
+          JSON.stringify(initialItem.artists),
+          JSON.stringify(initialItem.topics),
+          JSON.stringify(initialItem.raw ?? {}),
+          initialItem.score,
+          initialItem.status,
+          initialItem.savedAt ?? null,
+          initialItem.trackingAt ?? null,
+          initialItem.viewedAt ?? null,
+          JSON.stringify(initialItem.relatedSources ?? [])
         )
         .run();
 
@@ -695,11 +731,7 @@ class D1RadarDb extends RadarDb {
         .bind(crypto.randomUUID(), itemId, action, reason ?? null)
         .run();
 
-      if (action === 'save') await this.updateItemStatus(itemId, 'saved');
-      if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
-      if (action === 'unsave') await this.updateItemStatus(itemId, 'new');
-      if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
-      if (action === 'viewed') await this.updateItemStatus(itemId, 'viewed');
+      await this.applyFeedbackState(itemId, action);
 
       // Also record as preference signal
       await this.insertPreferenceSignal({
@@ -733,13 +765,51 @@ class D1RadarDb extends RadarDb {
 
   async updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void> {
     try {
-      await this.db
-        .prepare('UPDATE items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(status, itemId)
-        .run();
+      if (status === 'dismissed') {
+        await this.db
+          .prepare('UPDATE items SET status = ?, saved_at = NULL, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .bind(status, itemId)
+          .run();
+      } else if (status === 'viewed') {
+        await this.applyFeedbackState(itemId, 'viewed');
+      } else {
+        await this.db
+          .prepare('UPDATE items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .bind(status, itemId)
+          .run();
+      }
     } catch (error) {
       if (isMissingTableError(error)) return new MemoryRadarDb().updateItemStatus(itemId, status);
       throw error;
+    }
+  }
+
+  private async applyFeedbackState(itemId: string, action: FeedbackAction): Promise<void> {
+    if (action === 'save') {
+      await this.db
+        .prepare(`UPDATE items SET status = 'saved', saved_at = CURRENT_TIMESTAMP, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(itemId)
+        .run();
+    } else if (action === 'track') {
+      await this.db
+        .prepare(`UPDATE items SET status = 'tracking', saved_at = COALESCE(saved_at, CURRENT_TIMESTAMP), tracking_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(itemId)
+        .run();
+    } else if (action === 'unsave') {
+      await this.db
+        .prepare(`UPDATE items SET status = CASE WHEN viewed_at IS NULL THEN 'new' ELSE 'viewed' END, saved_at = NULL, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(itemId)
+        .run();
+    } else if (action === 'not_relevant' || action === 'less_like_this') {
+      await this.db
+        .prepare(`UPDATE items SET status = 'dismissed', saved_at = NULL, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(itemId)
+        .run();
+    } else if (action === 'viewed') {
+      await this.db
+        .prepare(`UPDATE items SET status = CASE WHEN status IN ('saved', 'tracking') THEN status ELSE 'viewed' END, viewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(itemId)
+        .run();
     }
   }
 
@@ -1006,10 +1076,17 @@ class D1RadarDb extends RadarDb {
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const { results } = await this.db
         .prepare(
-          `SELECT f.item_id, f.action, i.topics, i.source_type, f.created_at
-           FROM feedback_events f
+          `WITH ranked_feedback AS (
+             SELECT f.*,
+               ROW_NUMBER() OVER (PARTITION BY f.item_id ORDER BY f.created_at DESC, f.id DESC) AS rank
+             FROM feedback_events f
+             WHERE f.created_at >= ?
+               AND f.action IN ('save', 'track', 'unsave', 'not_relevant', 'more_like_this', 'less_like_this')
+           )
+           SELECT f.item_id, f.action, i.topics, i.source_type, f.created_at
+           FROM ranked_feedback f
            LEFT JOIN items i ON f.item_id = i.id
-           WHERE f.created_at >= ?
+           WHERE f.rank = 1
            ORDER BY f.created_at DESC`
         )
         .bind(cutoff)
@@ -1077,7 +1154,7 @@ class D1RadarDb extends RadarDb {
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const { results } = await this.db
         .prepare(
-          `SELECT id, title, url, image_url, summary, score, related_sources, created_at
+          `SELECT id, title, url, image_url, summary, score, status, saved_at, tracking_at, related_sources, created_at
            FROM items WHERE created_at >= ? AND status != 'dismissed' ORDER BY created_at DESC LIMIT ?`
         )
         .bind(cutoff, limit)
@@ -1088,6 +1165,9 @@ class D1RadarDb extends RadarDb {
           image_url: string | null;
           summary: string | null;
           score: number;
+          status: RadarItem['status'];
+          saved_at: string | null;
+          tracking_at: string | null;
           related_sources: string | null;
           created_at: string;
         }>();
@@ -1098,6 +1178,9 @@ class D1RadarDb extends RadarDb {
         imageUrl: r.image_url ?? undefined,
         summary: r.summary ?? undefined,
         score: r.score,
+        status: r.status,
+        savedAt: r.saved_at ?? undefined,
+        trackingAt: r.tracking_at ?? undefined,
         createdAt: r.created_at,
         relatedSources: parseJson(r.related_sources ?? '[]', [])
       }));
@@ -1226,6 +1309,76 @@ class D1RadarDb extends RadarDb {
   }
 }
 
+function withInitialEngagementState(item: RadarItem): RadarItem {
+  const timestamp = item.updatedAt ?? item.createdAt ?? new Date().toISOString();
+  if (item.status === 'tracking') {
+    return {
+      ...item,
+      savedAt: item.savedAt ?? timestamp,
+      trackingAt: item.trackingAt ?? timestamp
+    };
+  }
+  if (item.status === 'saved') {
+    return { ...item, savedAt: item.savedAt ?? timestamp };
+  }
+  if (item.status === 'viewed') {
+    return { ...item, viewedAt: item.viewedAt ?? timestamp };
+  }
+  return item;
+}
+
+function applyFeedbackState(item: RadarItem, action: FeedbackAction): RadarItem {
+  const now = new Date().toISOString();
+  if (action === 'save') {
+    return { ...item, status: 'saved', savedAt: now, trackingAt: undefined, updatedAt: now };
+  }
+  if (action === 'track') {
+    return {
+      ...item,
+      status: 'tracking',
+      savedAt: item.savedAt ?? now,
+      trackingAt: now,
+      updatedAt: now
+    };
+  }
+  if (action === 'unsave') {
+    return {
+      ...item,
+      status: item.viewedAt ? 'viewed' : 'new',
+      savedAt: undefined,
+      trackingAt: undefined,
+      updatedAt: now
+    };
+  }
+  if (action === 'not_relevant' || action === 'less_like_this') {
+    return {
+      ...item,
+      status: 'dismissed',
+      savedAt: undefined,
+      trackingAt: undefined,
+      updatedAt: now
+    };
+  }
+  if (action === 'viewed') {
+    return {
+      ...item,
+      status: item.status === 'saved' || item.status === 'tracking' ? item.status : 'viewed',
+      viewedAt: now,
+      updatedAt: now
+    };
+  }
+  return item;
+}
+
+function isEffectivePreferenceAction(action: FeedbackAction): boolean {
+  return action === 'save'
+    || action === 'track'
+    || action === 'unsave'
+    || action === 'not_relevant'
+    || action === 'more_like_this'
+    || action === 'less_like_this';
+}
+
 function itemFromRow(row: ItemRow): RadarItem {
   return {
     id: row.id,
@@ -1246,6 +1399,9 @@ function itemFromRow(row: ItemRow): RadarItem {
     raw: parseJson(row.raw_json, {}),
     score: row.score,
     status: row.status,
+    savedAt: row.saved_at ?? undefined,
+    trackingAt: row.tracking_at ?? undefined,
+    viewedAt: row.viewed_at ?? undefined,
     relatedSources: parseJson(row.related_sources ?? '[]', []),
     createdAt: row.created_at,
     updatedAt: row.updated_at
