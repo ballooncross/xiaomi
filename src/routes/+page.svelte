@@ -1051,6 +1051,61 @@
   />
 </svelte:head>
 
+{#snippet preferenceManager()}
+  <div class="preference-search">
+    <svg class="mini-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="6.2"></circle>
+      <path d="m16 16 4.2 4.2"></path>
+    </svg>
+    <input bind:value={preferenceQuery} placeholder="搜索音乐人、主题、来源..." />
+  </div>
+
+  <div class="preference-tabs" aria-label="偏好筛选">
+    {#each preferenceTabs as tab}
+      <button
+        class:active={preferenceView === tab.id}
+        type="button"
+        onclick={() => (preferenceView = tab.id)}
+      >
+        {tab.label}
+      </button>
+    {/each}
+  </div>
+
+  <div class="preference-result-line">
+    <span>{preferenceMatchCount} 个匹配</span>
+    {#if preferenceMatchCount > filteredPreferenceTopics.length}
+      <span>显示前 {filteredPreferenceTopics.length} 个</span>
+    {/if}
+  </div>
+
+  <div class="preference-list">
+    {#each filteredPreferenceTopics as topic}
+      <article class:blocked={topic.mode === 'blacklist'} class="preference-row">
+        <div class="preference-row-main">
+          <strong>{topic.name}</strong>
+          <span>{preferenceMeta(topic)}</span>
+        </div>
+        <div class="topic-actions">
+          <button type="button" onclick={() => startEditTopic(topic)}>编辑</button>
+          {#if topic.mode === 'blacklist'}
+            <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'follow')}>
+              关注
+            </button>
+          {:else}
+            <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'blacklist')}>
+              屏蔽
+            </button>
+          {/if}
+          <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>移除</button>
+        </div>
+      </article>
+    {:else}
+      <p class="quiet-copy">没有匹配的偏好。你可以添加音乐人、兴趣、来源或屏蔽规则。</p>
+    {/each}
+  </div>
+{/snippet}
+
 <main class="app-shell">
   <nav class="topbar">
     <button class="brand" type="button" aria-label="回到首页" onclick={() => setView('home')}>
@@ -1562,18 +1617,21 @@
               <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
             </div>
           <div class="settings-grid compact">
-            <button type="button" onclick={() => (preferenceView = 'artist')}>
+            <button class:active={preferenceView === 'artist'} type="button" onclick={() => (preferenceView = 'artist')}>
               <strong>{watchTopics.length}</strong>
               <span>音乐人</span>
               </button>
-              <button type="button" onclick={() => (preferenceView = 'topic')}>
+              <button class:active={preferenceView === 'topic'} type="button" onclick={() => (preferenceView = 'topic')}>
                 <strong>{interestTopics.length}</strong>
                 <span>兴趣主题</span>
               </button>
-              <button type="button" onclick={() => (preferenceView = 'blacklist')}>
+              <button class:active={preferenceView === 'blacklist'} type="button" onclick={() => (preferenceView = 'blacklist')}>
                 <strong>{blacklistTopics.length}</strong>
                 <span>屏蔽规则</span>
               </button>
+            </div>
+            <div class="me-preference-manager">
+              {@render preferenceManager()}
             </div>
           </section>
         </section>
@@ -1889,58 +1947,7 @@
           </button>
         </div>
 
-        <div class="preference-search">
-          <svg class="mini-search-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.2"></circle>
-            <path d="m16 16 4.2 4.2"></path>
-          </svg>
-          <input bind:value={preferenceQuery} placeholder="搜索音乐人、主题、来源..." />
-        </div>
-
-        <div class="preference-tabs" aria-label="偏好筛选">
-          {#each preferenceTabs as tab}
-            <button
-              class:active={preferenceView === tab.id}
-              type="button"
-              onclick={() => (preferenceView = tab.id)}
-            >
-              {tab.label}
-            </button>
-          {/each}
-        </div>
-
-        <div class="preference-result-line">
-          <span>{preferenceMatchCount} 个匹配</span>
-          {#if preferenceMatchCount > filteredPreferenceTopics.length}
-            <span>显示前 {filteredPreferenceTopics.length} 个</span>
-          {/if}
-        </div>
-
-        <div class="preference-list">
-          {#each filteredPreferenceTopics as topic}
-            <article class:blocked={topic.mode === 'blacklist'} class="preference-row">
-              <div class="preference-row-main">
-                <strong>{topic.name}</strong>
-                <span>{preferenceMeta(topic)}</span>
-              </div>
-              <div class="topic-actions">
-                <button type="button" onclick={() => startEditTopic(topic)}>编辑</button>
-                {#if topic.mode === 'blacklist'}
-                  <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'follow')}>
-                    关注
-                  </button>
-                {:else}
-                  <button type="button" disabled={topicPending === topic.id} onclick={() => updateTopicMode(topic, 'blacklist')}>
-                    屏蔽
-                  </button>
-                {/if}
-                <button type="button" disabled={topicPending === topic.id} onclick={() => removeTopic(topic)}>移除</button>
-              </div>
-            </article>
-          {:else}
-            <p class="quiet-copy">没有匹配的偏好。你可以添加音乐人、兴趣、来源或屏蔽规则。</p>
-          {/each}
-        </div>
+        {@render preferenceManager()}
       </section>
 
       <section class="mini-card">
@@ -3609,6 +3616,28 @@
     color: var(--muted);
     font-size: 12px;
     font-weight: 850;
+  }
+
+  .settings-grid.compact button {
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .settings-grid.compact button:hover {
+    border-color: var(--jade);
+  }
+
+  .settings-grid.compact button.active {
+    border-color: var(--jade);
+    background: rgba(215, 242, 220, 0.55);
+  }
+
+  .me-preference-manager {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
   }
 
   .side-panel {
