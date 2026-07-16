@@ -1,5 +1,6 @@
 export type WatchType = 'artist' | 'topic' | 'source';
 export type WatchMode = 'follow' | 'blacklist';
+export type OptimizeStatus = 'pending' | 'optimized' | 'locked';
 export type ItemKind = 'concert' | 'trend' | 'news' | 'opportunity' | 'insight';
 export type ItemStatus = 'new' | 'saved' | 'tracking' | 'dismissed' | 'viewed';
 export type FeedbackAction = 'save' | 'track' | 'unsave' | 'not_relevant' | 'more_like_this' | 'less_like_this' | 'viewed' | 'duplicate';
@@ -16,6 +17,8 @@ export type WatchTopic = {
   priority: number;
   mode: WatchMode;
   enabled: boolean;
+  /** Whether the local agent may auto-refine this interest (default 'pending'). */
+  optimizeStatus?: OptimizeStatus;
   createdAt?: string;
   updatedAt?: string;
 };

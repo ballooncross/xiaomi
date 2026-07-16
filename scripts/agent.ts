@@ -18,6 +18,7 @@
 import { runAiSearch } from './lib/ai/index';
 import { config } from './lib/config';
 import { processDevRequests } from './lib/dev-agent';
+import { optimizeInterests } from './lib/optimize-interests';
 import { hydrateImageForUrl } from './lib/images';
 import { runSource } from './lib/fetch-engine';
 import { fetchContext, submitFeeds, submitSignals } from './lib/radar-api';
@@ -63,6 +64,13 @@ async function tick() {
     await processDevRequests();
   } catch (error) {
     log(`Dev request error: ${error}`);
+  }
+
+  // Refine newly added interests into clean, searchable topics (once each)
+  try {
+    await optimizeInterests();
+  } catch (error) {
+    log(`Interest optimizer error: ${error}`);
   }
 
   const decision = decideScanTier(state, context);

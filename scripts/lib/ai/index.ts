@@ -12,33 +12,38 @@ import type { AgentContext } from '../types';
  */
 export async function runAiSearch(context: AgentContext): Promise<AiSearchResult> {
   const empty: AiSearchResult = { items: [], suggestedSources: [], derivedAvoid: [] };
-  const backend = config.aiBackend;
-  if (backend === 'none') return empty;
+  if (config.aiBackend === 'none') return empty;
 
-  const prompt = buildTrendPrompt(context);
-  let text: string | undefined;
+  const text = await askAi(buildTrendPrompt(context));
+  if (!text) return empty;
+  const result = parseAiResponse(text, config.aiBackend);
+  log(`AI search (${config.aiBackend}): ${result.items.length} items, ${result.suggestedSources.length} source suggestions`);
+  return result;
+}
+
+/**
+ * Send a single prompt to the configured AI backend and return raw text.
+ * Shared by trend search and interest optimization. Returns undefined when the
+ * backend is disabled, unavailable, or errors out.
+ */
+export async function askAi(prompt: string): Promise<string | undefined> {
+  const backend = config.aiBackend;
+  if (backend === 'none') return undefined;
 
   try {
     if (backend === 'codex')
-      text = await callCli('codex', ['exec', '--skip-git-repo-check', '-c', 'model_reasoning_effort=low', prompt]);
-    else if (backend === 'claude-code') text = await callCli('claude', ['-p', prompt]);
-    else if (backend === 'chatgpt') text = await callOpenAiCompatible('https://api.openai.com/v1/chat/completions', config.openaiApiKey, config.openaiModel, prompt);
-    else if (backend === 'deepseek') text = await callOpenAiCompatible('https://api.deepseek.com/chat/completions', config.deepseekApiKey, config.deepseekModel, prompt);
-    else if (backend === 'claude') text = await callClaude(prompt);
-    else if (backend === 'ollama') text = await callOllama(prompt);
-    else {
-      log(`Unknown AI_BACKEND "${backend}", skipping AI search`);
-      return empty;
-    }
+      return await callCli('codex', ['exec', '--skip-git-repo-check', '-c', 'model_reasoning_effort=low', prompt]);
+    if (backend === 'claude-code') return await callCli('claude', ['-p', prompt]);
+    if (backend === 'chatgpt') return await callOpenAiCompatible('https://api.openai.com/v1/chat/completions', config.openaiApiKey, config.openaiModel, prompt);
+    if (backend === 'deepseek') return await callOpenAiCompatible('https://api.deepseek.com/chat/completions', config.deepseekApiKey, config.deepseekModel, prompt);
+    if (backend === 'claude') return await callClaude(prompt);
+    if (backend === 'ollama') return await callOllama(prompt);
+    log(`Unknown AI_BACKEND "${backend}", skipping AI call`);
+    return undefined;
   } catch (error) {
-    log(`AI search error (${backend}): ${error}`);
-    return empty;
+    log(`AI call error (${backend}): ${error}`);
+    return undefined;
   }
-
-  if (!text) return empty;
-  const result = parseAiResponse(text, backend);
-  log(`AI search (${backend}): ${result.items.length} items, ${result.suggestedSources.length} source suggestions`);
-  return result;
 }
 
 /** Run a logged-in CLI (codex / claude) non-interactively and capture stdout. */

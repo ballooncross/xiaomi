@@ -46,12 +46,14 @@
   let newWatchCategory = $state('business');
   let newWatchPriority = $state(4);
   let newWatchMode = $state<WatchTopic['mode']>('follow');
+  let newWatchOptimize = $state(true);
   let editingTopicId = $state<string | null>(null);
   let editWatchName = $state('');
   let editWatchType = $state<WatchTopic['type']>('topic');
   let editWatchCategory = $state('business');
   let editWatchPriority = $state(3);
   let editWatchMode = $state<WatchTopic['mode']>('follow');
+  let editWatchOptimize = $state(true);
   let preferenceQuery = $state('');
   let preferenceView = $state<PreferenceView>('all');
   let feedbackPending = $state<string | null>(null);
@@ -575,6 +577,7 @@
       return;
     }
 
+    const optimizeStatus: WatchTopic['optimizeStatus'] = newWatchOptimize ? 'pending' : 'locked';
     const optimisticTopic: WatchTopic = {
       id: `${newWatchType}-${name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-')}`,
       type: newWatchType,
@@ -583,7 +586,8 @@
       category: newWatchCategory,
       priority: newWatchPriority,
       mode: newWatchMode,
-      enabled: true
+      enabled: true,
+      optimizeStatus
     };
     topics = [optimisticTopic, ...topics.filter((t) => t.id !== optimisticTopic.id)];
     newWatchName = '';
@@ -597,7 +601,8 @@
         type: newWatchType,
         category: newWatchCategory,
         priority: newWatchPriority,
-        mode: newWatchMode
+        mode: newWatchMode,
+        optimizeStatus
       })
     }).then(async (response) => {
       if (response.ok) {
@@ -615,6 +620,7 @@
     editWatchCategory = topic.category;
     editWatchPriority = topic.priority;
     editWatchMode = topic.mode;
+    editWatchOptimize = (topic.optimizeStatus ?? 'optimized') === 'pending';
     editWatchError = '';
     addWatchOpen = false;
     searchOpen = false;
@@ -630,15 +636,25 @@
     }
 
     const editId = editingTopicId;
+    const previous = topics.find((t) => t.id === editId);
+    const prevStatus = previous?.optimizeStatus ?? 'optimized';
+    // Checked = open it back up for the agent; unchecked keeps whatever
+    // non-pending state it had (already-optimized stays optimized, else locked).
+    const optimizeStatus: WatchTopic['optimizeStatus'] = editWatchOptimize
+      ? 'pending'
+      : prevStatus === 'pending'
+        ? 'locked'
+        : prevStatus;
     const optimisticTopic: WatchTopic = {
       id: editId,
       type: editWatchType,
       name,
-      aliases: topics.find((t) => t.id === editId)?.aliases ?? [],
+      aliases: previous?.aliases ?? [],
       category: editWatchCategory,
       priority: editWatchPriority,
       mode: editWatchMode,
-      enabled: true
+      enabled: true,
+      optimizeStatus
     };
     topics = topics.map((t) => (t.id === editId ? optimisticTopic : t));
     editingTopicId = null;
@@ -653,7 +669,8 @@
         category: editWatchCategory,
         priority: editWatchPriority,
         mode: editWatchMode,
-        enabled: true
+        enabled: true,
+        optimizeStatus
       })
     }).then(async (response) => {
       if (response.ok) {
@@ -1083,7 +1100,12 @@
     {#each filteredPreferenceTopics as topic}
       <article class:blocked={topic.mode === 'blacklist'} class="preference-row">
         <div class="preference-row-main">
-          <strong>{topic.name}</strong>
+          <strong>
+            {topic.name}
+            {#if (topic.optimizeStatus ?? 'optimized') === 'pending'}
+              <span class="optimize-badge" title="等待本地 AI 代理优化成更精准的关键词">待 AI 优化</span>
+            {/if}
+          </strong>
           <span>{preferenceMeta(topic)}</span>
         </div>
         <div class="topic-actions">
@@ -1227,6 +1249,10 @@
                   <option value="follow">关注</option>
                   <option value="blacklist">屏蔽</option>
                 </select>
+                <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
+                  <input type="checkbox" bind:checked={newWatchOptimize} />
+                  AI 优化
+                </label>
                 <button class="small-button primary" disabled={addWatchPending} onclick={addWatchTopic}>
                   {addWatchPending ? '添加中...' : '添加'}
                 </button>
@@ -1288,6 +1314,10 @@
                   <option value="follow">关注</option>
                   <option value="blacklist">屏蔽</option>
                 </select>
+                <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
+                  <input type="checkbox" bind:checked={editWatchOptimize} />
+                  AI 优化
+                </label>
                 <button class="small-button primary" disabled={topicPending === editingTopicId} onclick={saveTopicEdit}>
                   {topicPending === editingTopicId ? '保存中...' : '保存'}
                 </button>
@@ -2016,6 +2046,10 @@
           <option value="follow">关注</option>
           <option value="blacklist">屏蔽</option>
         </select>
+        <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
+          <input type="checkbox" bind:checked={newWatchOptimize} />
+          AI 优化
+        </label>
       </div>
       {#if addWatchError}<p class="form-error">{addWatchError}</p>{/if}
       <div class="modal-actions">
@@ -2065,6 +2099,10 @@
           <option value="follow">关注</option>
           <option value="blacklist">屏蔽</option>
         </select>
+        <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
+          <input type="checkbox" bind:checked={editWatchOptimize} />
+          AI 优化
+        </label>
       </div>
       {#if editWatchError}<p class="form-error">{editWatchError}</p>{/if}
       <div class="modal-actions">
@@ -2499,6 +2537,24 @@
     padding: 0 10px;
     font-size: 12px;
     font-weight: 900;
+  }
+
+  .optimize-check {
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .optimize-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #fff1c9;
+    border: 1px solid #f0d896;
+    color: #8a6d1a;
+    font-size: 10px;
+    font-weight: 800;
+    vertical-align: middle;
   }
 
   .search-row input,

@@ -97,6 +97,7 @@ type TopicRow = {
   priority: number;
   mode?: WatchTopic['mode'];
   enabled: number;
+  optimize_status?: string;
   created_at: string;
   updated_at: string;
 };
@@ -510,8 +511,8 @@ class D1RadarDb extends RadarDb {
     try {
       await this.db
         .prepare(
-          `INSERT INTO watch_topics (id, type, name, aliases, category, priority, mode, enabled, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `INSERT INTO watch_topics (id, type, name, aliases, category, priority, mode, enabled, optimize_status, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(id) DO UPDATE SET
            type = excluded.type,
            name = excluded.name,
@@ -520,6 +521,7 @@ class D1RadarDb extends RadarDb {
            priority = excluded.priority,
            mode = excluded.mode,
            enabled = excluded.enabled,
+           optimize_status = excluded.optimize_status,
            updated_at = CURRENT_TIMESTAMP`
         )
         .bind(
@@ -530,7 +532,8 @@ class D1RadarDb extends RadarDb {
           topic.category,
           topic.priority,
           topic.mode,
-          topic.enabled ? 1 : 0
+          topic.enabled ? 1 : 0,
+          topic.optimizeStatus ?? 'pending'
         )
         .run();
     } catch (error) {
@@ -1418,6 +1421,8 @@ function topicFromRow(row: TopicRow): WatchTopic {
     priority: row.priority,
     mode: row.mode ?? 'follow',
     enabled: row.enabled === 1,
+    // Rows predating the column read as already optimized so they aren't churned
+    optimizeStatus: (row.optimize_status as WatchTopic['optimizeStatus']) ?? 'optimized',
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

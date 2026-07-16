@@ -67,7 +67,10 @@ function topicFromBody(body: Partial<WatchTopic>): WatchTopic {
     category: body.category ?? (type === 'artist' ? 'concerts' : 'general'),
     priority: clampPriority(body.priority),
     mode: body.mode ?? 'follow',
-    enabled: body.enabled ?? true
+    enabled: body.enabled ?? true,
+    // New interests default to open-for-optimization; the client sends 'locked'
+    // to opt out, or 'optimized' is set by the agent after it refines them.
+    optimizeStatus: body.optimizeStatus ?? 'pending'
   };
 }
 
