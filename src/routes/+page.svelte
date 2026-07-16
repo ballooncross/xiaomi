@@ -8,7 +8,7 @@
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { PageData } from './$types';
 
-  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'me';
+  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'me' | 'saved';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & {
     nextDate: string;
@@ -26,11 +26,13 @@
     concerts: '/concerts',
     trends: '/trends',
     dates: '/dates',
-    me: '/me'
+    me: '/me',
+    saved: '/saved'
   };
 
   let { data }: { data: PageData } = $props();
   let items = $state<RadarItem[]>([]);
+  let savedItems = $state<RadarItem[]>([]);
   let topics = $state<WatchTopic[]>([]);
   let reminders = $state<ReminderView[]>([]);
   let activeView = $state<View>(viewFromPath(page.url.pathname));
@@ -128,6 +130,7 @@
 
   $effect(() => {
     items = data.items;
+    savedItems = data.savedItems;
     topics = data.topics;
     reminders = data.reminders;
     icaTool = data.icaTool;
@@ -141,6 +144,7 @@
     { id: 'dates', label: '日期' },
     { id: 'me', label: '我的' }
   ];
+  const navigationView = $derived(activeView === 'saved' ? 'me' : activeView);
 
   const filters = [
     { id: 'for-you', label: '推荐' },
@@ -167,9 +171,8 @@
         if (activeView === 'concerts') return item.kind === 'concert' && (searching || !hidden);
         if (activeView === 'trends') return item.kind !== 'concert' && (searching || !hidden);
         if (activeView === 'dates') return false;
-        if (activeView === 'me') return item.status === 'saved' || item.status === 'tracking';
+        if (activeView === 'me' || activeView === 'saved') return false;
         if (activeFilter === 'for-you') return searching || !hidden;
-        if (activeFilter === 'saved') return item.status === 'saved' || item.status === 'tracking';
         return item.topics.some((topic) => topic.toLowerCase().includes(activeFilter));
       })
       .filter((item) => matchesSearch(item, searchQuery))
@@ -188,6 +191,12 @@
       .filter((item) => item.kind === 'concert' && item.startsAt && item.status !== 'dismissed' && item.status !== 'viewed')
       .slice(0, 4)
   );
+  const savedViewItems = $derived(
+    savedItems
+      .filter((item) => item.status === 'saved' || item.status === 'tracking')
+      .filter((item) => matchesSearch(item, searchQuery))
+  );
+  const savedItemCount = $derived(savedItems.filter((item) => item.status === 'saved' || item.status === 'tracking').length);
   const watchTopics = $derived(topics.filter((topic) => topic.type === 'artist' && topic.mode !== 'blacklist'));
   const interestTopics = $derived(topics.filter((topic) => topic.type !== 'artist' && topic.mode !== 'blacklist'));
   const blacklistTopics = $derived(topics.filter((topic) => topic.mode === 'blacklist'));
@@ -235,14 +244,17 @@
     });
 
     if (response.ok) {
-      items = items.map((item) => {
+      const updateItemStatus = (item: RadarItem): RadarItem => {
         if (item.id !== itemId) return item;
         if (action === 'save') return { ...item, status: 'saved' };
         if (action === 'track') return { ...item, status: 'tracking' };
+        if (action === 'unsave') return { ...item, status: 'new' };
         if (action === 'not_relevant' || action === 'less_like_this') return { ...item, status: 'dismissed' };
         if (action === 'viewed') return { ...item, status: 'viewed' };
         return item;
-      });
+      };
+      items = items.map(updateItemStatus);
+      savedItems = savedItems.map(updateItemStatus);
     }
     feedbackPending = null;
   }
@@ -496,6 +508,14 @@
     activeView = view;
     activeFilter = 'for-you';
     await syncViewPath(view);
+  }
+
+  async function selectFilter(filterId: string) {
+    if (filterId === 'saved') {
+      await setView('saved');
+      return;
+    }
+    activeFilter = filterId;
   }
 
   async function syncViewPath(view: View) {
@@ -1014,10 +1034,10 @@
         <span>凡人咖啡馆</span>
       </div>
     </button>
-    <div class="primary-nav desktop-nav" data-active={activeView} aria-label="主导航">
+    <div class="primary-nav desktop-nav" data-active={navigationView} aria-label="主导航">
       <span class="nav-indicator" aria-hidden="true"></span>
       {#each navItems as item}
-        <button class:active={activeView === item.id} type="button" onclick={() => setView(item.id)}>
+        <button class:active={navigationView === item.id} type="button" onclick={() => setView(item.id)}>
           {item.label}
         </button>
       {/each}
@@ -1034,7 +1054,7 @@
     </div>
   </nav>
 
-  <div class:no-side-panel={activeView === 'dates' || activeView === 'me'} class="app-main">
+  <div class:no-side-panel={activeView === 'dates' || activeView === 'me' || activeView === 'saved'} class="app-main">
     <section class="feed">
       {#if searchOpen || digestOpen}
         <section class="action-panel">
@@ -1265,6 +1285,73 @@
           onEdit={openReminderForm}
           onDelete={deleteReminder}
         />
+      {:else if activeView === 'saved'}
+        <section class="saved-workspace">
+          <div class="saved-head">
+            <div>
+              <div class="eyebrow">我的收藏</div>
+              <h1>已保存</h1>
+              <p>稍后回来查看已保存和重点跟踪的内容。</p>
+            </div>
+            <button class="small-button" type="button" onclick={() => setView('me')}>返回我的</button>
+          </div>
+          <div class="section-title">
+            <h2>全部收藏</h2>
+            <span>{savedViewItems.length} 条</span>
+          </div>
+          {#if savedViewItems.length > 0}
+            <section class="timeline">
+              {#each savedViewItems as item}
+                <article class="timeline-item">
+                  <div class="date trend-date">
+                    <span><small>{itemKindLabel(item)}</small>{item.score}</span>
+                  </div>
+                  <img class="timeline-image" src={imageForItem(item)} alt="" loading="lazy" />
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.summary}</p>
+                    <div class="timeline-links">
+                      {#if item.url}
+                        <a class="source-link inline-source" href={item.url} target="_blank" rel="noreferrer">
+                          来源 · {sourceLabel(item)}
+                        </a>
+                      {/if}
+                      {#each (item.relatedSources ?? []).slice(0, 4) as related}
+                        <a class="source-link inline-source related-source" href={related.url} target="_blank" rel="noreferrer">
+                          {related.source}
+                        </a>
+                      {/each}
+                    </div>
+                    <div class="story-actions timeline-actions">
+                      {#if item.status === 'saved'}
+                        <button
+                          class="small-button primary"
+                          disabled={feedbackPending === `${item.id}:track`}
+                          onclick={() => sendFeedback(item.id, 'track')}
+                        >
+                          重点跟踪
+                        </button>
+                      {/if}
+                      <button
+                        class="small-button"
+                        disabled={feedbackPending === `${item.id}:unsave`}
+                        onclick={() => sendFeedback(item.id, 'unsave')}
+                      >
+                        取消保存
+                      </button>
+                      <span class="chip hot">{item.status === 'tracking' ? '重点跟踪' : '已保存'}</span>
+                    </div>
+                  </div>
+                </article>
+              {/each}
+            </section>
+          {:else}
+            <section class="empty-state">
+              <h3>{savedItemCount > 0 ? '没有匹配的收藏' : '还没有保存内容'}</h3>
+              <p>{savedItemCount > 0 ? '试试其他搜索关键词。' : '在趋势或演出内容上点击“保存”，之后就能从这里查看。'}</p>
+            </section>
+          {/if}
+        </section>
       {:else if activeView === 'me'}
         <section class="me-workspace">
           <div class="settings-grid">
@@ -1278,6 +1365,11 @@
               <strong>{nextReminder ? `${nextReminder.daysLeft} 天` : '暂无'}</strong>
               <p>{nextReminder ? `${nextReminder.title} · ${nextReminder.dateLabel}` : '添加生日或纪念日后会显示在这里。'}</p>
             </article>
+            <button class="settings-card saved-entry" type="button" onclick={() => setView('saved')}>
+              <span>收藏</span>
+              <strong>{savedItemCount}</strong>
+              <p>查看已保存和重点跟踪的内容 <b aria-hidden="true">→</b></p>
+            </button>
           </div>
 
           <section class="tools-panel">
@@ -1509,7 +1601,7 @@
               class:active={activeFilter === filter.id}
               class="tab"
               type="button"
-              onclick={() => (activeFilter = filter.id)}
+              onclick={() => selectFilter(filter.id)}
             >
               {filter.label}
             </button>
@@ -2039,10 +2131,10 @@
   </div>
 {/if}
 
-<nav class="primary-nav mobile-nav" data-active={activeView} aria-label="主导航">
+<nav class="primary-nav mobile-nav" data-active={navigationView} aria-label="主导航">
   <span class="nav-indicator" aria-hidden="true"></span>
   {#each navItems as item}
-    <button class:active={activeView === item.id} type="button" onclick={() => setView(item.id)}>
+    <button class:active={navigationView === item.id} type="button" onclick={() => setView(item.id)}>
       {item.label}
     </button>
   {/each}
@@ -3126,9 +3218,29 @@
     gap: 14px;
   }
 
+  .saved-workspace {
+    display: grid;
+  }
+
+  .saved-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+  }
+
+  .saved-head h1 {
+    margin: 7px 0 8px;
+  }
+
+  .saved-head p {
+    margin: 0;
+    color: var(--muted);
+  }
+
   .settings-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 14px;
   }
 
@@ -3421,6 +3533,23 @@
     color: var(--muted);
     font-size: 13px;
     line-height: 1.4;
+  }
+
+  .saved-entry {
+    color: var(--ink);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: border-color 160ms ease, transform 160ms ease;
+  }
+
+  .saved-entry:hover {
+    border-color: var(--jade);
+    transform: translateY(-1px);
+  }
+
+  .saved-entry b {
+    color: var(--accent);
   }
 
   .notebook-head {

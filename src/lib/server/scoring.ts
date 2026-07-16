@@ -78,6 +78,7 @@ function matchesTopic(haystack: string, topic: WatchTopic): boolean {
 export function statusForFeedback(action: FeedbackAction): RadarItem['status'] | undefined {
   if (action === 'save') return 'saved';
   if (action === 'track') return 'tracking';
+  if (action === 'unsave') return 'new';
   if (action === 'not_relevant' || action === 'less_like_this') return 'dismissed';
   if (action === 'viewed') return 'viewed';
   return undefined;

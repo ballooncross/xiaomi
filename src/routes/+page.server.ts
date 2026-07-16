@@ -10,8 +10,9 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ platform }) => {
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
   const db = getDb(env);
-  const [items, topics, reminders, icaTool, cronJobs] = await Promise.all([
+  const [items, savedItems, topics, reminders, icaTool, cronJobs] = await Promise.all([
     db.listItems(80),
+    db.listSavedItems(),
     db.listTopics(),
     db.listReminders(),
     getIcaToolStatus(env),
@@ -20,6 +21,7 @@ export const load: PageServerLoad = async ({ platform }) => {
 
   return {
     items,
+    savedItems,
     topics,
     reminders: sortReminders(reminders).map((reminder) => ({ ...reminder, note: '' })),
     icaTool,

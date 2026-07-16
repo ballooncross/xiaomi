@@ -154,6 +154,7 @@ export abstract class RadarDb {
   abstract upsertTopic(topic: WatchTopic): Promise<void>;
   abstract deleteTopic(topicId: string): Promise<void>;
   abstract listItems(limit?: number): Promise<RadarItem[]>;
+  abstract listSavedItems(): Promise<RadarItem[]>;
   abstract upsertItem(item: RadarItem): Promise<'inserted' | 'updated'>;
   abstract listReminders(): Promise<DateReminder[]>;
   abstract upsertReminder(reminder: DateReminder): Promise<void>;
@@ -240,6 +241,12 @@ class MemoryRadarDb extends RadarDb {
       .slice(0, limit);
   }
 
+  async listSavedItems(): Promise<RadarItem[]> {
+    return [...memory.items]
+      .filter((item) => item.status === 'saved' || item.status === 'tracking')
+      .sort((a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime());
+  }
+
   async upsertItem(item: RadarItem): Promise<'inserted' | 'updated'> {
     const index = memory.items.findIndex(
       (existing) => existing.sourceType === item.sourceType && existing.externalId === item.externalId
@@ -271,6 +278,7 @@ class MemoryRadarDb extends RadarDb {
     memory.feedback.push({ id: crypto.randomUUID(), itemId, action, reason });
     if (action === 'save') await this.updateItemStatus(itemId, 'saved');
     if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
+    if (action === 'unsave') await this.updateItemStatus(itemId, 'new');
     if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
     if (action === 'viewed') await this.updateItemStatus(itemId, 'viewed');
   }
@@ -535,6 +543,20 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async listSavedItems(): Promise<RadarItem[]> {
+    try {
+      const { results } = await this.db
+        .prepare(`SELECT * FROM items
+          WHERE status IN ('saved', 'tracking')
+          ORDER BY updated_at DESC, created_at DESC`)
+        .all<ItemRow>();
+      return results.map(itemFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb().listSavedItems();
+      throw error;
+    }
+  }
+
   async upsertItem(item: RadarItem): Promise<'inserted' | 'updated'> {
     try {
       const existing = await this.db
@@ -675,6 +697,7 @@ class D1RadarDb extends RadarDb {
 
       if (action === 'save') await this.updateItemStatus(itemId, 'saved');
       if (action === 'track') await this.updateItemStatus(itemId, 'tracking');
+      if (action === 'unsave') await this.updateItemStatus(itemId, 'new');
       if (action === 'not_relevant' || action === 'less_like_this') await this.updateItemStatus(itemId, 'dismissed');
       if (action === 'viewed') await this.updateItemStatus(itemId, 'viewed');
 
