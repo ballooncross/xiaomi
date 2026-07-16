@@ -76,6 +76,66 @@ All under `/api/agent/`, authenticated with the `x-admin-token` header:
 
 The 添加关注 card has a free-text box ("我关注追觅 IPO、财务和公司架构新闻，但不关心具体产品发布"). The text is stored verbatim as a Layer 1 `interest` signal via `POST /api/interests` and the context recompiles immediately. The AI backend receives the raw text and respects exclusions when picking items; during full/deep scans it also extracts explicit exclusions into `derivedAvoid`, which come back as `not_interested` signals so the keyword scorer and blacklist learn them too.
 
+## Writing interests that actually surface trends
+
+How you phrase an interest determines the search query the agent runs. `buildQueries` (in `scripts/lib/sources.ts`) turns each watch topic into search terms from its **name + aliases**, splitting Latin and CJK terms into separate `en` and `zh` queries.
+
+A watch topic whose name is a long descriptive sentence becomes one literal query and returns little. Example of what *not* to do:
+
+- Topic name: `新加坡展览礼品节宠物节等 比如九月份的another coffee festival`
+- Generated query (zh): `新加坡展览礼品节宠物节等 比如九月份的another coffee festival` — a whole sentence, so Google News/GDELT find nothing useful.
+
+Prefer several focused topics with short keyword aliases, including English ones:
+
+| Topic name | Aliases |
+|---|---|
+| `Singapore Coffee Festival` | `新加坡咖啡节`, `coffee festival Singapore` |
+| `Singapore Pet Expo` | `宠物节`, `Pet Expo Singapore` |
+| `Singapore gift fair` | `礼品节`, `gift fair Singapore`, `exhibitions Singapore` |
+
+Guidelines:
+
+- Keep the topic name to a few keywords, not a sentence.
+- Add both Chinese and English aliases so the agent runs a `zh` **and** an `en` query.
+- Put nuance ("but not X") in the **free-text interest** box instead — that goes to the AI backend, which handles exclusions (see *Natural language interests*). Watch-topic names are used verbatim for keyword search and cannot express exclusions.
+
+## Checking whether an interest is being searched
+
+After adding an interest, verify each step of the pipeline:
+
+**1. Is it stored?** Free-text interests land in `preference_signals`; the 添加关注 keyword form creates a `watch_topics` row.
+
+```bash
+# watch topic
+npx wrangler d1 execute personal-radar --remote --command \
+  "SELECT name, aliases, mode, enabled FROM watch_topics WHERE name LIKE '%coffee%';"
+# free-text interest
+npx wrangler d1 execute personal-radar --remote --command \
+  "SELECT signal_value, source, created_at FROM preference_signals WHERE signal_type='interest' ORDER BY created_at DESC LIMIT 5;"
+```
+
+**2. Does the agent see it?** It must appear in the live context (`watchTopics`, or `structuredContext.interestProfile.naturalLanguageInputs` for free text):
+
+```bash
+curl -s -H "x-admin-token: $TOKEN" $RADAR_URL/api/agent/context | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print([t['name'] for t in d['watchTopics']])"
+```
+
+Free-text interests only take effect after a context recompile — `POST /api/interests` recompiles immediately, but if you inserted a signal directly, force it with `POST /api/agent/context/compile`.
+
+**3. Was it actually searched?** Each scan writes a `free_text` log signal, and a new topic triggers a targeted scan immediately:
+
+```bash
+npx wrangler d1 execute personal-radar --remote --command \
+  "SELECT signal_value, created_at FROM preference_signals WHERE signal_value LIKE '%coffee festival%' ORDER BY created_at DESC LIMIT 5;"
+```
+
+**4. Watch the query live.** A dry-run scan logs a `Searching "<query>"` line for every topic — the fastest way to see the exact query and confirm it is not a whole sentence:
+
+```bash
+npm run agent:dry
+```
+
 ## Dedup
 
 `src/lib/server/dedup.ts` clusters items by title similarity (outlet suffixes stripped, stopwords removed, CJK bigrams) and merges duplicate coverage into one item with `relatedSources` links. Used by the cron trend fetch and the agent feed endpoint. One-time cleanup of stored duplicates:
