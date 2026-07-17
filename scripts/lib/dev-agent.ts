@@ -1,5 +1,7 @@
 import { execFileSync, execSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { existsSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { config, radarHeaders } from './config';
 import { log } from './utils';
 
@@ -55,9 +57,6 @@ async function handleRequest(request: DevRequest): Promise<void> {
   log(`Processing dev request: "${request.text.slice(0, 60)}..."`);
   await updateRequest(request.id, { status: 'in_progress' });
 
-  const originalBranch = git('rev-parse --abbrev-ref HEAD');
-  const restoreBranch = () => { try { git(`checkout ${originalBranch}`); } catch { /* best effort */ } };
-
   try {
     // First: ask the AI to assess whether this is safe to auto-implement
     const assessment = await assessRequest(request.text);
@@ -72,77 +71,100 @@ async function handleRequest(request: DevRequest): Promise<void> {
       return;
     }
 
-    // Safe to auto-implement: invoke codex/claude to make the change
-    log('  Assessed as safe to auto-implement. Running codex...');
-    const branch = `auto/${request.id.slice(0, 8)}`;
-
-    git('fetch origin');
-    git('checkout -B', branch, 'origin/main');
-
-    const cliResult = runImplementation(request.text);
-    if (!cliResult.success) {
-      restoreBranch();
-      await updateRequest(request.id, { status: 'rejected', response: `Implementation failed: ${cliResult.error}` });
-      return;
-    }
-
-    // Check how many files changed
-    const diffStat = git('diff --stat HEAD');
-    const changedFiles = diffStat.split('\n').filter((line) => line.includes('|')).length;
-    if (changedFiles === 0) {
-      restoreBranch();
-      await updateRequest(request.id, { status: 'completed', response: 'No changes needed (codex made no modifications).' });
-      return;
-    }
-
-    if (changedFiles > MAX_CHANGED_FILES) {
-      restoreBranch();
-      await updateRequest(request.id, {
-        status: 'replied',
-        response: `Change touches ${changedFiles} files (limit: ${MAX_CHANGED_FILES}). Too large for auto-deploy. Review the branch "${branch}" manually.`
-      });
-      return;
-    }
-
-    // Verify it builds
-    try {
-      execSync('npx tsc --noEmit', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
-      execSync('npm run build', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });
-    } catch (buildError) {
-      restoreBranch();
-      await updateRequest(request.id, {
-        status: 'rejected',
-        response: `Build failed after implementation: ${String(buildError).slice(0, 200)}`
-      });
-      return;
-    }
-
-    // Commit and push directly to origin/main (avoids checking out main locally,
-    // which fails when another worktree already has main checked out)
-    git('add -A');
-    git(`commit -m "auto: ${request.text.slice(0, 60).replace(/"/g, "'")}"`);
-    git(`push origin ${branch}:main`);
-    restoreBranch();
-    git(`branch -D ${branch}`);
-
-    log('  Deploying...');
-    execSync('npm run deploy', { cwd: projectRoot, timeout: 180000, stdio: 'pipe' });
-    execSync('npm run deploy:cron', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });
-
-    await updateRequest(request.id, {
-      status: 'completed',
-      branch,
-      response: `Implemented, merged to main, and deployed. ${changedFiles} file(s) changed.`
-    });
-    log(`  Request completed and deployed.`);
+    // Safe to auto-implement. All work happens in a throwaway worktree so the
+    // agent's own checkout is never mutated and we never touch `main` locally
+    // (which broke when another worktree held main).
+    log('  Assessed as safe to auto-implement. Running codex in isolated worktree...');
+    const result = await implementInWorktree(request);
+    await updateRequest(request.id, result);
+    log(`  Request ${result.status}.`);
   } catch (error) {
     log(`  Request failed: ${error}`);
-    restoreBranch();
     await updateRequest(request.id, {
       status: 'rejected',
       response: `Error: ${String(error).slice(0, 300)}`
     });
   }
+}
+
+type RequestOutcome = { status: string; response: string; branch?: string };
+
+async function implementInWorktree(request: DevRequest): Promise<RequestOutcome> {
+  const branch = `auto/${request.id.slice(0, 8)}`;
+  const worktreeDir = join(tmpdir(), `radar-dev-${request.id.slice(0, 8)}`);
+
+  git('fetch origin');
+  cleanupWorktree(worktreeDir, branch); // clear any stale worktree/branch from a prior run
+  git('worktree add --force', worktreeDir, '-b', branch, 'origin/main');
+
+  try {
+    // Reuse the main checkout's dependencies so tsc/build/deploy work without a
+    // fresh `npm ci` in the worktree.
+    linkNodeModules(worktreeDir);
+
+    const cliResult = runImplementation(request.text, worktreeDir);
+    if (!cliResult.success) {
+      return { status: 'rejected', response: `Implementation failed: ${cliResult.error}` };
+    }
+
+    const diffStat = gitc(worktreeDir, 'diff --stat HEAD');
+    const changedFiles = diffStat.split('\n').filter((line) => line.includes('|')).length;
+    if (changedFiles === 0) {
+      return { status: 'completed', response: 'No changes needed (codex made no modifications).' };
+    }
+    if (changedFiles > MAX_CHANGED_FILES) {
+      return {
+        status: 'replied',
+        response: `Change touches ${changedFiles} files (limit: ${MAX_CHANGED_FILES}). Too large for auto-deploy — please split into smaller requests.`
+      };
+    }
+
+    try {
+      // `npm run check` runs `svelte-kit sync` first, which generates the
+      // ./$types the app imports — a fresh worktree has no .svelte-kit yet, so
+      // a bare `tsc --noEmit` would always fail here.
+      execSync('npm run check', { cwd: worktreeDir, timeout: 120000, stdio: 'pipe' });
+      execSync('npm run build', { cwd: worktreeDir, timeout: 120000, stdio: 'pipe' });
+    } catch (buildError) {
+      const err = buildError as { stdout?: Buffer; stderr?: Buffer };
+      const detail = (err.stdout?.toString() || '') + (err.stderr?.toString() || '') || String(buildError);
+      return { status: 'rejected', response: `Build failed after implementation: ${detail.slice(-300)}` };
+    }
+
+    gitc(worktreeDir, 'add -A');
+    gitc(worktreeDir, `commit -m "auto: ${request.text.slice(0, 60).replace(/"/g, "'")}"`);
+    gitc(worktreeDir, `push origin ${branch}:main`);
+
+    log('  Deploying...');
+    execSync('npm run deploy', { cwd: worktreeDir, timeout: 180000, stdio: 'pipe' });
+    execSync('npm run deploy:cron', { cwd: worktreeDir, timeout: 120000, stdio: 'pipe' });
+
+    return {
+      status: 'completed',
+      branch,
+      response: `Implemented, merged to main, and deployed. ${changedFiles} file(s) changed.`
+    };
+  } finally {
+    cleanupWorktree(worktreeDir, branch);
+  }
+}
+
+function linkNodeModules(worktreeDir: string): void {
+  const link = join(worktreeDir, 'node_modules');
+  try {
+    if (!existsSync(link)) symlinkSync(join(projectRoot, 'node_modules'), link, 'dir');
+  } catch (error) {
+    log(`  Could not link node_modules into worktree: ${error}`);
+  }
+}
+
+function cleanupWorktree(worktreeDir: string, branch: string): void {
+  // Drop the symlink first so nothing recurses into the real node_modules.
+  try { rmSync(join(worktreeDir, 'node_modules'), { force: true }); } catch { /* best effort */ }
+  try { git('worktree remove --force', worktreeDir); } catch { /* best effort */ }
+  try { if (existsSync(worktreeDir)) rmSync(worktreeDir, { recursive: true, force: true }); } catch { /* best effort */ }
+  try { git('worktree prune'); } catch { /* best effort */ }
+  try { git(`branch -D ${branch}`); } catch { /* best effort */ }
 }
 
 type Assessment = { risk: 'minor' | 'major'; reason: string };
@@ -169,7 +191,7 @@ Respond with ONLY this JSON: {"risk": "minor" or "major", "reason": "one sentenc
   }
 }
 
-function runImplementation(requestText: string): { success: boolean; error?: string } {
+function runImplementation(requestText: string, cwd: string): { success: boolean; error?: string } {
   const prompt = `You are implementing a change in a SvelteKit project at the current directory.
 
 IMPORTANT RULES:
@@ -186,19 +208,26 @@ Implement this change now.`;
 
   try {
     const cli = config.aiBackend === 'claude-code' ? 'claude' : 'codex';
+    // codex >= 0.100 replaced `--writable-root <dir>` with a sandbox policy;
+    // `workspace-write` lets it edit files under the working root (the worktree).
     const args = cli === 'codex'
-      ? ['exec', '--skip-git-repo-check', '-c', 'model_reasoning_effort=medium', '--writable-root', projectRoot, prompt]
-      : ['-p', '--allowedTools', 'Read,Edit,Bash', prompt];
+      ? ['exec', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-c', 'model_reasoning_effort=medium', '-C', cwd, prompt]
+      // Headless Claude Code: bypass interactive approvals so it can actually
+      // write files + run commands. Safe here because it runs in a throwaway
+      // worktree and every change still passes the tsc/build gate before deploy.
+      : ['-p', '--dangerously-skip-permissions', prompt];
 
     execFileSync(cli, args, {
-      cwd: projectRoot,
+      cwd,
       timeout: 300000,
       stdio: 'pipe',
       maxBuffer: 10 * 1024 * 1024
     });
     return { success: true };
   } catch (error) {
-    return { success: false, error: String(error).slice(0, 300) };
+    const err = error as { stderr?: Buffer; stdout?: Buffer; message?: string };
+    const detail = err.stderr?.toString().trim() || err.stdout?.toString().trim() || err.message || String(error);
+    return { success: false, error: detail.slice(0, 400) };
   }
 }
 
@@ -224,6 +253,10 @@ function callCli(prompt: string): Promise<string | null> {
 }
 
 function git(...args: string[]): string {
-  const fullArgs = args.join(' ');
-  return execSync(`git ${fullArgs}`, { cwd: projectRoot, timeout: 30000, stdio: 'pipe' }).toString().trim();
+  return execSync(`git ${args.join(' ')}`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' }).toString().trim();
+}
+
+/** git, but run inside a specific worktree directory. */
+function gitc(dir: string, ...args: string[]): string {
+  return execSync(`git ${args.join(' ')}`, { cwd: dir, timeout: 60000, stdio: 'pipe' }).toString().trim();
 }

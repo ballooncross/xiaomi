@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.personalradar.agent</string>
+
+  <!-- Login shell so PATH includes homebrew (codex) + nvm (node/npx). -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>exec /Users/stevebai/workspace/xiaomi/scripts/run-agent.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/stevebai/workspace/xiaomi</string>
+
+  <!-- Start at login and restart if it ever exits (crash, sleep, etc.). -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/stevebai/Library/Logs/personal-radar-agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/stevebai/Library/Logs/personal-radar-agent.log</string>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

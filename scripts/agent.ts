@@ -36,18 +36,40 @@ async function main() {
   log(`  AI backend: ${config.aiBackend}`);
   if (!config.radarToken) log('WARNING: No RADAR_TOKEN set. API calls may fail with 401.');
 
-  await tick();
+  await runGuardedTick();
 
   if (!config.once) {
     log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
     setInterval(async () => {
-      try {
-        await tick();
-        log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
-      } catch (error) {
-        log(`ERROR in tick: ${error}`);
-      }
+      await runGuardedTick();
+      log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
     }, config.pollIntervalMs);
+  }
+}
+
+let tickCount = 0;
+
+/**
+ * Run one tick with a hard time budget. A tick that hangs (e.g. a wedged
+ * network call) must never block future ticks — the whole reason the agent
+ * previously went silent for hours. The watchdog is shorter than the poll
+ * interval so the next scheduled tick always gets a clean slate.
+ */
+async function runGuardedTick(): Promise<void> {
+  const budgetMs = Math.max(60000, config.pollIntervalMs - 60000);
+  log(`Heartbeat: tick #${++tickCount} starting (budget ${Math.round(budgetMs / 1000)}s)`);
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      tick(),
+      new Promise<never>((_, reject) => {
+        watchdog = setTimeout(() => reject(new Error(`tick exceeded ${budgetMs}ms budget`)), budgetMs);
+      })
+    ]);
+  } catch (error) {
+    log(`ERROR in tick #${tickCount}: ${error}`);
+  } finally {
+    if (watchdog) clearTimeout(watchdog);
   }
 }
 
