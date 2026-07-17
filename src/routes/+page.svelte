@@ -1941,7 +1941,7 @@
       {/if}
     </section>
 
-    {#if activeView !== 'dates' && activeView !== 'me'}
+    {#if activeView !== 'dates' && activeView !== 'gym' && activeView !== 'me'}
     <aside class="side-panel">
       <section class="profile-card">
         <div class="avatar-row">
@@ -2350,7 +2350,7 @@
     left: 5px;
     top: 5px;
     bottom: 5px;
-    width: calc((100% - 10px) / 5);
+    width: calc((100% - 10px) / 6);
     border-radius: 999px;
     background: var(--jade);
     box-shadow: 0 8px 18px rgba(31, 111, 91, 0.2);
@@ -2371,8 +2371,12 @@
     transform: translateX(300%);
   }
 
-  .primary-nav[data-active='me'] .nav-indicator {
+  .primary-nav[data-active='gym'] .nav-indicator {
     transform: translateX(400%);
+  }
+
+  .primary-nav[data-active='me'] .nav-indicator {
+    transform: translateX(500%);
   }
 
   .mobile-nav {
