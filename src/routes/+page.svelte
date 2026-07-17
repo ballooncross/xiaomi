@@ -8,7 +8,7 @@
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { PageData } from './$types';
 
-  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'me' | 'saved';
+  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'me' | 'saved';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & {
     nextDate: string;
@@ -26,6 +26,7 @@
     concerts: '/concerts',
     trends: '/trends',
     dates: '/dates',
+    gym: '/gym',
     me: '/me',
     saved: '/saved'
   };
@@ -144,6 +145,7 @@
     { id: 'concerts', label: '演出' },
     { id: 'trends', label: '趋势' },
     { id: 'dates', label: '日期' },
+    { id: 'gym', label: '健身' },
     { id: 'me', label: '我的' }
   ];
   const navigationView = $derived(activeView === 'saved' ? 'me' : activeView);
@@ -173,6 +175,7 @@
         if (activeView === 'concerts') return item.kind === 'concert' && (searching || !hidden);
         if (activeView === 'trends') return item.kind !== 'concert' && (searching || !hidden);
         if (activeView === 'dates') return false;
+        if (activeView === 'gym') return false;
         if (activeView === 'me' || activeView === 'saved') return false;
         if (activeFilter === 'for-you') return searching || !hidden;
         return item.topics.some((topic) => topic.toLowerCase().includes(activeFilter));
@@ -1157,7 +1160,7 @@
     </div>
   </nav>
 
-  <div class:no-side-panel={activeView === 'dates' || activeView === 'me' || activeView === 'saved'} class="app-main">
+  <div class:no-side-panel={activeView === 'dates' || activeView === 'gym' || activeView === 'me' || activeView === 'saved'} class="app-main">
     <section class="feed">
       {#if searchOpen || digestOpen}
         <section class="action-panel">
@@ -1387,7 +1390,12 @@
         </section>
       {/if}
 
-      {#if activeView === 'dates'}
+      {#if activeView === 'gym'}
+        <section class="gym-placeholder">
+          <h1>Exercise Search</h1>
+          <p>Coming soon</p>
+        </section>
+      {:else if activeView === 'dates'}
         <DateRemindersView
           {reminders}
           {nextReminder}
