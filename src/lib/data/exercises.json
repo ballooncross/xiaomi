@@ -1,0 +1,289 @@
+[
+  {
+    "name": "Barbell Bench Press",
+    "primaryMuscle": "chest",
+    "equipment": "barbell",
+    "description": "Lie on a flat bench, grip the barbell slightly wider than shoulder-width, lower to chest and press up.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0025.gif"
+  },
+  {
+    "name": "Incline Barbell Bench Press",
+    "primaryMuscle": "chest",
+    "equipment": "barbell",
+    "description": "Press a barbell upward from an incline bench to target the upper chest.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0047.gif"
+  },
+  {
+    "name": "Dumbbell Fly",
+    "primaryMuscle": "chest",
+    "equipment": "dumbbell",
+    "description": "Lie on a flat bench with dumbbells, open arms wide in an arc then squeeze back together.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0306.gif"
+  },
+  {
+    "name": "Push-Up",
+    "primaryMuscle": "chest",
+    "equipment": "body weight",
+    "description": "From a plank position, lower your body until your chest nearly touches the floor, then push back up.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0662.gif"
+  },
+  {
+    "name": "Cable Crossover",
+    "primaryMuscle": "chest",
+    "equipment": "cable",
+    "description": "Stand between cable machines, pull handles down and together in a hugging motion.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0160.gif"
+  },
+  {
+    "name": "Barbell Deadlift",
+    "primaryMuscle": "back",
+    "equipment": "barbell",
+    "description": "Hinge at the hips to grip a loaded barbell on the floor, then stand up by driving through the legs and hips.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0032.gif"
+  },
+  {
+    "name": "Pull-Up",
+    "primaryMuscle": "back",
+    "equipment": "body weight",
+    "description": "Hang from a bar with an overhand grip and pull yourself up until your chin clears the bar.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0651.gif"
+  },
+  {
+    "name": "Bent-Over Barbell Row",
+    "primaryMuscle": "back",
+    "equipment": "barbell",
+    "description": "Bend forward at the hips, pull the barbell toward your lower chest while keeping your back flat.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0027.gif"
+  },
+  {
+    "name": "Lat Pulldown",
+    "primaryMuscle": "back",
+    "equipment": "cable",
+    "description": "Sit at a lat pulldown machine and pull the bar down to your upper chest.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0450.gif"
+  },
+  {
+    "name": "Seated Cable Row",
+    "primaryMuscle": "back",
+    "equipment": "cable",
+    "description": "Sit upright, pull the cable handle toward your torso while squeezing your shoulder blades together.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0861.gif"
+  },
+  {
+    "name": "Barbell Squat",
+    "primaryMuscle": "quadriceps",
+    "equipment": "barbell",
+    "description": "Place the barbell on your upper back, squat down until thighs are parallel, then stand back up.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0043.gif"
+  },
+  {
+    "name": "Leg Press",
+    "primaryMuscle": "quadriceps",
+    "equipment": "machine",
+    "description": "Sit in the leg press machine and push the platform away by extending your knees and hips.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0460.gif"
+  },
+  {
+    "name": "Leg Extension",
+    "primaryMuscle": "quadriceps",
+    "equipment": "machine",
+    "description": "Sit on the machine and extend your legs to straighten the knees against resistance.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0458.gif"
+  },
+  {
+    "name": "Walking Lunge",
+    "primaryMuscle": "quadriceps",
+    "equipment": "body weight",
+    "description": "Step forward into a lunge, lower your back knee toward the ground, then step forward with the other leg.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/1474.gif"
+  },
+  {
+    "name": "Romanian Deadlift",
+    "primaryMuscle": "hamstrings",
+    "equipment": "barbell",
+    "description": "Hold a barbell at hip height, hinge forward at the hips while keeping legs nearly straight.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0085.gif"
+  },
+  {
+    "name": "Lying Leg Curl",
+    "primaryMuscle": "hamstrings",
+    "equipment": "machine",
+    "description": "Lie face down on the leg curl machine and curl your heels toward your glutes.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0576.gif"
+  },
+  {
+    "name": "Glute Bridge",
+    "primaryMuscle": "glutes",
+    "equipment": "body weight",
+    "description": "Lie on your back with knees bent, drive your hips up by squeezing your glutes.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/1565.gif"
+  },
+  {
+    "name": "Hip Thrust",
+    "primaryMuscle": "glutes",
+    "equipment": "barbell",
+    "description": "Sit with your upper back against a bench, roll a barbell over your hips, and thrust upward.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/1413.gif"
+  },
+  {
+    "name": "Standing Calf Raise",
+    "primaryMuscle": "calves",
+    "equipment": "machine",
+    "description": "Stand on the calf raise machine and push up onto the balls of your feet.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/1379.gif"
+  },
+  {
+    "name": "Seated Calf Raise",
+    "primaryMuscle": "calves",
+    "equipment": "machine",
+    "description": "Sit on the calf raise machine with pads on your thighs and raise your heels.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0753.gif"
+  },
+  {
+    "name": "Overhead Press",
+    "primaryMuscle": "shoulders",
+    "equipment": "barbell",
+    "description": "Stand and press a barbell from shoulder height to overhead until arms are fully extended.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0091.gif"
+  },
+  {
+    "name": "Dumbbell Lateral Raise",
+    "primaryMuscle": "shoulders",
+    "equipment": "dumbbell",
+    "description": "Stand holding dumbbells at your sides, raise them out to shoulder height with a slight bend in the elbows.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0312.gif"
+  },
+  {
+    "name": "Dumbbell Shoulder Press",
+    "primaryMuscle": "shoulders",
+    "equipment": "dumbbell",
+    "description": "Sit or stand, press dumbbells from shoulder height to overhead.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0314.gif"
+  },
+  {
+    "name": "Face Pull",
+    "primaryMuscle": "shoulders",
+    "equipment": "cable",
+    "description": "Pull a rope attachment toward your face at eye level, separating the ends and squeezing rear delts.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0163.gif"
+  },
+  {
+    "name": "Reverse Fly",
+    "primaryMuscle": "shoulders",
+    "equipment": "dumbbell",
+    "description": "Bend forward and raise dumbbells out to the sides to target the rear deltoids.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0321.gif"
+  },
+  {
+    "name": "Barbell Curl",
+    "primaryMuscle": "biceps",
+    "equipment": "barbell",
+    "description": "Stand and curl a barbell upward by bending at the elbows, keeping upper arms stationary.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0023.gif"
+  },
+  {
+    "name": "Dumbbell Curl",
+    "primaryMuscle": "biceps",
+    "equipment": "dumbbell",
+    "description": "Stand holding dumbbells, curl them up by bending at the elbows.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0294.gif"
+  },
+  {
+    "name": "Hammer Curl",
+    "primaryMuscle": "biceps",
+    "equipment": "dumbbell",
+    "description": "Curl dumbbells with a neutral (palms facing each other) grip to target the brachialis.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0303.gif"
+  },
+  {
+    "name": "Concentration Curl",
+    "primaryMuscle": "biceps",
+    "equipment": "dumbbell",
+    "description": "Sit on a bench, brace your elbow against your inner thigh, and curl a dumbbell upward.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0285.gif"
+  },
+  {
+    "name": "Tricep Pushdown",
+    "primaryMuscle": "triceps",
+    "equipment": "cable",
+    "description": "Stand at a cable machine and push the bar down by extending your elbows.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0862.gif"
+  },
+  {
+    "name": "Skull Crusher",
+    "primaryMuscle": "triceps",
+    "equipment": "barbell",
+    "description": "Lie on a bench, lower the barbell toward your forehead by bending at the elbows, then extend back up.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0035.gif"
+  },
+  {
+    "name": "Overhead Tricep Extension",
+    "primaryMuscle": "triceps",
+    "equipment": "dumbbell",
+    "description": "Hold a dumbbell overhead with both hands and lower it behind your head, then extend back up.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0341.gif"
+  },
+  {
+    "name": "Dip",
+    "primaryMuscle": "triceps",
+    "equipment": "body weight",
+    "description": "Support yourself on parallel bars, lower your body by bending the elbows, then press back up.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0716.gif"
+  },
+  {
+    "name": "Crunch",
+    "primaryMuscle": "abdominals",
+    "equipment": "body weight",
+    "description": "Lie on your back with knees bent, curl your shoulders off the floor by contracting your abs.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0274.gif"
+  },
+  {
+    "name": "Plank",
+    "primaryMuscle": "abdominals",
+    "equipment": "body weight",
+    "description": "Hold a push-up position on your forearms, keeping your body in a straight line.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0628.gif"
+  },
+  {
+    "name": "Hanging Leg Raise",
+    "primaryMuscle": "abdominals",
+    "equipment": "body weight",
+    "description": "Hang from a bar and raise your legs until they are parallel to the floor.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0397.gif"
+  },
+  {
+    "name": "Cable Woodchop",
+    "primaryMuscle": "abdominals",
+    "equipment": "cable",
+    "description": "Stand sideways to a cable machine and rotate your torso diagonally across your body.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0219.gif"
+  },
+  {
+    "name": "Russian Twist",
+    "primaryMuscle": "abdominals",
+    "equipment": "body weight",
+    "description": "Sit with knees bent and feet off the floor, rotate your torso side to side.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/2315.gif"
+  },
+  {
+    "name": "Dumbbell Shrug",
+    "primaryMuscle": "traps",
+    "equipment": "dumbbell",
+    "description": "Hold dumbbells at your sides and shrug your shoulders up toward your ears.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0319.gif"
+  },
+  {
+    "name": "Wrist Curl",
+    "primaryMuscle": "forearms",
+    "equipment": "barbell",
+    "description": "Rest your forearms on a bench with palms up, curl the barbell by flexing your wrists.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/0105.gif"
+  },
+  {
+    "name": "Farmer's Walk",
+    "primaryMuscle": "forearms",
+    "equipment": "dumbbell",
+    "description": "Hold heavy dumbbells at your sides and walk for distance or time.",
+    "gifUrl": "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/gifs/3662.gif"
+  }
+]
