@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
   import type { CronJobStatus, DateCategory, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
+  import { exercises } from '$lib/exercises';
   import { Solar } from 'lunar-javascript';
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
@@ -86,6 +87,7 @@
   let expandedDevRequest = $state<string | null>(null);
   let dedupPending = $state<string | null>(null);
   let dedupResult = $state<{ itemId: string; found: number } | null>(null);
+  let gymSearch = $state('');
   let nlInterestText = $state('');
   let nlInterestPending = $state(false);
   let nlInterestMessage = $state('');
@@ -218,6 +220,13 @@
     return closest;
   }, undefined));
   const upcomingReminders = $derived(reminders.filter((reminder) => reminder.daysLeft <= 30).slice(0, 4));
+  const filteredExercises = $derived(() => {
+    const q = gymSearch.trim().toLowerCase();
+    if (!q) return exercises;
+    return exercises.filter((ex) =>
+      [ex.name, ex.muscle, ex.equipment].join(' ').toLowerCase().includes(q)
+    );
+  });
 
   function datepicker(node: HTMLInputElement) {
     let picker: { destroy: () => void } | undefined;
@@ -1391,9 +1400,38 @@
       {/if}
 
       {#if activeView === 'gym'}
-        <section class="gym-placeholder">
-          <h1>Exercise Search</h1>
-          <p>Coming soon</p>
+        <section class="gym-view">
+          <div class="gym-head">
+            <div class="eyebrow">健身 · 动作库</div>
+            <h1>搜索训练动作</h1>
+            <p>按名称、肌肉群或器械搜索，查看动作演示和说明。</p>
+          </div>
+          <div class="gym-search-row">
+            <input
+              bind:value={gymSearch}
+              placeholder="搜索：胸肌、深蹲、哑铃..."
+              class="gym-search-input"
+            />
+            {#if gymSearch}
+              <button class="small-button" type="button" onclick={() => (gymSearch = '')}>清空</button>
+            {/if}
+          </div>
+          <div class="gym-result-count">{filteredExercises().length} 个动作</div>
+          <div class="gym-grid">
+            {#each filteredExercises() as ex (ex.id)}
+              <article class="gym-card">
+                <img class="gym-gif" src={ex.gifUrl} alt={ex.name} loading="lazy" />
+                <div class="gym-card-body">
+                  <strong>{ex.name}</strong>
+                  <span class="gym-muscle">{ex.muscle}</span>
+                  <p class="gym-desc">{ex.description}</p>
+                  <span class="gym-equip">器械：{ex.equipment}</span>
+                </div>
+              </article>
+            {:else}
+              <p class="quiet-copy">没有匹配的动作。试试其他关键词。</p>
+            {/each}
+          </div>
         </section>
       {:else if activeView === 'dates'}
         <DateRemindersView
@@ -4019,6 +4057,98 @@
     color: var(--muted);
     font-size: 12px;
     line-height: 1.4;
+  }
+
+  .gym-view {
+    padding: 0;
+  }
+
+  .gym-head {
+    margin-bottom: 16px;
+  }
+
+  .gym-search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .gym-search-input {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    background: #fffdf7;
+  }
+
+  .gym-search-input:focus {
+    outline: 2px solid var(--plum);
+    outline-offset: -1px;
+  }
+
+  .gym-result-count {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+    margin-bottom: 12px;
+  }
+
+  .gym-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+
+  .gym-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fffdf7;
+  }
+
+  .gym-gif {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-bottom: 1px solid var(--line);
+    background: #f5f0eb;
+  }
+
+  .gym-card-body {
+    padding: 12px;
+  }
+
+  .gym-card-body strong {
+    display: block;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  .gym-muscle {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--plum) 15%, white);
+    color: var(--plum);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .gym-desc {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  .gym-equip {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 700;
   }
 
   @media (max-width: 960px) {
