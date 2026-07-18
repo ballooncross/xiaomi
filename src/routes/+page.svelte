@@ -1789,39 +1789,6 @@
             </div>
           {/if}
         </section>
-        {#if gymDetail}
-          <div
-            class="modal-backdrop"
-            role="presentation"
-            tabindex="-1"
-            onkeydown={(event) => event.key === 'Escape' && (gymDetail = null)}
-            onclick={(event) => event.target === event.currentTarget && (gymDetail = null)}
-          >
-            <div class="modal-card gym-modal" role="dialog" aria-modal="true" aria-labelledby="gym-detail-title">
-              <div class="modal-head">
-                <div>
-                  <h2 id="gym-detail-title">{gymDetail.name}</h2>
-                  <p>{gymBodyParts.find((bp) => bp.id === gymDetail?.bodyPart)?.label ?? gymDetail.bodyPart}</p>
-                </div>
-                <button class="close-button" type="button" aria-label="关闭" onclick={() => (gymDetail = null)}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
-                </button>
-              </div>
-              <img class="gym-modal-gif" src={gymDetail.gifUrl} alt={gymDetail.name} />
-              <div class="gym-tags">
-                <span class="gym-tag part">{gymDetail.bodyPart}</span>
-                <span class="gym-tag target">{gymDetail.target}</span>
-                <span class="gym-tag gear">{gymDetail.equipment}</span>
-              </div>
-              {#if gymDetail.secondaryMuscles.length}
-                <p class="gym-modal-secondary">协同肌群：{gymDetail.secondaryMuscles.join('、')}</p>
-              {/if}
-              {#if gymDetail.instructions}
-                <p class="gym-modal-instructions">{gymDetail.instructions}</p>
-              {/if}
-            </div>
-          </div>
-        {/if}
       {:else if activeView === 'dates'}
         <DateRemindersView
           {reminders}
@@ -2656,6 +2623,40 @@
           </button>
         {/each}
       </div>
+    </div>
+  </div>
+{/if}
+
+{#if gymDetail}
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    tabindex="-1"
+    onkeydown={(event) => event.key === 'Escape' && (gymDetail = null)}
+    onclick={(event) => event.target === event.currentTarget && (gymDetail = null)}
+  >
+    <div class="modal-card gym-modal" role="dialog" aria-modal="true" aria-labelledby="gym-detail-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="gym-detail-title">{gymDetail.name}</h2>
+          <p>{gymBodyParts.find((bp) => bp.id === gymDetail?.bodyPart)?.label ?? gymDetail.bodyPart}</p>
+        </div>
+        <button class="close-button" type="button" aria-label="关闭" onclick={() => (gymDetail = null)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <img class="gym-modal-gif" src={gymDetail.gifUrl} alt={gymDetail.name} />
+      <div class="gym-tags">
+        <span class="gym-tag part">{gymDetail.bodyPart}</span>
+        <span class="gym-tag target">{gymDetail.target}</span>
+        <span class="gym-tag gear">{gymDetail.equipment}</span>
+      </div>
+      {#if gymDetail.secondaryMuscles.length}
+        <p class="gym-modal-secondary">协同肌群：{gymDetail.secondaryMuscles.join('、')}</p>
+      {/if}
+      {#if gymDetail.instructions}
+        <p class="gym-modal-instructions">{gymDetail.instructions}</p>
+      {/if}
     </div>
   </div>
 {/if}
