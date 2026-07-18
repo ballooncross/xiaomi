@@ -1,14 +1,17 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
+  import CoePriceView from '$lib/components/CoePriceView.svelte';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
+  import type { CoePayload } from '$lib/coe';
   import type { CronJobStatus, DateCategory, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { PageData } from './$types';
 
-  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'me' | 'saved';
+  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
+  type NavSlotId = 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & {
     nextDate: string;
@@ -27,9 +30,45 @@
     trends: '/trends',
     dates: '/dates',
     gym: '/gym',
+    coe: '/coe',
+    interests: '/interests',
     me: '/me',
+    settings: '/settings',
     saved: '/saved'
   };
+
+  const NAV_STORAGE_KEY = 'personal-radar-middle-nav';
+  const ALL_NAV_OPTIONS: Array<{ id: NavSlotId; label: string }> = [
+    { id: 'concerts', label: '演出' },
+    { id: 'trends', label: '趋势' },
+    { id: 'dates', label: '日期' },
+    { id: 'gym', label: '健身' },
+    { id: 'coe', label: 'COE' },
+    { id: 'interests', label: '兴趣' },
+    { id: 'me', label: '我的' },
+    { id: 'settings', label: '设置' }
+  ];
+  const DEFAULT_MIDDLE_NAV: NavSlotId[] = ['concerts', 'dates', 'gym'];
+  const MORE_MENU_ITEMS: Array<{ id: View; label: string; hint: string }> = [
+    { id: 'me', label: '我的', hint: '资料、工具与收藏' },
+    { id: 'concerts', label: '演出', hint: '演出流与时间线' },
+    { id: 'coe', label: 'COE', hint: '新加坡官方报价' },
+    { id: 'interests', label: '兴趣', hint: '关注主题与屏蔽' },
+    { id: 'settings', label: '设置', hint: '导航与偏好配置' }
+  ];
+
+  function normalizeMiddleNav(value: unknown): NavSlotId[] {
+    const valid = new Set(ALL_NAV_OPTIONS.map((item) => item.id));
+    const ids = Array.isArray(value)
+      ? value.filter((item): item is NavSlotId => typeof item === 'string' && valid.has(item as NavSlotId))
+      : [];
+    const unique = [...new Set(ids)].slice(0, 3);
+    for (const fallback of DEFAULT_MIDDLE_NAV) {
+      if (unique.length >= 3) break;
+      if (!unique.includes(fallback)) unique.push(fallback);
+    }
+    return unique;
+  }
 
   let { data }: { data: PageData } = $props();
   let items = $state<RadarItem[]>([]);
@@ -90,6 +129,13 @@
   let gymLoaded = $state(false);
   let gymDetail = $state<GymExercise | null>(null);
   let gymDebounce: ReturnType<typeof setTimeout> | undefined;
+  let coeData = $state<CoePayload | null>(null);
+  let coeLoading = $state(false);
+  let coeLoaded = $state(false);
+  let coeError = $state('');
+  let middleNav = $state<NavSlotId[]>([...DEFAULT_MIDDLE_NAV]);
+  let moreMenuOpen = $state(false);
+  let draftMiddleNav = $state<NavSlotId[]>([...DEFAULT_MIDDLE_NAV]);
 
   async function loadExercises() {
     gymLoading = true;
@@ -119,8 +165,58 @@
     loadExercises();
   }
 
+  async function loadCoe(force = false) {
+    if (coeLoading) return;
+    if (coeLoaded && !force) return;
+    coeLoading = true;
+    coeError = '';
+    try {
+      const response = await fetch('/api/coe');
+      const payload = (await response.json()) as CoePayload & { error?: string };
+      if (!response.ok) {
+        coeError = payload.error || '加载失败';
+        if (!coeData) coeData = payload;
+      } else {
+        coeData = payload;
+        coeLoaded = true;
+      }
+    } catch (error) {
+      coeError = String(error);
+    } finally {
+      coeLoading = false;
+    }
+  }
+
+  function saveMiddleNav(next: NavSlotId[]) {
+    const normalized = normalizeMiddleNav(next);
+    middleNav = normalized;
+    draftMiddleNav = [...normalized];
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(normalized));
+    }
+  }
+
+  function moveDraftNav(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= draftMiddleNav.length) return;
+    const next = [...draftMiddleNav];
+    [next[index], next[target]] = [next[target], next[index]];
+    draftMiddleNav = next;
+  }
+
+  function toggleDraftNavItem(id: NavSlotId) {
+    if (draftMiddleNav.includes(id)) {
+      if (draftMiddleNav.length <= 1) return;
+      draftMiddleNav = draftMiddleNav.filter((item) => item !== id);
+      return;
+    }
+    if (draftMiddleNav.length >= 3) return;
+    draftMiddleNav = [...draftMiddleNav, id];
+  }
+
   $effect(() => {
     if (activeView === 'gym' && !gymLoaded) loadExercises();
+    if (activeView === 'coe') loadCoe();
   });
   let topicPending = $state<string | null>(null);
   let digestSendPending = $state(false);
@@ -176,6 +272,16 @@
 
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
+    try {
+      const stored = window.localStorage.getItem(NAV_STORAGE_KEY);
+      const parsed = stored ? JSON.parse(stored) : DEFAULT_MIDDLE_NAV;
+      const normalized = normalizeMiddleNav(parsed);
+      middleNav = normalized;
+      draftMiddleNav = [...normalized];
+    } catch {
+      middleNav = [...DEFAULT_MIDDLE_NAV];
+      draftMiddleNav = [...DEFAULT_MIDDLE_NAV];
+    }
     loadDevRequests();
 
     const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -203,15 +309,45 @@
     cronJobs = data.cronJobs;
   });
 
-  const navItems: Array<{ id: View; label: string }> = [
-    { id: 'home', label: '首页' },
-    { id: 'concerts', label: '演出' },
-    { id: 'trends', label: '趋势' },
-    { id: 'dates', label: '日期' },
-    { id: 'gym', label: '健身' },
-    { id: 'me', label: '我的' }
-  ];
-  const navigationView = $derived(activeView === 'saved' ? 'me' : activeView);
+  const barNavItems = $derived([
+    { id: 'home' as const, label: '首页' },
+    ...middleNav.map((id) => {
+      const option = ALL_NAV_OPTIONS.find((item) => item.id === id);
+      return { id, label: option?.label ?? id };
+    }),
+    { id: 'more' as const, label: '更多' }
+  ]);
+  const moreMenuItems = $derived.by(() => {
+    const fixedIds = new Set(MORE_MENU_ITEMS.map((item) => item.id));
+    const extras = ALL_NAV_OPTIONS.filter(
+      (option) => !middleNav.includes(option.id) && !fixedIds.has(option.id)
+    ).map((option) => ({
+      id: option.id as View,
+      label: option.label,
+      hint: '未固定在导航栏'
+    }));
+    return [...MORE_MENU_ITEMS, ...extras];
+  });
+  const navigationView = $derived.by(() => {
+    if (activeView === 'home') return 'home';
+    if (middleNav.includes(activeView as NavSlotId)) return activeView;
+    return 'more';
+  });
+  const navActiveIndex = $derived(
+    Math.max(
+      0,
+      barNavItems.findIndex((item) => item.id === navigationView)
+    )
+  );
+  const hideSidePanel = $derived(
+    activeView === 'dates' ||
+      activeView === 'gym' ||
+      activeView === 'coe' ||
+      activeView === 'interests' ||
+      activeView === 'me' ||
+      activeView === 'settings' ||
+      activeView === 'saved'
+  );
 
   const filters = [
     { id: 'for-you', label: '推荐' },
@@ -239,7 +375,9 @@
         if (activeView === 'trends') return item.kind !== 'concert' && (searching || !hidden);
         if (activeView === 'dates') return false;
         if (activeView === 'gym') return false;
-        if (activeView === 'me' || activeView === 'saved') return false;
+        if (activeView === 'coe') return false;
+        if (activeView === 'interests') return false;
+        if (activeView === 'me' || activeView === 'settings' || activeView === 'saved') return false;
         if (activeFilter === 'for-you') return searching || !hidden;
         return item.topics.some((topic) => topic.toLowerCase().includes(activeFilter));
       })
@@ -579,6 +717,16 @@
     addWatchOpen = false;
     editingTopicId = null;
     reminderFormOpen = false;
+    moreMenuOpen = false;
+  }
+
+  function toggleMoreMenu() {
+    moreMenuOpen = !moreMenuOpen;
+  }
+
+  async function selectMoreItem(view: View) {
+    moreMenuOpen = false;
+    await setView(view);
   }
 
   function toggleSearch() {
@@ -598,6 +746,15 @@
     activeView = view;
     activeFilter = 'for-you';
     await syncViewPath(view);
+  }
+
+  async function onBarNavClick(id: string) {
+    if (id === 'more') {
+      toggleMoreMenu();
+      return;
+    }
+    moreMenuOpen = false;
+    await setView(id as View);
   }
 
   async function selectFilter(filterId: string) {
@@ -1203,10 +1360,19 @@
         <span>凡人咖啡馆</span>
       </div>
     </button>
-    <div class="primary-nav desktop-nav" data-active={navigationView} aria-label="主导航">
+    <div
+      class="primary-nav desktop-nav"
+      data-active={navigationView}
+      style={`--nav-count: ${barNavItems.length}; --nav-index: ${navActiveIndex};`}
+      aria-label="主导航"
+    >
       <span class="nav-indicator" aria-hidden="true"></span>
-      {#each navItems as item}
-        <button class:active={navigationView === item.id} type="button" onclick={() => setView(item.id)}>
+      {#each barNavItems as item}
+        <button
+          class:active={navigationView === item.id}
+          type="button"
+          onclick={() => onBarNavClick(item.id)}
+        >
           {item.label}
         </button>
       {/each}
@@ -1223,7 +1389,7 @@
     </div>
   </nav>
 
-  <div class:no-side-panel={activeView === 'dates' || activeView === 'gym' || activeView === 'me' || activeView === 'saved'} class="app-main">
+  <div class:no-side-panel={hideSidePanel} class="app-main">
     <section class="feed">
       {#if searchOpen || digestOpen}
         <section class="action-panel">
@@ -1453,7 +1619,129 @@
         </section>
       {/if}
 
-      {#if activeView === 'gym'}
+      {#if activeView === 'coe'}
+        <CoePriceView data={coeData} loading={coeLoading} error={coeError} onRefresh={() => loadCoe(true)} />
+      {:else if activeView === 'interests'}
+        <section class="interests-workspace">
+          <div class="interests-head">
+            <div>
+              <div class="eyebrow">偏好</div>
+              <h1>兴趣与关注</h1>
+              <p>管理音乐人、趋势主题、来源和屏蔽规则。首页不再展示兴趣列表。</p>
+            </div>
+            <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>
+              添加关注
+            </button>
+          </div>
+          <div class="settings-grid compact">
+            <button class:active={preferenceView === 'artist'} type="button" onclick={() => (preferenceView = 'artist')}>
+              <strong>{watchTopics.length}</strong>
+              <span>音乐人</span>
+            </button>
+            <button class:active={preferenceView === 'topic'} type="button" onclick={() => (preferenceView = 'topic')}>
+              <strong>{interestTopics.length}</strong>
+              <span>兴趣主题</span>
+            </button>
+            <button class:active={preferenceView === 'blacklist'} type="button" onclick={() => (preferenceView = 'blacklist')}>
+              <strong>{blacklistTopics.length}</strong>
+              <span>屏蔽规则</span>
+            </button>
+          </div>
+          <div class="me-preference-manager">
+            {@render preferenceManager()}
+          </div>
+        </section>
+      {:else if activeView === 'settings'}
+        <section class="settings-workspace">
+          <div class="interests-head">
+            <div>
+              <div class="eyebrow">设置</div>
+              <h1>导航与配置</h1>
+              <p>首页和「更多」固定；中间 3 个菜单可自选并调整顺序。</p>
+            </div>
+          </div>
+
+          <section class="notebook-card">
+            <div class="notebook-head">
+              <div>
+                <h2>底部导航中间项</h2>
+                <span>选择 1–3 个入口，顺序即显示顺序。未选中的功能仍可从「更多」进入。</span>
+              </div>
+            </div>
+            <div class="nav-config-list">
+              {#each ALL_NAV_OPTIONS as option}
+                {@const selectedIndex = draftMiddleNav.indexOf(option.id)}
+                {@const selected = selectedIndex >= 0}
+                <div class:selected class="nav-config-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={!selected && draftMiddleNav.length >= 3}
+                      onchange={() => toggleDraftNavItem(option.id)}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{selected ? `第 ${selectedIndex + 1} 位` : '未显示在导航栏'}</small>
+                    </span>
+                  </label>
+                  {#if selected}
+                    <div class="nav-config-actions">
+                      <button type="button" disabled={selectedIndex === 0} onclick={() => moveDraftNav(selectedIndex, -1)}>
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={selectedIndex === draftMiddleNav.length - 1}
+                        onclick={() => moveDraftNav(selectedIndex, 1)}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+            <div class="nav-config-footer">
+              <button class="small-button" type="button" onclick={() => (draftMiddleNav = [...DEFAULT_MIDDLE_NAV])}>
+                恢复默认
+              </button>
+              <button
+                class="small-button primary"
+                type="button"
+                disabled={draftMiddleNav.length === 0}
+                onclick={() => saveMiddleNav(draftMiddleNav)}
+              >
+                保存导航
+              </button>
+            </div>
+            <p class="quiet-copy">当前导航：首页 · {middleNav.map((id) => ALL_NAV_OPTIONS.find((o) => o.id === id)?.label ?? id).join(' · ')} · 更多</p>
+          </section>
+
+          <section class="notebook-card">
+            <div class="notebook-head">
+              <div>
+                <h2>快捷入口</h2>
+                <span>常用页面</span>
+              </div>
+            </div>
+            <div class="settings-grid compact">
+              <button type="button" onclick={() => setView('me')}>
+                <strong>我的</strong>
+                <span>资料与工具</span>
+              </button>
+              <button type="button" onclick={() => setView('interests')}>
+                <strong>兴趣</strong>
+                <span>关注与屏蔽</span>
+              </button>
+              <button type="button" onclick={() => setView('coe')}>
+                <strong>COE</strong>
+                <span>官方报价</span>
+              </button>
+            </div>
+          </section>
+        </section>
+      {:else if activeView === 'gym'}
         <section class="gym">
           <header class="gym-head">
             <h1>健身动作库</h1>
@@ -1788,27 +2076,27 @@
           <section class="notebook-card">
             <div class="notebook-head">
               <div>
-                <h2>偏好与设置</h2>
-                <span>管理音乐人、趋势主题、来源和屏蔽规则。</span>
+                <h2>偏好入口</h2>
+                <span>兴趣列表已移至独立页面，也可在设置里配置导航。</span>
               </div>
-              <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
+              <div class="preference-add">
+                <button type="button" onclick={() => setView('interests')}>兴趣</button>
+                <button type="button" onclick={() => setView('settings')}>设置</button>
+              </div>
             </div>
-          <div class="settings-grid compact">
-            <button class:active={preferenceView === 'artist'} type="button" onclick={() => (preferenceView = 'artist')}>
-              <strong>{watchTopics.length}</strong>
-              <span>音乐人</span>
-              </button>
-              <button class:active={preferenceView === 'topic'} type="button" onclick={() => (preferenceView = 'topic')}>
+            <div class="settings-grid compact">
+              <button type="button" onclick={() => setView('interests')}>
                 <strong>{interestTopics.length}</strong>
                 <span>兴趣主题</span>
               </button>
-              <button class:active={preferenceView === 'blacklist'} type="button" onclick={() => (preferenceView = 'blacklist')}>
-                <strong>{blacklistTopics.length}</strong>
-                <span>屏蔽规则</span>
+              <button type="button" onclick={() => setView('interests')}>
+                <strong>{watchTopics.length}</strong>
+                <span>音乐人</span>
               </button>
-            </div>
-            <div class="me-preference-manager">
-              {@render preferenceManager()}
+              <button type="button" onclick={() => setView('coe')}>
+                <strong>COE</strong>
+                <span>官方报价</span>
+              </button>
             </div>
           </section>
         </section>
@@ -2080,7 +2368,7 @@
       {/if}
     </section>
 
-    {#if activeView !== 'dates' && activeView !== 'gym' && activeView !== 'me'}
+    {#if !hideSidePanel}
     <aside class="side-panel">
       <section class="profile-card">
         <div class="avatar-row">
@@ -2096,38 +2384,30 @@
         </div>
       </section>
 
-      <section class="mini-card preference-card">
+      <section class="mini-card">
         <div class="mini-card-head">
           <div>
-            <h2>偏好</h2>
-            <span>{followedTopicCount} 个关注 · {blacklistTopics.length} 个屏蔽</span>
-          </div>
-          <div class="preference-add">
-            <button type="button" onclick={() => openAddWatch('artist', 'concerts')}>音乐人</button>
-            <button type="button" onclick={() => openAddWatch('topic', 'business')}>兴趣</button>
-            <button type="button" onclick={() => openAddBlacklist()}>屏蔽</button>
+            <h2>快捷入口</h2>
+            <span>兴趣已独立成页</span>
           </div>
         </div>
-
-        <div class="preference-summary" aria-label="偏好概览">
-          <button type="button" onclick={() => (preferenceView = 'artist')}>
-            <strong>{watchTopics.length}</strong>
-            <span>音乐人</span>
-          </button>
-          <button type="button" onclick={() => (preferenceView = 'topic')}>
+        <div class="preference-summary" aria-label="快捷入口">
+          <button type="button" onclick={() => setView('interests')}>
             <strong>{interestTopics.length}</strong>
             <span>兴趣</span>
           </button>
-          <button type="button" onclick={() => (preferenceView = 'blacklist')}>
-            <strong>{blacklistTopics.length}</strong>
-            <span>已屏蔽</span>
+          <button type="button" onclick={() => setView('coe')}>
+            <strong>COE</strong>
+            <span>报价</span>
+          </button>
+          <button type="button" onclick={() => setView('me')}>
+            <strong>{followedTopicCount}</strong>
+            <span>我的</span>
           </button>
         </div>
-
-        {@render preferenceManager()}
       </section>
 
-      <section class="mini-card">
+      <section class="mini-card desktop-only-side">
         <h2>今日摘要</h2>
         <div class="brew-list">
           <div class="brew">
@@ -2350,10 +2630,49 @@
   </div>
 {/if}
 
-<nav class="primary-nav mobile-nav" data-active={navigationView} aria-label="主导航">
+{#if moreMenuOpen}
+  <div
+    class="more-menu-backdrop"
+    role="presentation"
+    tabindex="-1"
+    onkeydown={(event) => event.key === 'Escape' && (moreMenuOpen = false)}
+    onclick={(event) => event.target === event.currentTarget && (moreMenuOpen = false)}
+  >
+    <div class="more-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="more-menu-title">
+      <div class="more-menu-head">
+        <div>
+          <h2 id="more-menu-title">更多</h2>
+          <p>我的、演出、COE、兴趣与设置</p>
+        </div>
+        <button class="close-button" type="button" aria-label="关闭更多菜单" onclick={() => (moreMenuOpen = false)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <div class="more-menu-list">
+        {#each moreMenuItems as item}
+          <button type="button" onclick={() => selectMoreItem(item.id)}>
+            <strong>{item.label}</strong>
+            <span>{item.hint}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+  </div>
+{/if}
+
+<nav
+  class="primary-nav mobile-nav"
+  data-active={navigationView}
+  style={`--nav-count: ${barNavItems.length}; --nav-index: ${navActiveIndex};`}
+  aria-label="主导航"
+>
   <span class="nav-indicator" aria-hidden="true"></span>
-  {#each navItems as item}
-    <button class:active={navigationView === item.id} type="button" onclick={() => setView(item.id)}>
+  {#each barNavItems as item}
+    <button
+      class:active={navigationView === item.id}
+      type="button"
+      onclick={() => onBarNavClick(item.id)}
+    >
       {item.label}
     </button>
   {/each}
@@ -2489,33 +2808,13 @@
     left: 5px;
     top: 5px;
     bottom: 5px;
-    width: calc((100% - 10px) / 6);
+    width: calc((100% - 10px) / var(--nav-count, 5));
     border-radius: 999px;
     background: var(--jade);
     box-shadow: 0 8px 18px rgba(31, 111, 91, 0.2);
-    transform: translateX(0);
+    transform: translateX(calc(100% * var(--nav-index, 0)));
     transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
     z-index: 0;
-  }
-
-  .primary-nav[data-active='concerts'] .nav-indicator {
-    transform: translateX(100%);
-  }
-
-  .primary-nav[data-active='trends'] .nav-indicator {
-    transform: translateX(200%);
-  }
-
-  .primary-nav[data-active='dates'] .nav-indicator {
-    transform: translateX(300%);
-  }
-
-  .primary-nav[data-active='gym'] .nav-indicator {
-    transform: translateX(400%);
-  }
-
-  .primary-nav[data-active='me'] .nav-indicator {
-    transform: translateX(500%);
   }
 
   .mobile-nav {
@@ -3628,9 +3927,159 @@
     color: var(--muted);
   }
 
-  .me-workspace {
+  .me-workspace,
+  .interests-workspace,
+  .settings-workspace {
     display: grid;
     gap: 14px;
+  }
+
+  .interests-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+  }
+
+  .interests-head h1 {
+    margin: 7px 0 8px;
+  }
+
+  .interests-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .nav-config-list {
+    display: grid;
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+
+  .nav-config-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fffdf7;
+  }
+
+  .nav-config-row.selected {
+    border-color: color-mix(in srgb, var(--jade) 45%, var(--line));
+    background: color-mix(in srgb, var(--mint) 45%, white);
+  }
+
+  .nav-config-row label {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .nav-config-row strong,
+  .nav-config-row small {
+    display: block;
+  }
+
+  .nav-config-row small {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .nav-config-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .nav-config-actions button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fffdf7;
+    font-weight: 900;
+  }
+
+  .nav-config-actions button:disabled {
+    opacity: 0.4;
+  }
+
+  .nav-config-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+
+  .more-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(38, 29, 20, 0.28);
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    padding: 16px;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .more-menu-sheet {
+    width: min(420px, 100%);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: #fffdf7;
+    box-shadow: 0 24px 50px rgba(38, 29, 20, 0.22);
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .more-menu-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .more-menu-head h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+  }
+
+  .more-menu-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .more-menu-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .more-menu-list button {
+    text-align: left;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fffdf7;
+    padding: 12px 14px;
+    display: grid;
+    gap: 2px;
+  }
+
+  .more-menu-list button strong {
+    font-size: 15px;
+  }
+
+  .more-menu-list button span {
+    color: var(--muted);
+    font-size: 12px;
   }
 
   .saved-workspace {
@@ -4408,7 +4857,7 @@
     }
 
     .side-panel {
-      padding: 0 20px 24px;
+      display: none;
     }
 
     .greeting {
