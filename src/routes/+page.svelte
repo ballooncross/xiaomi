@@ -57,15 +57,14 @@
     { id: 'settings', label: '设置', hint: '导航与偏好配置' }
   ];
 
-  function normalizeMiddleNav(value: unknown): NavSlotId[] {
+  function normalizeMiddleNav(value: unknown, options?: { fallbackToDefault?: boolean }): NavSlotId[] {
     const valid = new Set(ALL_NAV_OPTIONS.map((item) => item.id));
     const ids = Array.isArray(value)
       ? value.filter((item): item is NavSlotId => typeof item === 'string' && valid.has(item as NavSlotId))
       : [];
     const unique = [...new Set(ids)].slice(0, 3);
-    for (const fallback of DEFAULT_MIDDLE_NAV) {
-      if (unique.length >= 3) break;
-      if (!unique.includes(fallback)) unique.push(fallback);
+    if (unique.length === 0 && options?.fallbackToDefault !== false) {
+      return [...DEFAULT_MIDDLE_NAV];
     }
     return unique;
   }
@@ -188,7 +187,8 @@
   }
 
   function saveMiddleNav(next: NavSlotId[]) {
-    const normalized = normalizeMiddleNav(next);
+    const normalized = normalizeMiddleNav(next, { fallbackToDefault: false });
+    if (normalized.length === 0) return;
     middleNav = normalized;
     draftMiddleNav = [...normalized];
     if (typeof window !== 'undefined') {
@@ -1673,7 +1673,7 @@
                 {@const selectedIndex = draftMiddleNav.indexOf(option.id)}
                 {@const selected = selectedIndex >= 0}
                 <div class:selected class="nav-config-row">
-                  <label>
+                  <label class="nav-config-main">
                     <input
                       type="checkbox"
                       checked={selected}
@@ -2792,16 +2792,30 @@
     min-height: 34px;
     border-radius: 999px;
     background: transparent;
+    background-clip: padding-box;
     color: var(--muted);
     font-size: 13px;
     font-weight: 950;
     position: relative;
     z-index: 1;
-    transition: color 180ms ease;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 180ms ease, background 140ms ease;
+  }
+
+  .primary-nav button:active {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mint) 42%, transparent);
   }
 
   .primary-nav button.active {
     color: var(--accent-text);
+  }
+
+  .primary-nav button.active:active {
+    background: transparent;
   }
 
   .nav-indicator {
@@ -2814,8 +2828,11 @@
     background: var(--jade);
     box-shadow: 0 8px 18px rgba(31, 111, 91, 0.2);
     transform: translateX(calc(100% * var(--nav-index, 0)));
-    transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition:
+      transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      width 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
     z-index: 0;
+    pointer-events: none;
   }
 
   .mobile-nav {
@@ -2826,11 +2843,21 @@
   .button {
     border: 1px solid var(--line);
     background: #fffdf7;
+    background-clip: padding-box;
     color: var(--ink);
     border-radius: 8px;
     font-size: 13px;
     font-weight: 850;
     min-height: 36px;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .icon-button:active,
+  .button:active {
+    border-radius: 8px;
   }
 
   .icon-button {
@@ -3948,9 +3975,10 @@
     gap: 12px;
     align-items: center;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     padding: 10px 12px;
-    background: #fffdf7;
+    background: var(--surface);
+    overflow: hidden;
   }
 
   .nav-config-row.selected {
@@ -3958,11 +3986,18 @@
     background: color-mix(in srgb, var(--mint) 45%, white);
   }
 
-  .nav-config-row label {
+  .nav-config-main {
     display: flex;
     gap: 10px;
     align-items: center;
     min-width: 0;
+    flex: 1;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .nav-config-main:active {
+    border-radius: var(--radius-sm);
   }
 
   .nav-config-row strong,
@@ -4434,9 +4469,22 @@
 
   .settings-grid.compact button {
     cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+    background-clip: padding-box;
     transition:
       border-color 0.15s ease,
       background 0.15s ease;
+  }
+
+  .settings-grid.compact button:active {
+    border-radius: 12px;
+  }
+
+  .settings-grid.compact button *,
+  .nav-config-main * {
+    cursor: inherit;
   }
 
   .settings-grid.compact button:hover {

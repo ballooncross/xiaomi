@@ -89,7 +89,39 @@ textarea {
   font: inherit;
 }
 
-button {
+button,
+.btn,
+.icon-btn,
+.icon-button,
+.small-button,
+label,
+summary,
+a,
+[role='button'] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+.btn,
+.icon-btn,
+.icon-button,
+.small-button {
+  appearance: none;
+  -webkit-appearance: none;
+  user-select: none;
+}
+
+/* Keep I-beam only for real editable fields */
+input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']),
+textarea,
+[contenteditable='true'] {
+  cursor: text;
+  user-select: text;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
   cursor: pointer;
 }
 
@@ -164,11 +196,13 @@ a {
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface);
+  background-clip: padding-box;
   color: var(--ink);
   font-size: var(--text-md);
   font-weight: var(--weight-black);
   line-height: 1;
   text-decoration: none;
+  overflow: hidden;
   transition:
     background var(--ease),
     border-color var(--ease),
@@ -181,8 +215,20 @@ a {
   border-color: color-mix(in srgb, var(--jade) 40%, var(--line));
 }
 
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled),
+.btn:focus-visible {
+  border-radius: var(--radius-pill);
   transform: translateY(1px);
+}
+
+.btn:focus {
+  outline: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--jade) 55%, white);
+  outline-offset: 2px;
+  transform: none;
 }
 
 .btn:disabled {
@@ -262,7 +308,9 @@ a {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
+  background-clip: padding-box;
   color: var(--ink);
+  overflow: hidden;
   transition:
     background var(--ease),
     border-color var(--ease);
@@ -271,6 +319,11 @@ a {
 .icon-btn:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--jade) 48%, var(--line));
   background: color-mix(in srgb, var(--mint) 70%, white);
+}
+
+.icon-btn:active:not(:disabled),
+.icon-btn:focus-visible {
+  border-radius: var(--radius-sm);
 }
 
 .icon-btn svg {
@@ -282,14 +335,21 @@ a {
 .small-button {
   border: 1px solid color-mix(in srgb, var(--line) 70%, var(--ink));
   background: var(--paper);
+  background-clip: padding-box;
   border-radius: var(--radius-sm);
   padding: var(--space-2) 10px;
   font-size: var(--text-sm);
   font-weight: 900;
   color: var(--ink);
+  overflow: hidden;
   transition:
     background var(--ease),
     border-color var(--ease);
+}
+
+.small-button:active:not(:disabled),
+.small-button:focus-visible {
+  border-radius: var(--radius-sm);
 }
 
 .small-button.primary {
