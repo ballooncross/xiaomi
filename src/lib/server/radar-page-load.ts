@@ -1,0 +1,33 @@
+import { getDb } from '$lib/server/db';
+import { env as privateEnv } from '$env/dynamic/private';
+import { mergeLocalEnv } from '$lib/server/env';
+import { getIcaToolStatus } from '$lib/server/ica-tool';
+import { getCronJobStatuses } from '$lib/server/job-status';
+import { sortReminders } from '$lib/server/lunar';
+import type { Env } from '$lib/server/types';
+
+export async function loadRadarPageData(platformEnv: Env | undefined) {
+	const env = mergeLocalEnv(platformEnv, privateEnv);
+	const db = getDb(env);
+	const [items, savedItems, topics, reminders, icaTool, cronJobs] = await Promise.all([
+		db.listItems(80),
+		db.listSavedItems(),
+		db.listTopics(),
+		db.listReminders(),
+		getIcaToolStatus(env),
+		getCronJobStatuses(env)
+	]);
+
+	return {
+		items,
+		savedItems,
+		topics,
+		reminders: sortReminders(reminders).map((reminder) => ({ ...reminder, note: '' })),
+		icaTool,
+		cronJobs,
+		aiEnabled: (env?.AI_ENABLED ?? 'auto') !== 'false',
+		telegramConfigured: Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID)
+	};
+}
+
+export type RadarPageData = Awaited<ReturnType<typeof loadRadarPageData>>;
