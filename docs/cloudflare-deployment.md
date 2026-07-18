@@ -59,23 +59,27 @@ Paste the output into `.env` (for example `SESSION_SECRET=...`). Do not commit i
 Keep secrets in the gitignored local `.env` (start from `.env.example`). When values are filled in, bulk-upload them instead of running `secret put` once per key:
 
 ```bash
-# Pages app (SvelteKit)
-npx wrangler pages secret bulk .env --project-name personal-radar
+# Pages app — secrets only (do NOT upload wrangler.toml [vars])
+npm run secrets:sync:pages
 
 # Cron Worker (separate binding set)
-npx wrangler secret bulk .env --config wrangler.cron.toml
+npm run secrets:sync:cron
 ```
 
-Wrangler accepts a `KEY=VALUE` file (same format as `.env` / `.dev.vars`). This upserts every key found in the file.
+Or manually with a filtered file (same idea):
+
+```bash
+npx wrangler pages secret bulk .env.secrets --project-name personal-radar
+npx wrangler secret bulk .env.secrets --config wrangler.cron.toml
+```
 
 **Rules / caveats**
 
-- Fill values before syncing. An empty `FOO=` in `.env` can overwrite the production secret with an empty string.
-- Only put secrets in `.env` for upload. Non-secret config already in `wrangler.toml` `[vars]` does not need to be a Cloudflare secret.
+- Never bulk-upload the full `.env` if it contains keys already in `wrangler.toml` `[vars]` (`AI_ENABLED`, `BANDSINTOWN_APP_ID`, `ICA_CHECK_ENABLED`, etc.). That creates a secret/var name clash and **Pages deploy fails**.
+- Fill values before syncing. An empty `FOO=` can overwrite the production secret with an empty string.
 - Pages and the cron Worker have separate secret stores — sync both when a key is used by both (for example `ADMIN_TOKEN`, Telegram, AI keys).
-- Auth secrets are Pages-only (login runs in the Pages app): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_EMAILS` (bootstrap), `ADMIN_EMAILS` (admins; e.g. `tofu.hike@gmail.com`).
+- Auth secrets are Pages-only: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_EMAILS` (bootstrap), `ADMIN_EMAILS`.
 - After multi-account migration, allowlist is managed in **Me → 允许登录的邮箱**; keep `ADMIN_EMAILS` in secrets.
-- Optional: keep a gitignored `.env.production` with only production-ready non-empty secrets and bulk that file instead of the full local `.env`.
 
 ### One-by-one (optional)
 

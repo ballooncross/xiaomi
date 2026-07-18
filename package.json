@@ -17,6 +17,8 @@
     "db:seed:remote": "wrangler d1 execute personal-radar --remote --file ./scripts/seed.sql",
     "deploy": "npm version patch --no-git-tag-version && npm run build && wrangler pages deploy .svelte-kit/cloudflare --project-name personal-radar --branch main",
     "deploy:cron": "wrangler deploy --config wrangler.cron.toml",
+    "secrets:sync:pages": "node scripts/sync-secrets.mjs pages",
+    "secrets:sync:cron": "node scripts/sync-secrets.mjs cron",
     "agent": "npx tsx scripts/agent.ts",
     "agent:dry": "npx tsx scripts/agent.ts --dry-run"
   },
