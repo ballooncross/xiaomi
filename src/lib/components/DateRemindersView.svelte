@@ -79,7 +79,7 @@
       </div>
       <small>第 {yearProgress} / {yearLength} 天</small>
     </div>
-    <button type="button" onclick={onAdd}>添加日期</button>
+    <button class="btn btn-ghost" type="button" onclick={onAdd}>添加日期</button>
   </div>
 
   {#if nextReminder}
@@ -152,7 +152,7 @@
     {:else}
       <div class="date-empty">
         <strong>暂无日期提醒</strong>
-        <button type="button" onclick={onAdd}>添加生日或纪念日</button>
+        <button class="btn btn-primary" type="button" onclick={onAdd}>添加生日或纪念日</button>
       </div>
     {/each}
   </section>
@@ -161,7 +161,7 @@
 <style>
   .dates-view {
     display: grid;
-    gap: 18px;
+    gap: var(--space-4);
   }
 
   .dates-hero,
@@ -169,17 +169,17 @@
   .date-row,
   .date-empty {
     border: 1px solid var(--line);
-    background: rgba(255, 253, 247, 0.92);
-    box-shadow: 0 18px 48px rgba(38, 29, 20, 0.08);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: var(--shadow-md);
   }
 
   .dates-hero {
     min-height: 210px;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 24px;
+    gap: var(--space-6);
     align-items: center;
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
     padding: 28px;
     background:
       linear-gradient(105deg, rgba(251, 241, 228, 0.96), rgba(215, 242, 220, 0.62)),
@@ -195,15 +195,15 @@
 
   .dates-hero > div:first-child strong {
     display: block;
-    color: #2d6382;
+    color: var(--sea);
     font-size: 96px;
     line-height: 0.9;
   }
 
   .today-meta h2 {
     margin: 0;
-    color: #2d6382;
-    font-size: 30px;
+    color: var(--sea);
+    font-size: var(--text-2xl);
   }
 
   .today-meta p,
@@ -216,47 +216,27 @@
     width: min(360px, 100%);
     height: 5px;
     overflow: hidden;
-    border-radius: 999px;
-    background: rgba(45, 99, 130, 0.12);
-    margin: 18px 0 8px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--sea) 12%, transparent);
+    margin: 18px 0 var(--space-2);
   }
 
   .year-line span {
     display: block;
     height: 100%;
-    background: #7ea79d;
+    background: var(--sage);
   }
 
-  .dates-hero button {
-    min-height: 42px;
-    border: 2px solid #7ea79d;
-    border-radius: 999px;
+  .dates-hero .btn,
+  .date-empty .btn {
+    min-height: var(--control-h-lg);
     padding: 0 18px;
-    background: transparent;
-    color: #4d8976;
-    font-weight: 950;
-    transition: background 150ms ease, color 150ms ease;
-  }
-
-  .dates-hero button:hover {
-    background: #7ea79d;
-    color: #fff8eb;
-  }
-
-  .date-empty button {
-    min-height: 42px;
-    border: 0;
-    border-radius: 999px;
-    padding: 0 18px;
-    background: #7ea79d;
-    color: #fff8eb;
-    font-weight: 950;
   }
 
   .date-feature {
     position: relative;
     overflow: hidden;
-    border-radius: 24px;
+    border-radius: var(--radius-xl);
     padding: 22px 24px;
     min-height: 210px;
     background:
@@ -269,7 +249,7 @@
 
   .date-feature h1 {
     margin: 12px 0 0;
-    color: #2d6382;
+    color: var(--sea);
   }
 
   .feature-count {
@@ -278,7 +258,7 @@
     justify-content: center;
     gap: 14px;
     margin: 18px 0 12px;
-    color: #2d6382;
+    color: var(--sea);
   }
 
   .feature-count strong {
@@ -314,7 +294,7 @@
   }
 
   .milestone-head strong {
-    color: #2d6382;
+    color: var(--sea);
     font-size: 18px;
   }
 
@@ -361,7 +341,7 @@
 
   .milestone-info strong {
     display: block;
-    color: #2d6382;
+    color: var(--sea);
     font-size: 15px;
   }
 
@@ -390,7 +370,7 @@
 
   .milestone-kind-age {
     background: rgba(45, 99, 130, 0.1);
-    color: #2d6382;
+    color: var(--sea);
   }
 
   .milestone-kind-day_count {
@@ -434,7 +414,7 @@
     place-items: center;
     border-radius: 14px;
     background: rgba(45, 99, 130, 0.1);
-    color: #2d6382;
+    color: var(--sea);
   }
 
   .date-icon svg {
@@ -447,7 +427,7 @@
 
   .date-main strong {
     display: block;
-    color: #2d6382;
+    color: var(--sea);
     font-size: 20px;
     line-height: 1.15;
   }
@@ -489,7 +469,7 @@
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 0 10px;
-    background: #fff8eb;
+    background: var(--paper);
     color: var(--muted);
     font-weight: 900;
   }

@@ -3765,23 +3765,6 @@
     color: var(--accent-text);
   }
 
-  .small-button {
-    border: 1px solid color-mix(in srgb, var(--line) 70%, var(--ink));
-    background: #fff8eb;
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 12px;
-    font-weight: 900;
-    color: var(--ink);
-    transition: background 120ms ease, border-color 120ms ease;
-  }
-
-  .small-button.primary {
-    background: var(--jade);
-    color: #fff8eb;
-    border-color: var(--jade);
-  }
-
   .source-link {
     min-height: 31px;
     display: inline-flex;
