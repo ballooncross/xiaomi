@@ -3,10 +3,6 @@ import type { Cookies } from '@sveltejs/kit';
 const SESSION_COOKIE = '__session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-const ALLOWED_EMAILS = [
-	'stevebaigame@gmail.com'
-];
-
 type Session = {
 	email: string;
 	name: string;
@@ -14,25 +10,21 @@ type Session = {
 	exp: number;
 };
 
-export function isAllowedEmail(email: string): boolean {
-	const allowedEnv = getEnvAllowedEmails();
-	const allowed = allowedEnv.length > 0 ? allowedEnv : ALLOWED_EMAILS;
-	return allowed.some((e) => e.toLowerCase() === email.toLowerCase());
-}
+let _allowedEmails: string[] = [];
 
-let _envAllowedEmails: string[] | null = null;
-
+/** Comma-separated allowlist from env (ALLOWED_EMAILS). No hardcoded emails. */
 export function setEnvAllowedEmails(raw?: string) {
-	_envAllowedEmails = raw
+	_allowedEmails = raw
 		? raw
 				.split(',')
 				.map((e) => e.trim())
 				.filter(Boolean)
-		: null;
+		: [];
 }
 
-function getEnvAllowedEmails(): string[] {
-	return _envAllowedEmails ?? [];
+export function isAllowedEmail(email: string): boolean {
+	if (_allowedEmails.length === 0) return false;
+	return _allowedEmails.some((e) => e.toLowerCase() === email.toLowerCase());
 }
 
 async function getSigningKey(secret: string): Promise<CryptoKey> {

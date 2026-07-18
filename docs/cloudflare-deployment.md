@@ -40,39 +40,65 @@ Run these commands in your local terminal inside this project directory. They ar
 
 This project installs Wrangler as a dev dependency, so use `npx wrangler ...` for direct CLI commands. Raw `wrangler ...` only works if you also install Wrangler globally or add the local npm bin directory to your shell `PATH`.
 
-Pages app:
+### Generate a secure random secret
+
+Use this for values like `SESSION_SECRET` or `ADMIN_TOKEN` (32+ bytes of entropy):
+
+```bash
+# hex (64 chars) — good default
+openssl rand -hex 32
+
+# base64url-ish (no padding); fine for cookies/tokens
+openssl rand -base64 32 | tr -d '=\n' | tr '+/' '-_'
+```
+
+Paste the output into `.env` (for example `SESSION_SECRET=...`). Do not commit it.
+
+### Preferred: sync from `.env`
+
+Keep secrets in the gitignored local `.env` (start from `.env.example`). When values are filled in, bulk-upload them instead of running `secret put` once per key:
+
+```bash
+# Pages app (SvelteKit)
+npx wrangler pages secret bulk .env --project-name personal-radar
+
+# Cron Worker (separate binding set)
+npx wrangler secret bulk .env --config wrangler.cron.toml
+```
+
+Wrangler accepts a `KEY=VALUE` file (same format as `.env` / `.dev.vars`). This upserts every key found in the file.
+
+**Rules / caveats**
+
+- Fill values before syncing. An empty `FOO=` in `.env` can overwrite the production secret with an empty string.
+- Only put secrets in `.env` for upload. Non-secret config already in `wrangler.toml` `[vars]` does not need to be a Cloudflare secret.
+- Pages and the cron Worker have separate secret stores — sync both when a key is used by both (for example `ADMIN_TOKEN`, Telegram, AI keys).
+- Auth secrets are Pages-only (login runs in the Pages app): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_EMAILS`.
+- Optional: keep a gitignored `.env.production` with only production-ready non-empty secrets and bulk that file instead of the full local `.env`.
+
+### One-by-one (optional)
+
+Use this when updating a single secret:
 
 ```bash
 npx wrangler pages secret put ADMIN_TOKEN --project-name personal-radar
-npx wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name personal-radar
-npx wrangler pages secret put TELEGRAM_CHAT_ID --project-name personal-radar
-npx wrangler pages secret put TICKETMASTER_API_KEY --project-name personal-radar
-npx wrangler pages secret put GEMINI_API_KEY --project-name personal-radar
-npx wrangler pages secret put DEEPSEEK_API_KEY --project-name personal-radar
-```
-
-Cron worker:
-
-```bash
 npx wrangler secret put ADMIN_TOKEN --config wrangler.cron.toml
-npx wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.cron.toml
-npx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
-npx wrangler secret put TICKETMASTER_API_KEY --config wrangler.cron.toml
-npx wrangler secret put GEMINI_API_KEY --config wrangler.cron.toml
-npx wrangler secret put DEEPSEEK_API_KEY --config wrangler.cron.toml
-npx wrangler secret put ICA_APPLICATION_ID --config wrangler.cron.toml
 ```
+
+Typical Pages secrets: `ADMIN_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TICKETMASTER_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `EXTENSION_NOTIFY_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_EMAILS`.
+
+Typical cron secrets: `ADMIN_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TICKETMASTER_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `ICA_APPLICATION_ID`.
 
 Only set AI keys if you want AI enabled. The app falls back to rules when keys are missing.
 
-Optional ICA browser fallback:
+Optional ICA browser fallback (cron only; set after the GCP Playwright runner is deployed):
 
 ```bash
 npx wrangler secret put ICA_FALLBACK_CHECK_URL --config wrangler.cron.toml
 npx wrangler secret put ICA_FALLBACK_TRIGGER_TOKEN --config wrangler.cron.toml
 ```
 
-Set these only after the GCP Playwright runner is deployed. The cron Worker automatically calls the fallback runner when Cloudflare Browser Run returns `blocked`, `error`, or is missing its Browser Run binding. It does not call the fallback after normal `ok` or `found_earlier` results.
+The cron Worker automatically calls the fallback runner when Cloudflare Browser Run returns `blocked`, `error`, or is missing its Browser Run binding. It does not call the fallback after normal `ok` or `found_earlier` results.
 
 For Ticketmaster, register on the Ticketmaster Developer Portal. The default application has a `Consumer Key`; use that value as `TICKETMASTER_API_KEY`.
 
