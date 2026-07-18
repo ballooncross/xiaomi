@@ -66,6 +66,7 @@
         {:else}
           LTA · data.gov.sg
         {/if}
+        · 打开页面时拉取；后台每 6 小时检查，周三/四约 18:00 SGT 再查一次；新结果会 Telegram 通知
       </p>
     </div>
     {#if onRefresh}

@@ -28,6 +28,13 @@ const scheduledJobs: CronJobDefinition[] = [
     enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
   },
   {
+    jobName: 'coe-check',
+    label: 'COE 结果检查',
+    description: '拉取 LTA 官方报价；发现新一轮时 Telegram 通知 Cat A/B。',
+    schedule: '每 6 小时 · 周三/四 18:00 SGT',
+    enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
+  },
+  {
     jobName: 'ica-appointment-check',
     label: 'ICA 预约检查',
     description: 'Cloudflare Browser Run 会被 ICA 搜索接口拒绝，已停止定时运行。',

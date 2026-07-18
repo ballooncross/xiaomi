@@ -145,6 +145,7 @@ const memory = {
   aiContextSnapshots: [] as (AiContextDocument & { id: string })[],
   agentOutcomes: [] as Array<{ id: string; agentFeedId: string; outcome: string; createdAt: string }>,
   impressions: [] as Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>,
+  notifications: [] as Array<{ id: string; itemId?: string; channel: string; type: string; status: string; message: string; createdAt: string }>,
   devRequests: [] as DevRequest[]
 };
 
@@ -166,6 +167,7 @@ export abstract class RadarDb {
   abstract recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void>;
   abstract updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void>;
   abstract logNotification(input: { itemId?: string; channel: string; type: string; status: string; message: string }): Promise<void>;
+  abstract notificationExists(type: string, itemId?: string): Promise<boolean>;
   abstract logJob(input: { jobName: string; status: string; detail: string }): Promise<void>;
   abstract listJobRuns(jobName: string, limit?: number): Promise<JobRun[]>;
 
@@ -311,8 +313,22 @@ class MemoryRadarDb extends RadarDb {
     item.updatedAt = new Date().toISOString();
   }
 
-  async logNotification(): Promise<void> {
-    return;
+  async logNotification(input: { itemId?: string; channel: string; type: string; status: string; message: string }): Promise<void> {
+    memory.notifications.unshift({
+      id: crypto.randomUUID(),
+      itemId: input.itemId,
+      channel: input.channel,
+      type: input.type,
+      status: input.status,
+      message: input.message,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  async notificationExists(type: string, itemId?: string): Promise<boolean> {
+    return memory.notifications.some(
+      (notification) => notification.type === type && (itemId == null || notification.itemId === itemId)
+    );
   }
 
   async logJob(input: { jobName: string; status: string; detail: string }): Promise<void> {
@@ -824,6 +840,26 @@ class D1RadarDb extends RadarDb {
         .run();
     } catch (error) {
       if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async notificationExists(type: string, itemId?: string): Promise<boolean> {
+    try {
+      if (itemId != null) {
+        const row = await this.db
+          .prepare('SELECT 1 AS ok FROM notifications WHERE type = ? AND item_id = ? LIMIT 1')
+          .bind(type, itemId)
+          .first<{ ok: number }>();
+        return Boolean(row);
+      }
+      const row = await this.db
+        .prepare('SELECT 1 AS ok FROM notifications WHERE type = ? LIMIT 1')
+        .bind(type)
+        .first<{ ok: number }>();
+      return Boolean(row);
+    } catch (error) {
+      if (isMissingTableError(error)) return false;
       throw error;
     }
   }

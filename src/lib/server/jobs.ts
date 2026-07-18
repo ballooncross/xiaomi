@@ -1,4 +1,5 @@
 import { enhanceItemWithAi, generateDigestWithAi } from './ai';
+import { runCoeCheckJob } from './coe';
 import { clusterForBackfill, dedupeBatch } from './dedup';
 import { buildTemplateDigest, renderTelegramDigest } from './digest';
 import { getDb } from './db';
@@ -10,6 +11,8 @@ import { getAllUpcomingMilestones } from './milestones';
 import { isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
 import type { DateReminder, Env, JobResult, RadarItem } from './types';
+
+export { runCoeCheckJob } from './coe';
 
 export async function runConcertFetchJob(env: Env): Promise<JobResult> {
   const db = getDb(env);
@@ -131,12 +134,13 @@ function appendReminderDigest(message: string, reminders: DateReminder[]): strin
 export async function runAllFetchJobs(env: Env): Promise<JobResult> {
   const concerts = await runConcertFetchJob(env);
   const trends = await runTrendFetchJob(env);
+  const coe = await runCoeCheckJob(env);
   return {
-    inserted: concerts.inserted + trends.inserted,
-    updated: concerts.updated + trends.updated,
-    considered: concerts.considered + trends.considered,
-    notified: concerts.notified + trends.notified,
-    detail: `${concerts.detail}; ${trends.detail}`
+    inserted: concerts.inserted + trends.inserted + coe.inserted,
+    updated: concerts.updated + trends.updated + coe.updated,
+    considered: concerts.considered + trends.considered + coe.considered,
+    notified: concerts.notified + trends.notified + coe.notified,
+    detail: `${concerts.detail}; ${trends.detail}; ${coe.detail}`
   };
 }
 

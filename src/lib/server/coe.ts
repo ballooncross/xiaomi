@@ -1,6 +1,9 @@
 /** Official Singapore COE bidding results from LTA via data.gov.sg */
 
-import type { CoeBiddingRound, CoeCategory, CoeCategoryResult, CoePayload } from '$lib/coe';
+import { formatCoeTelegramMessage, type CoeBiddingRound, type CoeCategory, type CoeCategoryResult, type CoePayload } from '$lib/coe';
+import { getDb } from './db';
+import { sendTelegramMessage } from './telegram';
+import type { Env, JobResult } from './types';
 
 export type { CoeBiddingRound, CoeCategory, CoeCategoryResult, CoePayload } from '$lib/coe';
 export { formatSgd } from '$lib/coe';
@@ -122,4 +125,71 @@ export async function fetchCoePayload(fetchImpl: typeof fetch = fetch): Promise<
 		latest: history[0] ?? null,
 		history
 	};
+}
+
+/**
+ * Lightweight COE poller:
+ * - fetches the official latest round
+ * - seeds a baseline on first run (no spam)
+ * - Telegram-notifies once when a newer round appears
+ */
+export async function runCoeCheckJob(env: Env): Promise<JobResult> {
+	const db = getDb(env);
+
+	try {
+		const payload = await fetchCoePayload();
+		const latest = payload.latest;
+		if (!latest) {
+			const detail = 'no latest COE round';
+			await db.logJob({ jobName: 'coe-check', status: 'skipped', detail });
+			return { inserted: 0, updated: 0, considered: 0, notified: 0, detail };
+		}
+
+		if (await db.notificationExists('coe_result', latest.id)) {
+			const detail = `already seen ${latest.id}`;
+			await db.logJob({ jobName: 'coe-check', status: 'ok', detail });
+			return { inserted: 0, updated: 0, considered: 1, notified: 0, detail };
+		}
+
+		// First successful poll: remember current latest without notifying.
+		if (!(await db.notificationExists('coe_result'))) {
+			await db.logNotification({
+				itemId: latest.id,
+				channel: 'telegram',
+				type: 'coe_result',
+				status: 'skipped',
+				message: `baseline ${latest.label}`
+			});
+			const detail = `seeded baseline ${latest.id}`;
+			await db.logJob({ jobName: 'coe-check', status: 'ok', detail });
+			return { inserted: 0, updated: 1, considered: 1, notified: 0, detail };
+		}
+
+		const message = formatCoeTelegramMessage(latest, payload.sourceUrl);
+		const telegram = await sendTelegramMessage(env, message);
+		await db.logNotification({
+			itemId: latest.id,
+			channel: 'telegram',
+			type: 'coe_result',
+			status: telegram.ok ? 'sent' : 'skipped',
+			message
+		});
+		await db.logJob({
+			jobName: 'coe-check',
+			status: telegram.ok ? 'ok' : 'skipped',
+			detail: telegram.ok ? `notified ${latest.id}` : `notify failed ${latest.id}: ${telegram.detail}`
+		});
+
+		return {
+			inserted: 0,
+			updated: 0,
+			considered: 1,
+			notified: telegram.ok ? 1 : 0,
+			detail: telegram.ok ? `notified ${latest.id}` : telegram.detail
+		};
+	} catch (error) {
+		const detail = `coe check failed: ${String(error)}`;
+		await db.logJob({ jobName: 'coe-check', status: 'error', detail });
+		return { inserted: 0, updated: 0, considered: 0, notified: 0, detail };
+	}
 }

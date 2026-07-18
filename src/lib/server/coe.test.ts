@@ -1,11 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { formatSgd } from '$lib/coe';
+import { formatCoeTelegramMessage, formatSgd } from '$lib/coe';
 import { fetchCoePayload } from './coe';
 
 describe('coe helpers', () => {
 	it('formats SGD without cents', () => {
 		expect(formatSgd(129000)).toBe('S$129,000');
 		expect(formatSgd(10201)).toBe('S$10,201');
+	});
+
+	it('formats a concise Telegram alert for Cat A/B', () => {
+		const message = formatCoeTelegramMessage(
+			{
+				id: '2026-07-1',
+				month: '2026-07',
+				biddingNo: 1,
+				label: 'Jul 2026 1st',
+				categories: [
+					{
+						category: 'A',
+						label: 'Cat A · 小型车',
+						quota: 1244,
+						bidsSuccess: 1207,
+						bidsReceived: 1879,
+						premium: 129000
+					},
+					{
+						category: 'B',
+						label: 'Cat B · 大型车',
+						quota: 867,
+						bidsSuccess: 863,
+						bidsReceived: 1500,
+						premium: 130889
+					}
+				]
+			},
+			'https://data.gov.sg/example'
+		);
+
+		expect(message).toContain('Jul 2026 1st');
+		expect(message).toContain('Cat A：S$129,000');
+		expect(message).toContain('Cat B：S$130,889');
+		expect(message).toContain('https://data.gov.sg/example');
 	});
 
 	it('groups bidding rounds and sorts latest first', async () => {
