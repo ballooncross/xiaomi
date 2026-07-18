@@ -59,6 +59,68 @@
   let preferenceView = $state<PreferenceView>('all');
   let feedbackPending = $state<string | null>(null);
   let addWatchPending = $state(false);
+
+  type GymExercise = {
+    id: string;
+    name: string;
+    bodyPart: string;
+    equipment: string;
+    target: string;
+    secondaryMuscles: string[];
+    instructions: string;
+    gifUrl: string;
+    imageUrl: string | null;
+  };
+  const gymBodyParts: Array<{ id: string; label: string }> = [
+    { id: 'back', label: '背部' },
+    { id: 'chest', label: '胸部' },
+    { id: 'upper arms', label: '大臂' },
+    { id: 'lower arms', label: '小臂' },
+    { id: 'shoulders', label: '肩部' },
+    { id: 'upper legs', label: '大腿' },
+    { id: 'lower legs', label: '小腿' },
+    { id: 'waist', label: '核心' },
+    { id: 'cardio', label: '有氧' },
+    { id: 'neck', label: '颈部' }
+  ];
+  let gymQuery = $state('');
+  let gymBodyPart = $state('');
+  let gymResults = $state<GymExercise[]>([]);
+  let gymLoading = $state(false);
+  let gymLoaded = $state(false);
+  let gymDebounce: ReturnType<typeof setTimeout> | undefined;
+
+  async function loadExercises() {
+    gymLoading = true;
+    gymLoaded = true;
+    try {
+      const params = new URLSearchParams();
+      const query = gymQuery.trim();
+      if (query) params.set('q', query);
+      if (gymBodyPart) params.set('bodyPart', gymBodyPart);
+      const response = await fetch(`/api/exercises?${params.toString()}`);
+      const data = (await response.json()) as { exercises?: GymExercise[] };
+      gymResults = data.exercises ?? [];
+    } catch {
+      gymResults = [];
+    } finally {
+      gymLoading = false;
+    }
+  }
+
+  function onGymSearch() {
+    clearTimeout(gymDebounce);
+    gymDebounce = setTimeout(loadExercises, 300);
+  }
+
+  function setGymBodyPart(bodyPart: string) {
+    gymBodyPart = bodyPart;
+    loadExercises();
+  }
+
+  $effect(() => {
+    if (activeView === 'gym' && !gymLoaded) loadExercises();
+  });
   let topicPending = $state<string | null>(null);
   let digestSendPending = $state(false);
   let digestSendMessage = $state('');
@@ -1391,9 +1453,51 @@
       {/if}
 
       {#if activeView === 'gym'}
-        <section class="gym-placeholder">
-          <h1>Exercise Search</h1>
-          <p>Coming soon</p>
+        <section class="gym">
+          <header class="gym-head">
+            <h1>健身动作库</h1>
+            <p>搜索 1,300+ 训练动作 · 动图、目标肌群与所需器械（数据来自 exercises-dataset）</p>
+          </header>
+          <div class="gym-search">
+            <input
+              type="search"
+              placeholder="搜索动作 / 肌群 / 器械，如 curl、abs、dumbbell、深蹲…"
+              bind:value={gymQuery}
+              oninput={onGymSearch}
+            />
+          </div>
+          <div class="gym-filters" role="group" aria-label="按部位筛选">
+            <button type="button" class:active={gymBodyPart === ''} onclick={() => setGymBodyPart('')}>全部</button>
+            {#each gymBodyParts as bp}
+              <button type="button" class:active={gymBodyPart === bp.id} onclick={() => setGymBodyPart(bp.id)}>
+                {bp.label}
+              </button>
+            {/each}
+          </div>
+          {#if gymLoading}
+            <p class="quiet-copy">加载中…</p>
+          {:else if gymResults.length === 0}
+            <p class="quiet-copy">没有匹配的动作，试试其他关键词或部位。</p>
+          {:else}
+            <div class="gym-grid">
+              {#each gymResults as exercise (exercise.id)}
+                <article class="gym-card">
+                  <img class="gym-gif" src={exercise.gifUrl} alt={exercise.name} loading="lazy" />
+                  <div class="gym-card-body">
+                    <strong>{exercise.name}</strong>
+                    <div class="gym-tags">
+                      <span class="gym-tag part">{exercise.bodyPart}</span>
+                      <span class="gym-tag target">{exercise.target}</span>
+                      <span class="gym-tag gear">{exercise.equipment}</span>
+                    </div>
+                    {#if exercise.instructions}
+                      <p class="gym-instructions">{exercise.instructions}</p>
+                    {/if}
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
         </section>
       {:else if activeView === 'dates'}
         <DateRemindersView
@@ -2870,6 +2974,134 @@
 
   .app-main.no-side-panel .feed {
     border-right: 0;
+  }
+
+  .gym {
+    padding: 4px 0 24px;
+  }
+
+  .gym-head h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+
+  .gym-head p {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0;
+  }
+
+  .gym-search {
+    margin: 16px 0 0;
+  }
+
+  .gym-search input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fffdf7;
+    font-size: 14px;
+  }
+
+  .gym-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 20px;
+  }
+
+  .gym-filters button {
+    border: 1px solid var(--line);
+    background: #fffdf7;
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .gym-filters button.active {
+    background: var(--jade);
+    color: #fff;
+    border-color: var(--jade);
+  }
+
+  .gym-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  .gym-card {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fffdf7;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gym-gif {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .gym-card-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .gym-card-body strong {
+    font-size: 14px;
+    text-transform: capitalize;
+  }
+
+  .gym-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .gym-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-transform: capitalize;
+  }
+
+  .gym-tag.part {
+    background: rgba(31, 111, 91, 0.12);
+    color: var(--jade);
+  }
+
+  .gym-tag.target {
+    background: rgba(31, 111, 91, 0.08);
+    color: var(--jade);
+  }
+
+  .gym-tag.gear {
+    background: rgba(120, 90, 40, 0.1);
+    color: #7a5a28;
+  }
+
+  .gym-instructions {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .greeting {
