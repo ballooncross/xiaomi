@@ -70,8 +70,25 @@
       </p>
     </div>
     {#if onRefresh}
-      <button class="small-button" type="button" disabled={loading} onclick={onRefresh}>
-        {loading ? '刷新中…' : '刷新'}
+      <button
+        class="coe-refresh"
+        class:spinning={loading}
+        type="button"
+        disabled={loading}
+        aria-label={loading ? '刷新中' : '刷新 COE 报价'}
+        onclick={onRefresh}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span>{loading ? '刷新中' : '刷新'}</span>
       </button>
     {/if}
   </header>
@@ -83,7 +100,19 @@
       <h3>暂时无法加载 COE 数据</h3>
       <p>{error}</p>
       {#if onRefresh}
-        <button class="small-button primary" type="button" onclick={onRefresh}>重试</button>
+        <button class="coe-refresh primary" type="button" onclick={onRefresh}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>重试</span>
+        </button>
       {/if}
     </section>
   {:else if latest}
@@ -186,6 +215,10 @@
     align-items: start;
   }
 
+  .coe-head > div {
+    min-width: 0;
+  }
+
   .eyebrow {
     font-size: 11px;
     letter-spacing: 0.08em;
@@ -210,6 +243,63 @@
   .coe-head a {
     color: var(--jade);
     font-weight: 800;
+  }
+
+  .coe-refresh {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--jade) 42%, var(--line));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mint) 55%, #fffdf7);
+    color: var(--jade);
+    font-size: 13px;
+    font-weight: 850;
+    cursor: pointer;
+    transition:
+      background 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
+  }
+
+  .coe-refresh:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--mint) 78%, white);
+    border-color: var(--jade);
+  }
+
+  .coe-refresh:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .coe-refresh:disabled {
+    opacity: 0.72;
+    cursor: wait;
+  }
+
+  .coe-refresh.primary {
+    background: var(--jade);
+    border-color: var(--jade);
+    color: #fff8eb;
+  }
+
+  .coe-refresh svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+
+  .coe-refresh.spinning svg {
+    animation: coe-spin 0.85s linear infinite;
+  }
+
+  @keyframes coe-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .coe-latest,
@@ -413,6 +503,20 @@
 
     .coe-price {
       font-size: 24px;
+    }
+
+    .coe-refresh {
+      width: 36px;
+      padding: 0;
+      justify-content: center;
+    }
+
+    .coe-refresh span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
     }
   }
 </style>
