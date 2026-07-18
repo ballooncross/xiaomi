@@ -88,6 +88,7 @@
   let gymResults = $state<GymExercise[]>([]);
   let gymLoading = $state(false);
   let gymLoaded = $state(false);
+  let gymDetail = $state<GymExercise | null>(null);
   let gymDebounce: ReturnType<typeof setTimeout> | undefined;
 
   async function loadExercises() {
@@ -1481,7 +1482,7 @@
           {:else}
             <div class="gym-grid">
               {#each gymResults as exercise (exercise.id)}
-                <article class="gym-card">
+                <button type="button" class="gym-card" onclick={() => (gymDetail = exercise)}>
                   <img class="gym-gif" src={exercise.gifUrl} alt={exercise.name} loading="lazy" />
                   <div class="gym-card-body">
                     <strong>{exercise.name}</strong>
@@ -1493,12 +1494,46 @@
                     {#if exercise.instructions}
                       <p class="gym-instructions">{exercise.instructions}</p>
                     {/if}
+                    <span class="gym-more">查看详情 →</span>
                   </div>
-                </article>
+                </button>
               {/each}
             </div>
           {/if}
         </section>
+        {#if gymDetail}
+          <div
+            class="modal-backdrop"
+            role="presentation"
+            tabindex="-1"
+            onkeydown={(event) => event.key === 'Escape' && (gymDetail = null)}
+            onclick={(event) => event.target === event.currentTarget && (gymDetail = null)}
+          >
+            <div class="modal-card gym-modal" role="dialog" aria-modal="true" aria-labelledby="gym-detail-title">
+              <div class="modal-head">
+                <div>
+                  <h2 id="gym-detail-title">{gymDetail.name}</h2>
+                  <p>{gymBodyParts.find((bp) => bp.id === gymDetail?.bodyPart)?.label ?? gymDetail.bodyPart}</p>
+                </div>
+                <button class="close-button" type="button" aria-label="关闭" onclick={() => (gymDetail = null)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+                </button>
+              </div>
+              <img class="gym-modal-gif" src={gymDetail.gifUrl} alt={gymDetail.name} />
+              <div class="gym-tags">
+                <span class="gym-tag part">{gymDetail.bodyPart}</span>
+                <span class="gym-tag target">{gymDetail.target}</span>
+                <span class="gym-tag gear">{gymDetail.equipment}</span>
+              </div>
+              {#if gymDetail.secondaryMuscles.length}
+                <p class="gym-modal-secondary">协同肌群：{gymDetail.secondaryMuscles.join('、')}</p>
+              {/if}
+              {#if gymDetail.instructions}
+                <p class="gym-modal-instructions">{gymDetail.instructions}</p>
+              {/if}
+            </div>
+          </div>
+        {/if}
       {:else if activeView === 'dates'}
         <DateRemindersView
           {reminders}
@@ -3030,8 +3065,8 @@
 
   .gym-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
   }
 
   .gym-card {
@@ -3040,27 +3075,73 @@
     overflow: hidden;
     background: #fffdf7;
     display: flex;
-    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 10px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .gym-card:hover {
+    border-color: var(--jade);
+    box-shadow: 0 6px 18px rgba(38, 29, 20, 0.1);
   }
 
   .gym-gif {
-    width: 100%;
-    aspect-ratio: 1 / 1;
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
     object-fit: contain;
     background: #fff;
-    border-bottom: 1px solid var(--line);
+    border: 1px solid var(--line);
+    border-radius: 12px;
   }
 
   .gym-card-body {
-    padding: 12px 14px;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
   }
 
   .gym-card-body strong {
     font-size: 14px;
     text-transform: capitalize;
+  }
+
+  .gym-more {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--jade);
+  }
+
+  .gym-modal-gif {
+    display: block;
+    width: min(240px, 70%);
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    margin: 0 auto 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .gym-modal-secondary {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 12px 0 0;
+    text-transform: capitalize;
+  }
+
+  .gym-modal-instructions {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.6;
+    margin: 12px 0 0;
   }
 
   .gym-tags {
@@ -3098,8 +3179,8 @@
     margin: 0;
     line-height: 1.5;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
