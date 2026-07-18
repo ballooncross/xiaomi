@@ -73,7 +73,8 @@ Wrangler accepts a `KEY=VALUE` file (same format as `.env` / `.dev.vars`). This 
 - Fill values before syncing. An empty `FOO=` in `.env` can overwrite the production secret with an empty string.
 - Only put secrets in `.env` for upload. Non-secret config already in `wrangler.toml` `[vars]` does not need to be a Cloudflare secret.
 - Pages and the cron Worker have separate secret stores — sync both when a key is used by both (for example `ADMIN_TOKEN`, Telegram, AI keys).
-- Auth secrets are Pages-only (login runs in the Pages app): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_EMAILS`.
+- Auth secrets are Pages-only (login runs in the Pages app): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_EMAILS` (bootstrap), `ADMIN_EMAILS` (admins; e.g. `tofu.hike@gmail.com`).
+- After multi-account migration, allowlist is managed in **Me → 允许登录的邮箱**; keep `ADMIN_EMAILS` in secrets.
 - Optional: keep a gitignored `.env.production` with only production-ready non-empty secrets and bulk that file instead of the full local `.env`.
 
 ### One-by-one (optional)

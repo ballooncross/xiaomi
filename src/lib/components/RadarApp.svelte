@@ -206,6 +206,13 @@
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(normalized));
     }
+    void fetch('/api/settings/nav', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nav: normalized })
+    }).catch(() => {
+      /* localStorage already updated */
+    });
   }
 
   function moveDraftNav(index: number, direction: -1 | 1) {
@@ -255,6 +262,10 @@
   let devRequestMessage = $state('');
   let devRequests = $state<Array<{id: string; text: string; status: string; response: string; createdAt?: string}>>([]);
   let expandedDevRequest = $state<string | null>(null);
+  let allowlistEmails = $state<string[]>([]);
+  let allowlistNewEmail = $state('');
+  let allowlistPending = $state(false);
+  let allowlistMessage = $state('');
   let dedupPending = $state<string | null>(null);
   let dedupResult = $state<{ itemId: string; found: number } | null>(null);
   let nlInterestText = $state('');
@@ -284,10 +295,14 @@
 
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
-    const storedNav = readStoredMiddleNav();
+    const serverNav = normalizeMiddleNav(data.middleNav, { fallbackToDefault: false });
+    const storedNav = serverNav.length > 0 ? serverNav : readStoredMiddleNav();
     middleNav = storedNav;
     draftMiddleNav = [...storedNav];
-    loadDevRequests();
+    if (data.user?.isAdmin) {
+      loadDevRequests();
+      loadAllowlist();
+    }
 
     const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     const timer = setInterval(() => {
@@ -295,7 +310,10 @@
     }, REFRESH_INTERVAL_MS);
 
     const onVisible = () => {
-      if (!document.hidden) { invalidateAll(); loadDevRequests(); }
+      if (!document.hidden) {
+        invalidateAll();
+        if (data.user?.isAdmin) loadDevRequests();
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
 
@@ -534,6 +552,7 @@
   }
 
   async function loadDevRequests() {
+    if (!data.user?.isAdmin) return;
     try {
       const response = await fetch('/api/dev-requests');
       if (response.ok) {
@@ -543,6 +562,69 @@
     } catch {
       // ignore
     }
+  }
+
+  async function loadAllowlist() {
+    if (!data.user?.isAdmin) return;
+    try {
+      const response = await fetch('/api/admin/allowlist');
+      if (response.ok) {
+        const result = (await response.json()) as { emails: string[] };
+        allowlistEmails = result.emails;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function addAllowlistEmail() {
+    const email = allowlistNewEmail.trim().toLowerCase();
+    if (!email.includes('@')) {
+      allowlistMessage = '请输入有效邮箱';
+      return;
+    }
+    allowlistPending = true;
+    allowlistMessage = '';
+    try {
+      const response = await fetch('/api/admin/allowlist', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const result = (await response.json().catch(() => ({}))) as { emails?: string[]; error?: string };
+      if (response.ok) {
+        allowlistEmails = result.emails ?? [];
+        allowlistNewEmail = '';
+        allowlistMessage = '已添加';
+      } else {
+        allowlistMessage = result.error || '添加失败';
+      }
+    } catch {
+      allowlistMessage = '添加失败';
+    }
+    allowlistPending = false;
+  }
+
+  async function removeAllowlistEmail(email: string) {
+    allowlistPending = true;
+    allowlistMessage = '';
+    try {
+      const response = await fetch('/api/admin/allowlist', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const result = (await response.json().catch(() => ({}))) as { emails?: string[]; error?: string };
+      if (response.ok) {
+        allowlistEmails = result.emails ?? [];
+        allowlistMessage = '已移除';
+      } else {
+        allowlistMessage = result.error || '移除失败';
+      }
+    } catch {
+      allowlistMessage = '移除失败';
+    }
+    allowlistPending = false;
   }
 
   async function submitDevRequest() {
@@ -1438,10 +1520,10 @@
                 <button
                   class="small-button primary"
                   type="button"
-                  disabled={digestSendPending || !data.telegramConfigured}
+                  disabled={digestSendPending || !data.telegramConfigured || !data.user?.isAdmin}
                   onclick={sendTelegramSummary}
                 >
-                  {digestSendPending ? '发送中...' : '发送到 Telegram'}
+                  {digestSendPending ? '发送中...' : data.user?.isAdmin ? '发送到 Telegram' : '仅管理员可发送'}
                 </button>
                 {#if digestSendMessage}<span>{digestSendMessage}</span>{/if}
                 {#if !data.telegramConfigured}<span>Telegram 尚未配置。</span>{/if}
@@ -1877,8 +1959,15 @@
           <div class="settings-grid">
             <article class="settings-card">
               <span>资料</span>
-              <strong>个人雷达</strong>
-              <p>Telegram {data.telegramConfigured ? '已连接' : '未配置'} · AI {data.aiEnabled ? '可用' : '关闭'} · {followedTopicCount} 个关注</p>
+              <strong>{data.user?.name || '个人雷达'}</strong>
+              <p>
+                {data.user?.email ?? ''}
+                {#if data.user?.isAdmin} · 管理员{/if}
+                · {followedTopicCount} 个关注
+              </p>
+              <p style="margin-top:8px">
+                <a href="/auth/logout" class="small-button">退出登录</a>
+              </p>
             </article>
             <article class="settings-card">
               <span>下一条提醒</span>
@@ -1891,6 +1980,51 @@
               <p>查看已保存和重点跟踪的内容 <b aria-hidden="true">→</b></p>
             </button>
           </div>
+
+          {#if data.user?.isAdmin}
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>访问控制</span>
+              <strong>允许登录的邮箱</strong>
+              <p>添加朋友的 Google 邮箱后，对方即可登录；各自数据互相隔离。</p>
+            </div>
+            <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
+              <input
+                bind:value={allowlistNewEmail}
+                type="email"
+                placeholder="friend@gmail.com"
+                style="flex:1;min-width:180px"
+              />
+              <button
+                class="small-button primary"
+                type="button"
+                disabled={allowlistPending || !allowlistNewEmail.trim()}
+                onclick={addAllowlistEmail}
+              >
+                {allowlistPending ? '…' : '添加'}
+              </button>
+            </div>
+            {#if allowlistMessage}
+              <p style="font-size:12px;color:var(--muted);padding:0 14px">{allowlistMessage}</p>
+            {/if}
+            <div style="padding:8px 14px 14px;display:grid;gap:6px">
+              {#each allowlistEmails as email}
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+                  <span>{email}</span>
+                  <button
+                    class="small-button"
+                    type="button"
+                    disabled={allowlistPending || email.toLowerCase() === data.user?.email?.toLowerCase()}
+                    onclick={() => removeAllowlistEmail(email)}
+                  >
+                    移除
+                  </button>
+                </div>
+              {:else}
+                <p style="font-size:12px;color:var(--muted)">暂无记录</p>
+              {/each}
+            </div>
+          </section>
 
           <section class="tools-panel">
             <div class="notebook-head">
@@ -2045,6 +2179,7 @@
               </div>
             {/if}
           </section>
+          {/if}
 
           <section class="notebook-card">
             <div class="notebook-head">

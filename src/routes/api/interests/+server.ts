@@ -3,6 +3,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
 import { getDb } from '$lib/server/db';
 import { compileContext } from '$lib/server/context-compiler';
+import { requireSessionUser } from '$lib/server/request-auth';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -11,7 +12,8 @@ import type { RequestHandler } from './$types';
  * verbatim as a Layer 1 signal; the compiled context carries it to the local
  * AI agent, which interprets nuance like "interested in X but not Y".
  */
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json().catch(() => ({}))) as { text?: string };
   const text = body.text?.trim();
   if (!text || text.length < 4) {
@@ -21,7 +23,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     return json({ error: 'text too long (max 2000 chars)' }, { status: 400 });
   }
 
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   await db.insertPreferenceSignal({
     id: crypto.randomUUID(),
     signalType: 'interest',
@@ -29,7 +31,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     source: 'ui'
   });
 
-  // Explicit user input is high-signal: recompile the context immediately
   const doc = await compileContext(db);
   return json({ ok: true, contextVersion: doc.version });
 };

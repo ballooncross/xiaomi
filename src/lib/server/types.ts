@@ -132,6 +132,7 @@ export type Env = {
   GOOGLE_CLIENT_SECRET?: string;
   SESSION_SECRET?: string;
   ALLOWED_EMAILS?: string;
+  ADMIN_EMAILS?: string;
 };
 
 export type JobResult = {

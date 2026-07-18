@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
-import { getDb } from '$lib/server/db';
+import { getAdminScopedDb } from '$lib/server/users';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -9,7 +9,7 @@ export const GET: RequestHandler = async ({ request, platform }) => {
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
   if (!isAuthorized(request, env)) return json({ error: 'Unauthorized' }, { status: 401 });
 
-  const db = getDb(env);
+  const db = await getAdminScopedDb(env);
 
   const [topics, recentFeedback, signals, agentStats, latestContext, recentItems, lastFetchJobs] = await Promise.all([
     db.listTopics(),

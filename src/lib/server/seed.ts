@@ -37,6 +37,23 @@ export const defaultWatchTopics: WatchTopic[] = [
   )
 ];
 
+/** General starter pack for new accounts (no personal dates). */
+export const starterWatchTopics: WatchTopic[] = [
+  topic(
+    'topic-sg-local-life',
+    'topic',
+    '新加坡本地生活动态',
+    ['Singapore local news', 'HDB policy', 'COE price', 'Singapore food', 'hawker', 'MRT'],
+    'life',
+    4
+  ),
+  topic('topic-ai-product-sg', 'topic', '新加坡 AI 产品岗位', ['AI product roles Singapore', 'AI PM Singapore'], 'career', 4),
+  topic('topic-sea-funding', 'topic', '东南亚创业融资', ['SEA startup funding', 'Southeast Asia startup funding'], 'business', 3),
+  topic('topic-us-china-ai', 'topic', '中美 AI 政策', ['US-China AI policy', 'AI chip export controls'], 'geopolitics', 3),
+  topic('artist-coldplay', 'artist', 'Coldplay', [], 'concerts', 3),
+  topic('artist-mayday', 'artist', 'Mayday', ['五月天'], 'concerts', 3)
+];
+
 export const demoItems: RadarItem[] = [
   {
     id: 'demo-concert-watch-status',

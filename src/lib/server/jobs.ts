@@ -10,13 +10,14 @@ import { sortReminders, todayInSingapore } from './lunar';
 import { getAllUpcomingMilestones } from './milestones';
 import { isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
+import { getDigestOwnerUserId } from './users';
 import type { DateReminder, Env, JobResult, RadarItem } from './types';
 
 export { runCoeCheckJob } from './coe';
 
 export async function runConcertFetchJob(env: Env): Promise<JobResult> {
   const db = getDb(env);
-  const topics = await db.listTopics();
+  const topics = await db.listTopicsForIngestion();
   const fetched = [
     ...(await fetchTicketmasterConcerts(env, topics)),
     ...(await fetchBandsintownConcerts(env, topics))
@@ -28,7 +29,16 @@ export async function runConcertFetchJob(env: Env): Promise<JobResult> {
   for (const item of fetched) {
     const scored = scoreItem(item, topics);
     const enhanced = await maybeEnhance(env, scored);
-    const result = await db.upsertItem({ ...scored, summary: enhanced.summary, score: Math.max(scored.score, enhanced.relevance) });
+    const result = await db.upsertItem({
+      ...scored,
+      summary: enhanced.summary,
+      score: Math.max(scored.score, enhanced.relevance),
+      // Catalog is shared across users: ingest never carries a personal engagement state.
+      status: 'new',
+      savedAt: undefined,
+      trackingAt: undefined,
+      viewedAt: undefined
+    });
     if (result === 'inserted') inserted += 1;
     else updated += 1;
   }
@@ -40,7 +50,7 @@ export async function runConcertFetchJob(env: Env): Promise<JobResult> {
 
 export async function runTrendFetchJob(env: Env): Promise<JobResult> {
   const db = getDb(env);
-  const topics = await db.listTopics();
+  const topics = await db.listTopicsForIngestion();
   const fetched = await buildTrendSearchItems(topics);
   const scored = fetched.map((item) => scoreItem(item, topics)).filter((item) => !isStaleItem(item));
 
@@ -52,7 +62,8 @@ export async function runTrendFetchJob(env: Env): Promise<JobResult> {
   let inserted = 0;
   let updated = 0;
   for (const item of toInsert) {
-    const result = await db.upsertItem(item);
+    // Catalog is shared across users: ingest never carries a personal engagement state.
+    const result = await db.upsertItem({ ...item, status: 'new', savedAt: undefined, trackingAt: undefined, viewedAt: undefined });
     if (result === 'inserted') inserted += 1;
     else updated += 1;
   }
@@ -81,7 +92,10 @@ export async function runItemDedupJob(env: Env): Promise<JobResult> {
 }
 
 export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual_digest' = 'daily_digest'): Promise<JobResult> {
-  const db = getDb(env);
+  // Phase 1: digests use the first admin account's feed/reminders + shared Telegram chat.
+  const base = getDb(env);
+  const ownerId = await getDigestOwnerUserId(base, env);
+  const db = getDb(env, ownerId);
   const [items, reminders] = await Promise.all([db.listItems(12), db.listReminders()]);
   const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
   const message = appendReminderDigest(renderTelegramDigest(digest), reminders);

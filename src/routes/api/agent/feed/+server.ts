@@ -36,7 +36,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   }
 
   const db = getDb(env);
-  const topics = await db.listTopics();
+  const topics = await db.listTopicsForIngestion();
   const results: Array<{ id: string; status: string; promotedItemId: string | null }> = [];
   let accepted = 0;
   let urlDuplicates = 0;

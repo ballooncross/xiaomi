@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
-import { getDb } from '$lib/server/db';
+import { getAdminScopedDb } from '$lib/server/users';
 import { compileContext } from '$lib/server/context-compiler';
 import type { Env, PreferenceSignal, SignalType } from '$lib/server/types';
 import type { RequestHandler } from './$types';
@@ -29,7 +29,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     return json({ error: 'signals array is required' }, { status: 400 });
   }
 
-  const db = getDb(env);
+  const db = await getAdminScopedDb(env);
   let accepted = 0;
 
   for (const input of body.signals) {

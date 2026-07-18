@@ -1,5 +1,5 @@
 import type { DedupExisting, MergeAction } from './dedup';
-import { MAX_TREND_AGE_DAYS } from './scoring';
+import { MAX_TREND_AGE_DAYS, scoreItem } from './scoring';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
 import type {
   AgentFeedItem,
@@ -90,6 +90,7 @@ type FeedbackJoinRow = {
 
 type TopicRow = {
   id: string;
+  user_id?: string;
   type: WatchTopic['type'];
   name: string;
   aliases: string;
@@ -104,6 +105,7 @@ type TopicRow = {
 
 type ReminderRow = {
   id: string;
+  user_id?: string;
   title: string;
   calendar_type: DateReminder['calendarType'];
   category: DateReminder['category'];
@@ -134,30 +136,109 @@ type DevRequestRow = {
   branch: string | null; created_at: string; updated_at: string;
 };
 
+type UserRow = { id: string; email: string; name: string; picture: string };
+
+/** Per-user overlay on top of the shared items catalog. */
+type MemoryUserItemState = {
+  status: RadarItem['status'];
+  savedAt?: string;
+  trackingAt?: string;
+  viewedAt?: string;
+  updatedAt?: string;
+};
+
+const DEFAULT_MEMORY_USER = 'memory-user';
+
 const memory = {
-  topics: [...defaultWatchTopics],
+  users: [] as Array<{ id: string; email: string; name: string; picture: string; createdAt: string; updatedAt: string }>,
+  allowedEmails: [] as Array<{ email: string; createdAt: string; createdBy?: string }>,
+  topicsByUser: new Map<string, WatchTopic[]>(),
   items: [...demoItems],
-  reminders: [...defaultDateReminders],
-  feedback: [] as Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string; createdAt: string }>,
+  itemStateByUser: new Map<string, Map<string, MemoryUserItemState>>(),
+  remindersByUser: new Map<string, DateReminder[]>(),
+  middleNavByUser: new Map<string, string[]>(),
+  feedbackByUser: new Map<string, Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string; createdAt: string }>>(),
   jobs: [] as JobRun[],
   agentFeeds: [] as AgentFeedItem[],
-  preferenceSignals: [] as PreferenceSignal[],
-  aiContextSnapshots: [] as (AiContextDocument & { id: string })[],
+  preferenceSignalsByUser: new Map<string, PreferenceSignal[]>(),
+  aiContextByUser: new Map<string, (AiContextDocument & { id: string })[]>(),
   agentOutcomes: [] as Array<{ id: string; agentFeedId: string; outcome: string; createdAt: string }>,
-  impressions: [] as Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>,
+  impressionsByUser: new Map<string, Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>>(),
   notifications: [] as Array<{ id: string; itemId?: string; channel: string; type: string; status: string; message: string; createdAt: string }>,
   devRequests: [] as DevRequest[]
 };
 
-export function getDb(env?: Env): RadarDb {
-  if (env?.DB) return new D1RadarDb(env.DB);
-  return new MemoryRadarDb();
+function getUserTopics(userId: string): WatchTopic[] {
+  if (!memory.topicsByUser.has(userId)) memory.topicsByUser.set(userId, []);
+  return memory.topicsByUser.get(userId)!;
+}
+
+function getUserReminders(userId: string): DateReminder[] {
+  if (!memory.remindersByUser.has(userId)) memory.remindersByUser.set(userId, []);
+  return memory.remindersByUser.get(userId)!;
+}
+
+function getUserItemStateMap(userId: string): Map<string, MemoryUserItemState> {
+  if (!memory.itemStateByUser.has(userId)) memory.itemStateByUser.set(userId, new Map());
+  return memory.itemStateByUser.get(userId)!;
+}
+
+function getUserFeedback(userId: string) {
+  if (!memory.feedbackByUser.has(userId)) memory.feedbackByUser.set(userId, []);
+  return memory.feedbackByUser.get(userId)!;
+}
+
+function getUserPreferenceSignals(userId: string) {
+  if (!memory.preferenceSignalsByUser.has(userId)) memory.preferenceSignalsByUser.set(userId, []);
+  return memory.preferenceSignalsByUser.get(userId)!;
+}
+
+function getUserAiContexts(userId: string) {
+  if (!memory.aiContextByUser.has(userId)) memory.aiContextByUser.set(userId, []);
+  return memory.aiContextByUser.get(userId)!;
+}
+
+function getUserImpressions(userId: string) {
+  if (!memory.impressionsByUser.has(userId)) memory.impressionsByUser.set(userId, []);
+  return memory.impressionsByUser.get(userId)!;
+}
+
+function mergeItemWithState(item: RadarItem, state?: MemoryUserItemState): RadarItem {
+  if (!state) return item;
+  return {
+    ...item,
+    status: state.status ?? item.status,
+    savedAt: state.savedAt ?? item.savedAt,
+    trackingAt: state.trackingAt ?? item.trackingAt,
+    viewedAt: state.viewedAt ?? item.viewedAt
+  };
+}
+
+/** Union of all enabled follow topics across every user, deduped by lowercased name keeping highest priority. */
+function dedupeTopicsByName(topics: WatchTopic[]): WatchTopic[] {
+  const byName = new Map<string, WatchTopic>();
+  for (const topic of topics) {
+    const key = topic.name.toLowerCase();
+    const existing = byName.get(key);
+    if (!existing || topic.priority > existing.priority) byName.set(key, topic);
+  }
+  return [...byName.values()];
+}
+
+export function getDb(env?: Env, userId?: string): RadarDb {
+  if (env?.DB) return new D1RadarDb(env.DB, userId);
+  return new MemoryRadarDb(userId);
 }
 
 export abstract class RadarDb {
+  constructor(protected readonly userId?: string) {}
+
   abstract listTopics(): Promise<WatchTopic[]>;
   abstract upsertTopic(topic: WatchTopic): Promise<void>;
+  abstract upsertTopicForUser(userId: string, topic: WatchTopic): Promise<void>;
   abstract deleteTopic(topicId: string): Promise<void>;
+  /** Union of every user's enabled follow topics, for ingestion/cron jobs — not scoped to this.userId. */
+  abstract listTopicsForIngestion(): Promise<WatchTopic[]>;
   abstract listItems(limit?: number): Promise<RadarItem[]>;
   abstract listSavedItems(): Promise<RadarItem[]>;
   abstract upsertItem(item: RadarItem): Promise<'inserted' | 'updated'>;
@@ -170,6 +251,18 @@ export abstract class RadarDb {
   abstract notificationExists(type: string, itemId?: string): Promise<boolean>;
   abstract logJob(input: { jobName: string; status: string; detail: string }): Promise<void>;
   abstract listJobRuns(jobName: string, limit?: number): Promise<JobRun[]>;
+
+  // User / allowlist methods
+  abstract listAllowedEmails(): Promise<string[]>;
+  abstract addAllowedEmail(email: string, createdBy?: string): Promise<void>;
+  abstract removeAllowedEmail(email: string): Promise<void>;
+  abstract getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; picture: string } | null>;
+  abstract createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void>;
+  abstract updateUserProfile(id: string, name: string, picture: string): Promise<void>;
+
+  // User settings
+  abstract getMiddleNav(userId?: string): Promise<string[] | null>;
+  abstract setMiddleNav(nav: string[], userId?: string): Promise<void>;
 
   // Agent feed methods
   abstract insertAgentFeed(feed: AgentFeedItem): Promise<void>;
@@ -217,24 +310,48 @@ export abstract class RadarDb {
 }
 
 class MemoryRadarDb extends RadarDb {
+  private get uid(): string {
+    return this.userId ?? DEFAULT_MEMORY_USER;
+  }
+
   async listTopics(): Promise<WatchTopic[]> {
-    return memory.topics.filter((topic) => topic.enabled);
+    return getUserTopics(this.uid).filter((topic) => topic.enabled);
   }
 
   async upsertTopic(topic: WatchTopic): Promise<void> {
-    const index = memory.topics.findIndex((existing) => existing.id === topic.id);
-    if (index >= 0) memory.topics[index] = topic;
-    else memory.topics.push(topic);
+    return this.upsertTopicForUser(this.uid, topic);
+  }
+
+  async upsertTopicForUser(userId: string, topic: WatchTopic): Promise<void> {
+    const topics = getUserTopics(userId);
+    const index = topics.findIndex((existing) => existing.id === topic.id);
+    if (index >= 0) topics[index] = topic;
+    else topics.push(topic);
   }
 
   async deleteTopic(topicId: string): Promise<void> {
-    const index = memory.topics.findIndex((topic) => topic.id === topicId);
-    if (index >= 0) memory.topics[index] = { ...memory.topics[index], enabled: false, updatedAt: new Date().toISOString() };
+    const topics = getUserTopics(this.uid);
+    const index = topics.findIndex((topic) => topic.id === topicId);
+    if (index >= 0) topics[index] = { ...topics[index], enabled: false, updatedAt: new Date().toISOString() };
+  }
+
+  async listTopicsForIngestion(): Promise<WatchTopic[]> {
+    if (memory.topicsByUser.size === 0) {
+      return dedupeTopicsByName(defaultWatchTopics.filter((topic) => topic.enabled && topic.mode === 'follow'));
+    }
+    const all: WatchTopic[] = [];
+    for (const topics of memory.topicsByUser.values()) {
+      all.push(...topics.filter((topic) => topic.enabled && topic.mode === 'follow'));
+    }
+    return dedupeTopicsByName(all);
   }
 
   async listItems(limit = 30): Promise<RadarItem[]> {
     const cutoff = Date.now() - MAX_TREND_AGE_DAYS * 24 * 60 * 60 * 1000;
-    return [...memory.items]
+    const stateMap = getUserItemStateMap(this.uid);
+    const topics = getUserTopics(this.uid).filter((topic) => topic.enabled);
+    return memory.items
+      .map((item) => mergeItemWithState(item, stateMap.get(item.id)))
       .filter((item) => {
         if (item.status === 'dismissed' || item.status === 'viewed' || item.viewedAt) return false;
         if (item.status === 'saved' || item.status === 'tracking') return true;
@@ -243,13 +360,20 @@ class MemoryRadarDb extends RadarDb {
         const date = new Date(item.publishedAt ?? item.createdAt ?? 0).getTime();
         return date > cutoff;
       })
+      .map((item) => scoreItem(item, topics))
+      .filter((item) => !(item.score === 0 && item.status === 'dismissed'))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   }
 
   async listSavedItems(): Promise<RadarItem[]> {
-    return [...memory.items]
+    const stateMap = getUserItemStateMap(this.uid);
+    const topics = getUserTopics(this.uid).filter((topic) => topic.enabled);
+    return memory.items
+      .map((item) => mergeItemWithState(item, stateMap.get(item.id)))
       .filter((item) => item.savedAt || item.trackingAt || item.status === 'saved' || item.status === 'tracking')
+      .map((item) => scoreItem(item, topics))
+      .filter((item) => !(item.score === 0 && item.status === 'dismissed'))
       .sort((a, b) =>
         new Date(b.trackingAt ?? b.savedAt ?? b.updatedAt ?? b.createdAt ?? 0).getTime()
         - new Date(a.trackingAt ?? a.savedAt ?? a.updatedAt ?? a.createdAt ?? 0).getTime()
@@ -273,44 +397,50 @@ class MemoryRadarDb extends RadarDb {
       };
       return 'updated';
     }
-    memory.items.push(withInitialEngagementState(item));
+    // Catalog is shared: ingested items always start clean, never inherit personal engagement.
+    memory.items.push({ ...item, status: 'new', savedAt: undefined, trackingAt: undefined, viewedAt: undefined });
     return 'inserted';
   }
 
   async listReminders(): Promise<DateReminder[]> {
-    return memory.reminders.filter((reminder) => reminder.enabled);
+    return getUserReminders(this.uid).filter((reminder) => reminder.enabled);
   }
 
   async upsertReminder(reminder: DateReminder): Promise<void> {
-    const index = memory.reminders.findIndex((existing) => existing.id === reminder.id);
-    if (index >= 0) memory.reminders[index] = { ...reminder, updatedAt: new Date().toISOString() };
-    else memory.reminders.push(reminder);
+    const reminders = getUserReminders(this.uid);
+    const index = reminders.findIndex((existing) => existing.id === reminder.id);
+    if (index >= 0) reminders[index] = { ...reminder, updatedAt: new Date().toISOString() };
+    else reminders.push(reminder);
   }
 
   async deleteReminder(reminderId: string): Promise<void> {
-    const index = memory.reminders.findIndex((reminder) => reminder.id === reminderId);
-    if (index >= 0) memory.reminders[index] = { ...memory.reminders[index], enabled: false, updatedAt: new Date().toISOString() };
+    const reminders = getUserReminders(this.uid);
+    const index = reminders.findIndex((reminder) => reminder.id === reminderId);
+    if (index >= 0) reminders[index] = { ...reminders[index], enabled: false, updatedAt: new Date().toISOString() };
   }
 
   async recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void> {
-    memory.feedback.push({ id: crypto.randomUUID(), itemId, action, reason, createdAt: new Date().toISOString() });
-    const index = memory.items.findIndex((item) => item.id === itemId);
-    if (index >= 0) memory.items[index] = applyFeedbackState(memory.items[index], action);
+    getUserFeedback(this.uid).push({ id: crypto.randomUUID(), itemId, action, reason, createdAt: new Date().toISOString() });
+    const stateMap = getUserItemStateMap(this.uid);
+    stateMap.set(itemId, applyFeedbackState(stateMap.get(itemId), action));
   }
 
   async updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void> {
-    const item = memory.items.find((candidate) => candidate.id === itemId);
-    if (!item) return;
+    const stateMap = getUserItemStateMap(this.uid);
+    const current = stateMap.get(itemId);
     if (status === 'dismissed') {
-      item.status = status;
-      item.savedAt = undefined;
-      item.trackingAt = undefined;
+      stateMap.set(itemId, {
+        status: 'dismissed',
+        savedAt: undefined,
+        trackingAt: undefined,
+        viewedAt: current?.viewedAt,
+        updatedAt: new Date().toISOString()
+      });
     } else if (status === 'viewed') {
-      Object.assign(item, applyFeedbackState(item, 'viewed'));
+      stateMap.set(itemId, applyFeedbackState(current, 'viewed'));
     } else {
-      item.status = status;
+      stateMap.set(itemId, { ...current, status, updatedAt: new Date().toISOString() });
     }
-    item.updatedAt = new Date().toISOString();
   }
 
   async logNotification(input: { itemId?: string; channel: string; type: string; status: string; message: string }): Promise<void> {
@@ -347,6 +477,58 @@ class MemoryRadarDb extends RadarDb {
     return memory.jobs.filter((job) => job.jobName === jobName).slice(0, limit);
   }
 
+  async listAllowedEmails(): Promise<string[]> {
+    return memory.allowedEmails.map((entry) => entry.email);
+  }
+
+  async addAllowedEmail(email: string, createdBy?: string): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return;
+    if (!memory.allowedEmails.some((entry) => entry.email === normalized)) {
+      memory.allowedEmails.push({ email: normalized, createdAt: new Date().toISOString(), createdBy });
+    }
+  }
+
+  async removeAllowedEmail(email: string): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    const index = memory.allowedEmails.findIndex((entry) => entry.email === normalized);
+    if (index >= 0) memory.allowedEmails.splice(index, 1);
+  }
+
+  async getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; picture: string } | null> {
+    const normalized = email.trim().toLowerCase();
+    const user = memory.users.find((candidate) => candidate.email === normalized);
+    return user ? { id: user.id, email: user.email, name: user.name, picture: user.picture } : null;
+  }
+
+  async createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void> {
+    const now = new Date().toISOString();
+    memory.users.push({
+      id: user.id,
+      email: user.email.trim().toLowerCase(),
+      name: user.name,
+      picture: user.picture,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+
+  async updateUserProfile(id: string, name: string, picture: string): Promise<void> {
+    const user = memory.users.find((candidate) => candidate.id === id);
+    if (!user) return;
+    if (name) user.name = name;
+    if (picture) user.picture = picture;
+    user.updatedAt = new Date().toISOString();
+  }
+
+  async getMiddleNav(userId?: string): Promise<string[] | null> {
+    return memory.middleNavByUser.get(userId ?? this.uid) ?? null;
+  }
+
+  async setMiddleNav(nav: string[], userId?: string): Promise<void> {
+    memory.middleNavByUser.set(userId ?? this.uid, [...nav]);
+  }
+
   async insertAgentFeed(feed: AgentFeedItem): Promise<void> {
     memory.agentFeeds.push(feed);
   }
@@ -374,23 +556,24 @@ class MemoryRadarDb extends RadarDb {
   }
 
   async insertPreferenceSignal(signal: PreferenceSignal): Promise<void> {
-    memory.preferenceSignals.push(signal);
+    getUserPreferenceSignals(this.uid).push(signal);
   }
 
   async listPreferenceSignals(options?: { since?: string; type?: string; limit?: number }): Promise<PreferenceSignal[]> {
-    let signals = [...memory.preferenceSignals];
+    let signals = [...getUserPreferenceSignals(this.uid)];
     if (options?.since) signals = signals.filter((s) => (s.createdAt ?? '') >= options.since!);
     if (options?.type) signals = signals.filter((s) => s.signalType === options.type);
     return signals.slice(0, options?.limit ?? 500);
   }
 
   async insertAiContextSnapshot(doc: AiContextDocument): Promise<void> {
-    memory.aiContextSnapshots.push({ ...doc, id: crypto.randomUUID() });
+    getUserAiContexts(this.uid).push({ ...doc, id: crypto.randomUUID() });
   }
 
   async getLatestAiContext(): Promise<AiContextDocument | null> {
-    if (memory.aiContextSnapshots.length === 0) return null;
-    return memory.aiContextSnapshots[memory.aiContextSnapshots.length - 1];
+    const contexts = getUserAiContexts(this.uid);
+    if (contexts.length === 0) return null;
+    return contexts[contexts.length - 1];
   }
 
   async recordAgentOutcome(feedId: string, outcome: string): Promise<void> {
@@ -412,10 +595,11 @@ class MemoryRadarDb extends RadarDb {
 
   async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const latestByItem = new Map<string, (typeof memory.feedback)[number]>();
-    for (const feedback of memory.feedback) {
-      if (feedback.createdAt < cutoff || !isEffectivePreferenceAction(feedback.action)) continue;
-      latestByItem.set(feedback.itemId, feedback);
+    const feedback = getUserFeedback(this.uid);
+    const latestByItem = new Map<string, (typeof feedback)[number]>();
+    for (const entry of feedback) {
+      if (entry.createdAt < cutoff || !isEffectivePreferenceAction(entry.action)) continue;
+      latestByItem.set(entry.itemId, entry);
     }
     return [...latestByItem.values()]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -425,17 +609,19 @@ class MemoryRadarDb extends RadarDb {
       });
   }
 
-  async recordImpressions(itemIds: string[]): Promise<void> {
+  async recordImpressions(itemIds: string[], impressionType = 'feed'): Promise<void> {
     const now = new Date().toISOString();
+    const impressions = getUserImpressions(this.uid);
     for (const itemId of itemIds) {
-      memory.impressions.push({ id: crypto.randomUUID(), itemId, impressionType: 'feed', createdAt: now });
+      impressions.push({ id: crypto.randomUUID(), itemId, impressionType, createdAt: now });
     }
   }
 
   async getImpressionCounts(itemIds: string[]): Promise<Map<string, number>> {
+    const impressions = getUserImpressions(this.uid);
     const counts = new Map<string, number>();
     for (const id of itemIds) {
-      counts.set(id, memory.impressions.filter((i) => i.itemId === id).length);
+      counts.set(id, impressions.filter((i) => i.itemId === id).length);
     }
     return counts;
   }
@@ -507,14 +693,16 @@ class MemoryRadarDb extends RadarDb {
 }
 
 class D1RadarDb extends RadarDb {
-  constructor(private readonly db: D1Database) {
-    super();
+  constructor(private readonly db: D1Database, userId?: string) {
+    super(userId);
   }
 
   async listTopics(): Promise<WatchTopic[]> {
+    if (!this.userId) return [];
     try {
       const { results } = await this.db
-        .prepare('SELECT * FROM watch_topics WHERE enabled = 1 ORDER BY priority DESC, name ASC')
+        .prepare('SELECT * FROM watch_topics WHERE user_id = ? AND enabled = 1 ORDER BY priority DESC, name ASC')
+        .bind(this.userId)
         .all<TopicRow>();
       return results.map(topicFromRow);
     } catch (error) {
@@ -524,12 +712,18 @@ class D1RadarDb extends RadarDb {
   }
 
   async upsertTopic(topic: WatchTopic): Promise<void> {
+    if (!this.userId) return;
+    return this.upsertTopicForUser(this.userId, topic);
+  }
+
+  async upsertTopicForUser(userId: string, topic: WatchTopic): Promise<void> {
+    if (!userId) return;
     try {
       await this.db
         .prepare(
-          `INSERT INTO watch_topics (id, type, name, aliases, category, priority, mode, enabled, optimize_status, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(id) DO UPDATE SET
+          `INSERT INTO watch_topics (user_id, id, type, name, aliases, category, priority, mode, enabled, optimize_status, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id, id) DO UPDATE SET
            type = excluded.type,
            name = excluded.name,
            aliases = excluded.aliases,
@@ -541,6 +735,7 @@ class D1RadarDb extends RadarDb {
            updated_at = CURRENT_TIMESTAMP`
         )
         .bind(
+          userId,
           topic.id,
           topic.type,
           topic.name,
@@ -553,40 +748,72 @@ class D1RadarDb extends RadarDb {
         )
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().upsertTopic(topic);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).upsertTopicForUser(userId, topic);
       throw error;
     }
   }
 
   async deleteTopic(topicId: string): Promise<void> {
+    if (!this.userId) return;
     try {
       await this.db
-        .prepare('UPDATE watch_topics SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(topicId)
+        .prepare('UPDATE watch_topics SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND id = ?')
+        .bind(this.userId, topicId)
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().deleteTopic(topicId);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).deleteTopic(topicId);
+      throw error;
+    }
+  }
+
+  async listTopicsForIngestion(): Promise<WatchTopic[]> {
+    try {
+      const { results } = await this.db
+        .prepare(`SELECT * FROM watch_topics WHERE enabled = 1 AND mode = 'follow' ORDER BY priority DESC, name ASC`)
+        .all<TopicRow>();
+      return dedupeTopicsByName(results.map(topicFromRow));
+    } catch (error) {
+      if (isMissingTableError(error)) return dedupeTopicsByName(defaultWatchTopics.filter((t) => t.enabled && t.mode === 'follow'));
       throw error;
     }
   }
 
   async listItems(limit = 30): Promise<RadarItem[]> {
+    if (!this.userId) return [];
+    const fetchLimit = Math.min(500, Math.max(limit * 5, 150));
     try {
       const { results } = await this.db
-        .prepare(`SELECT * FROM items WHERE status NOT IN ('dismissed', 'viewed')
-           AND viewed_at IS NULL
-           AND (
-             status IN ('saved', 'tracking')
-             OR (starts_at IS NOT NULL AND starts_at > datetime('now'))
-             OR (
-               (kind NOT IN ('trend', 'news', 'opportunity') OR published_at IS NOT NULL)
-               AND COALESCE(published_at, created_at) > datetime('now', '-${MAX_TREND_AGE_DAYS} days')
-             )
-           )
-           ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?`)
-        .bind(limit)
+        .prepare(`SELECT * FROM (
+            SELECT
+              i.id, i.source_id, i.source_type, i.external_id, i.kind, i.title, i.summary, i.description,
+              i.url, i.image_url, i.location, i.starts_at, i.published_at, i.artists, i.topics, i.raw_json,
+              i.score, i.related_sources, i.created_at, i.updated_at,
+              COALESCE(s.status, i.status) AS status,
+              COALESCE(s.saved_at, i.saved_at) AS saved_at,
+              COALESCE(s.tracking_at, i.tracking_at) AS tracking_at,
+              COALESCE(s.viewed_at, i.viewed_at) AS viewed_at
+            FROM items i
+            LEFT JOIN user_item_state s ON s.item_id = i.id AND s.user_id = ?
+          )
+          WHERE status NOT IN ('dismissed', 'viewed')
+            AND viewed_at IS NULL
+            AND (
+              status IN ('saved', 'tracking')
+              OR (starts_at IS NOT NULL AND starts_at > datetime('now'))
+              OR (
+                (kind NOT IN ('trend', 'news', 'opportunity') OR published_at IS NOT NULL)
+                AND COALESCE(published_at, created_at) > datetime('now', '-${MAX_TREND_AGE_DAYS} days')
+              )
+            )
+          ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?`)
+        .bind(this.userId, fetchLimit)
         .all<ItemRow>();
-      return results.map(itemFromRow);
+      const topics = await this.listTopics();
+      return results
+        .map((row) => scoreItem(itemFromRow(row), topics))
+        .filter((item) => !(item.score === 0 && item.status === 'dismissed'))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
     } catch (error) {
       if (isMissingTableError(error)) return demoItems.slice(0, limit);
       throw error;
@@ -594,15 +821,31 @@ class D1RadarDb extends RadarDb {
   }
 
   async listSavedItems(): Promise<RadarItem[]> {
+    if (!this.userId) return [];
     try {
       const { results } = await this.db
-        .prepare(`SELECT * FROM items
+        .prepare(`SELECT * FROM (
+            SELECT
+              i.id, i.source_id, i.source_type, i.external_id, i.kind, i.title, i.summary, i.description,
+              i.url, i.image_url, i.location, i.starts_at, i.published_at, i.artists, i.topics, i.raw_json,
+              i.score, i.related_sources, i.created_at, i.updated_at,
+              COALESCE(s.status, i.status) AS status,
+              COALESCE(s.saved_at, i.saved_at) AS saved_at,
+              COALESCE(s.tracking_at, i.tracking_at) AS tracking_at,
+              COALESCE(s.viewed_at, i.viewed_at) AS viewed_at
+            FROM items i
+            LEFT JOIN user_item_state s ON s.item_id = i.id AND s.user_id = ?
+          )
           WHERE saved_at IS NOT NULL OR tracking_at IS NOT NULL OR status IN ('saved', 'tracking')
           ORDER BY COALESCE(tracking_at, saved_at, updated_at, created_at) DESC`)
+        .bind(this.userId)
         .all<ItemRow>();
-      return results.map(itemFromRow);
+      const topics = await this.listTopics();
+      return results
+        .map((row) => scoreItem(itemFromRow(row), topics))
+        .filter((item) => !(item.score === 0 && item.status === 'dismissed'));
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().listSavedItems();
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).listSavedItems();
       throw error;
     }
   }
@@ -614,7 +857,8 @@ class D1RadarDb extends RadarDb {
         .bind(item.sourceType, item.externalId)
         .first<{ id: string }>();
 
-      const initialItem = withInitialEngagementState(item);
+      // Catalog is shared: ingested items always start clean ('new', no engagement),
+      // never inheriting a personal dismiss/save/track state from the fetcher.
       await this.db
         .prepare(
           `INSERT INTO items (
@@ -622,7 +866,7 @@ class D1RadarDb extends RadarDb {
           location, starts_at, published_at, artists, topics, raw_json, score, status,
           saved_at, tracking_at, viewed_at, related_sources, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', NULL, NULL, NULL, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(source_type, external_id) DO UPDATE SET
           title = excluded.title,
           summary = excluded.summary,
@@ -641,42 +885,40 @@ class D1RadarDb extends RadarDb {
           updated_at = CURRENT_TIMESTAMP`
         )
         .bind(
-          initialItem.id,
-          initialItem.sourceId,
-          initialItem.sourceType,
-          initialItem.externalId,
-          initialItem.kind,
-          initialItem.title,
-          initialItem.summary,
-          initialItem.description,
-          initialItem.url ?? null,
-          initialItem.imageUrl ?? null,
-          initialItem.location ?? null,
-          initialItem.startsAt ?? null,
-          initialItem.publishedAt ?? null,
-          JSON.stringify(initialItem.artists),
-          JSON.stringify(initialItem.topics),
-          JSON.stringify(initialItem.raw ?? {}),
-          initialItem.score,
-          initialItem.status,
-          initialItem.savedAt ?? null,
-          initialItem.trackingAt ?? null,
-          initialItem.viewedAt ?? null,
-          JSON.stringify(initialItem.relatedSources ?? [])
+          item.id,
+          item.sourceId,
+          item.sourceType,
+          item.externalId,
+          item.kind,
+          item.title,
+          item.summary,
+          item.description,
+          item.url ?? null,
+          item.imageUrl ?? null,
+          item.location ?? null,
+          item.startsAt ?? null,
+          item.publishedAt ?? null,
+          JSON.stringify(item.artists),
+          JSON.stringify(item.topics),
+          JSON.stringify(item.raw ?? {}),
+          item.score,
+          JSON.stringify(item.relatedSources ?? [])
         )
         .run();
 
       return existing ? 'updated' : 'inserted';
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().upsertItem(item);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).upsertItem(item);
       throw error;
     }
   }
 
   async listReminders(): Promise<DateReminder[]> {
+    if (!this.userId) return [];
     try {
       const { results } = await this.db
-        .prepare('SELECT * FROM date_reminders WHERE enabled = 1 ORDER BY pinned DESC, title ASC')
+        .prepare('SELECT * FROM date_reminders WHERE user_id = ? AND enabled = 1 ORDER BY pinned DESC, title ASC')
+        .bind(this.userId)
         .all<ReminderRow>();
       return results.map(reminderFromRow);
     } catch (error) {
@@ -686,15 +928,16 @@ class D1RadarDb extends RadarDb {
   }
 
   async upsertReminder(reminder: DateReminder): Promise<void> {
+    if (!this.userId) return;
     try {
       await this.db
         .prepare(
           `INSERT INTO date_reminders (
-            id, title, calendar_type, category, year, month, day, lunar_is_leap_month, repeat, note,
+            user_id, id, title, calendar_type, category, year, month, day, lunar_is_leap_month, repeat, note,
             pinned, enabled, remind_days_before, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(id) DO UPDATE SET
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id, id) DO UPDATE SET
             title = excluded.title,
             calendar_type = excluded.calendar_type,
             category = excluded.category,
@@ -710,6 +953,7 @@ class D1RadarDb extends RadarDb {
             updated_at = CURRENT_TIMESTAMP`
         )
         .bind(
+          this.userId,
           reminder.id,
           reminder.title,
           reminder.calendarType,
@@ -726,28 +970,30 @@ class D1RadarDb extends RadarDb {
         )
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().upsertReminder(reminder);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).upsertReminder(reminder);
       throw error;
     }
   }
 
   async deleteReminder(reminderId: string): Promise<void> {
+    if (!this.userId) return;
     try {
       await this.db
-        .prepare('UPDATE date_reminders SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(reminderId)
+        .prepare('UPDATE date_reminders SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND id = ?')
+        .bind(this.userId, reminderId)
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().deleteReminder(reminderId);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).deleteReminder(reminderId);
       throw error;
     }
   }
 
   async recordFeedback(itemId: string, action: FeedbackAction, reason?: string): Promise<void> {
+    if (!this.userId) return;
     try {
       await this.db
-        .prepare('INSERT INTO feedback_events (id, item_id, action, reason) VALUES (?, ?, ?, ?)')
-        .bind(crypto.randomUUID(), itemId, action, reason ?? null)
+        .prepare('INSERT INTO feedback_events (id, item_id, action, reason, user_id) VALUES (?, ?, ?, ?, ?)')
+        .bind(crypto.randomUUID(), itemId, action, reason ?? null, this.userId)
         .run();
 
       await this.applyFeedbackState(itemId, action);
@@ -777,58 +1023,94 @@ class D1RadarDb extends RadarDb {
         }
       }
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().recordFeedback(itemId, action, reason);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).recordFeedback(itemId, action, reason);
       throw error;
     }
   }
 
   async updateItemStatus(itemId: string, status: RadarItem['status']): Promise<void> {
+    if (!this.userId) return;
     try {
       if (status === 'dismissed') {
-        await this.db
-          .prepare('UPDATE items SET status = ?, saved_at = NULL, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-          .bind(status, itemId)
-          .run();
+        const existing = await this.getUserItemState(itemId);
+        await this.setUserItemState(itemId, { status: 'dismissed', savedAt: null, trackingAt: null, viewedAt: existing?.viewedAt ?? null });
       } else if (status === 'viewed') {
         await this.applyFeedbackState(itemId, 'viewed');
       } else {
-        await this.db
-          .prepare('UPDATE items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-          .bind(status, itemId)
-          .run();
+        const existing = await this.getUserItemState(itemId);
+        await this.setUserItemState(itemId, {
+          status,
+          savedAt: existing?.savedAt ?? null,
+          trackingAt: existing?.trackingAt ?? null,
+          viewedAt: existing?.viewedAt ?? null
+        });
       }
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().updateItemStatus(itemId, status);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).updateItemStatus(itemId, status);
       throw error;
     }
   }
 
+  private async getUserItemState(itemId: string): Promise<{ status: string; savedAt: string | null; trackingAt: string | null; viewedAt: string | null } | null> {
+    if (!this.userId) return null;
+    const row = await this.db
+      .prepare('SELECT status, saved_at, tracking_at, viewed_at FROM user_item_state WHERE user_id = ? AND item_id = ?')
+      .bind(this.userId, itemId)
+      .first<{ status: string; saved_at: string | null; tracking_at: string | null; viewed_at: string | null }>();
+    if (!row) return null;
+    return { status: row.status, savedAt: row.saved_at, trackingAt: row.tracking_at, viewedAt: row.viewed_at };
+  }
+
+  private async setUserItemState(
+    itemId: string,
+    state: { status: string; savedAt: string | null; trackingAt: string | null; viewedAt: string | null }
+  ): Promise<void> {
+    if (!this.userId) return;
+    await this.db
+      .prepare(
+        `INSERT INTO user_item_state (user_id, item_id, status, saved_at, tracking_at, viewed_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id, item_id) DO UPDATE SET
+           status = excluded.status,
+           saved_at = excluded.saved_at,
+           tracking_at = excluded.tracking_at,
+           viewed_at = excluded.viewed_at,
+           updated_at = CURRENT_TIMESTAMP`
+      )
+      .bind(this.userId, itemId, state.status, state.savedAt, state.trackingAt, state.viewedAt)
+      .run();
+  }
+
   private async applyFeedbackState(itemId: string, action: FeedbackAction): Promise<void> {
+    if (!this.userId) return;
+    const now = new Date().toISOString();
+    const existing = await this.getUserItemState(itemId);
     if (action === 'save') {
-      await this.db
-        .prepare(`UPDATE items SET status = 'saved', saved_at = CURRENT_TIMESTAMP, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(itemId)
-        .run();
+      await this.setUserItemState(itemId, { status: 'saved', savedAt: now, trackingAt: null, viewedAt: existing?.viewedAt ?? null });
     } else if (action === 'track') {
-      await this.db
-        .prepare(`UPDATE items SET status = 'tracking', saved_at = COALESCE(saved_at, CURRENT_TIMESTAMP), tracking_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(itemId)
-        .run();
+      await this.setUserItemState(itemId, {
+        status: 'tracking',
+        savedAt: existing?.savedAt ?? now,
+        trackingAt: now,
+        viewedAt: existing?.viewedAt ?? null
+      });
     } else if (action === 'unsave') {
-      await this.db
-        .prepare(`UPDATE items SET status = CASE WHEN viewed_at IS NULL THEN 'new' ELSE 'viewed' END, saved_at = NULL, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(itemId)
-        .run();
+      await this.setUserItemState(itemId, {
+        status: existing?.viewedAt ? 'viewed' : 'new',
+        savedAt: null,
+        trackingAt: null,
+        viewedAt: existing?.viewedAt ?? null
+      });
     } else if (action === 'not_relevant' || action === 'less_like_this') {
-      await this.db
-        .prepare(`UPDATE items SET status = 'dismissed', saved_at = NULL, tracking_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(itemId)
-        .run();
+      await this.setUserItemState(itemId, { status: 'dismissed', savedAt: null, trackingAt: null, viewedAt: existing?.viewedAt ?? null });
     } else if (action === 'viewed') {
-      await this.db
-        .prepare(`UPDATE items SET status = CASE WHEN status IN ('saved', 'tracking') THEN status ELSE 'viewed' END, viewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(itemId)
-        .run();
+      const status = existing?.status === 'saved' || existing?.status === 'tracking' ? existing.status : 'viewed';
+      await this.setUserItemState(itemId, {
+        status,
+        savedAt: existing?.savedAt ?? null,
+        trackingAt: existing?.trackingAt ?? null,
+        viewedAt: now
+      });
     }
   }
 
@@ -889,6 +1171,112 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async listAllowedEmails(): Promise<string[]> {
+    try {
+      const { results } = await this.db
+        .prepare('SELECT email FROM allowed_emails ORDER BY created_at ASC')
+        .all<{ email: string }>();
+      return results.map((r) => r.email);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async addAllowedEmail(email: string, createdBy?: string): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return;
+    try {
+      await this.db
+        .prepare('INSERT INTO allowed_emails (email, created_by) VALUES (?, ?) ON CONFLICT(email) DO NOTHING')
+        .bind(normalized, createdBy ?? null)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).addAllowedEmail(email, createdBy);
+      throw error;
+    }
+  }
+
+  async removeAllowedEmail(email: string): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    try {
+      await this.db.prepare('DELETE FROM allowed_emails WHERE email = ?').bind(normalized).run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; picture: string } | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT id, email, name, picture FROM users WHERE email = ?')
+        .bind(email.trim().toLowerCase())
+        .first<UserRow>();
+      return row ?? null;
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void> {
+    try {
+      await this.db
+        .prepare('INSERT INTO users (id, email, name, picture) VALUES (?, ?, ?, ?)')
+        .bind(user.id, user.email.trim().toLowerCase(), user.name, user.picture)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).createUser(user);
+      throw error;
+    }
+  }
+
+  async updateUserProfile(id: string, name: string, picture: string): Promise<void> {
+    try {
+      await this.db
+        .prepare('UPDATE users SET name = COALESCE(NULLIF(?, \'\'), name), picture = COALESCE(NULLIF(?, \'\'), picture), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(name ?? '', picture ?? '', id)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getMiddleNav(userId?: string): Promise<string[] | null> {
+    const uid = userId ?? this.userId;
+    if (!uid) return null;
+    try {
+      const row = await this.db
+        .prepare('SELECT middle_nav_json FROM user_settings WHERE user_id = ?')
+        .bind(uid)
+        .first<{ middle_nav_json: string }>();
+      if (!row) return null;
+      return parseJson<string[]>(row.middle_nav_json, []);
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async setMiddleNav(nav: string[], userId?: string): Promise<void> {
+    const uid = userId ?? this.userId;
+    if (!uid) return;
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO user_settings (user_id, middle_nav_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(user_id) DO UPDATE SET middle_nav_json = excluded.middle_nav_json, updated_at = CURRENT_TIMESTAMP`
+        )
+        .bind(uid, JSON.stringify(nav))
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).setMiddleNav(nav, userId);
+      throw error;
+    }
+  }
+
   async insertAgentFeed(feed: AgentFeedItem): Promise<void> {
     try {
       await this.db
@@ -905,7 +1293,7 @@ class D1RadarDb extends RadarDb {
         )
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().insertAgentFeed(feed);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).insertAgentFeed(feed);
       throw error;
     }
   }
@@ -920,8 +1308,7 @@ class D1RadarDb extends RadarDb {
       }
       sql += ' ORDER BY created_at DESC LIMIT ?';
       binds.push(options?.limit ?? 50);
-      const stmt = this.db.prepare(sql);
-      const { results } = await (binds.length === 1 ? stmt.bind(binds[0]) : stmt.bind(...binds)).all<AgentFeedRow>();
+      const { results } = await this.db.prepare(sql).bind(...binds).all<AgentFeedRow>();
       return results.map(agentFeedFromRow);
     } catch (error) {
       if (isMissingTableError(error)) return [];
@@ -971,27 +1358,31 @@ class D1RadarDb extends RadarDb {
     try {
       await this.db
         .prepare(
-          `INSERT INTO preference_signals (id, signal_type, signal_value, related_item_id, related_topic_id, source)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO preference_signals (id, signal_type, signal_value, related_item_id, related_topic_id, source, user_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(signal.id, signal.signalType, signal.signalValue, signal.relatedItemId ?? null, signal.relatedTopicId ?? null, signal.source)
+        .bind(
+          signal.id, signal.signalType, signal.signalValue,
+          signal.relatedItemId ?? null, signal.relatedTopicId ?? null, signal.source,
+          this.userId ?? null
+        )
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().insertPreferenceSignal(signal);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).insertPreferenceSignal(signal);
       throw error;
     }
   }
 
   async listPreferenceSignals(options?: { since?: string; type?: string; limit?: number }): Promise<PreferenceSignal[]> {
+    if (!this.userId) return [];
     try {
-      let sql = 'SELECT * FROM preference_signals WHERE 1=1';
-      const binds: unknown[] = [];
+      let sql = 'SELECT * FROM preference_signals WHERE user_id = ?';
+      const binds: unknown[] = [this.userId];
       if (options?.since) { sql += ' AND created_at >= ?'; binds.push(options.since); }
       if (options?.type) { sql += ' AND signal_type = ?'; binds.push(options.type); }
       sql += ' ORDER BY created_at DESC LIMIT ?';
       binds.push(options?.limit ?? 500);
-      const stmt = this.db.prepare(sql);
-      const { results } = await (binds.length === 1 ? stmt.bind(binds[0]) : stmt.bind(...binds)).all<PreferenceSignalRow>();
+      const { results } = await this.db.prepare(sql).bind(...binds).all<PreferenceSignalRow>();
       return results.map(preferenceSignalFromRow);
     } catch (error) {
       if (isMissingTableError(error)) return [];
@@ -1000,38 +1391,47 @@ class D1RadarDb extends RadarDb {
   }
 
   async insertAiContextSnapshot(doc: AiContextDocument): Promise<void> {
+    if (!this.userId) return;
     try {
       const signalCount = await this.db
-        .prepare('SELECT COUNT(*) as cnt FROM preference_signals')
+        .prepare('SELECT COUNT(*) as cnt FROM preference_signals WHERE user_id = ?')
+        .bind(this.userId)
         .first<{ cnt: number }>()
         .then((r) => r?.cnt ?? 0);
 
       await this.db
         .prepare(
-          `INSERT INTO ai_context_snapshots (id, version, context_json, compiled_from, signal_count)
-           VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO ai_context_snapshots (id, version, context_json, compiled_from, signal_count, user_id)
+           VALUES (?, ?, ?, ?, ?, ?)`
         )
         .bind(
           crypto.randomUUID(), doc.version, JSON.stringify(doc),
           `${doc.interestProfile.primary.length} topics, ${doc.stats.totalFeedbackEvents} feedback events`,
-          signalCount
+          signalCount, this.userId
         )
         .run();
 
-      // Keep only the last 10 snapshots
+      // Keep only the last 10 snapshots per user
       await this.db
-        .prepare('DELETE FROM ai_context_snapshots WHERE id NOT IN (SELECT id FROM ai_context_snapshots ORDER BY version DESC LIMIT 10)')
+        .prepare(
+          `DELETE FROM ai_context_snapshots WHERE user_id = ? AND id NOT IN (
+             SELECT id FROM ai_context_snapshots WHERE user_id = ? ORDER BY version DESC LIMIT 10
+           )`
+        )
+        .bind(this.userId, this.userId)
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().insertAiContextSnapshot(doc);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).insertAiContextSnapshot(doc);
       throw error;
     }
   }
 
   async getLatestAiContext(): Promise<AiContextDocument | null> {
+    if (!this.userId) return null;
     try {
       const row = await this.db
-        .prepare('SELECT * FROM ai_context_snapshots ORDER BY version DESC LIMIT 1')
+        .prepare('SELECT * FROM ai_context_snapshots WHERE user_id = ? ORDER BY version DESC LIMIT 1')
+        .bind(this.userId)
         .first<AiContextRow>();
       if (!row) return null;
       return parseJson<AiContextDocument>(row.context_json, null as unknown as AiContextDocument);
@@ -1111,6 +1511,7 @@ class D1RadarDb extends RadarDb {
   }
 
   async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
+    if (!this.userId) return [];
     try {
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const { results } = await this.db
@@ -1119,7 +1520,7 @@ class D1RadarDb extends RadarDb {
              SELECT f.*,
                ROW_NUMBER() OVER (PARTITION BY f.item_id ORDER BY f.created_at DESC, f.id DESC) AS rank
              FROM feedback_events f
-             WHERE f.created_at >= ?
+             WHERE f.created_at >= ? AND f.user_id = ?
                AND f.action IN ('save', 'track', 'unsave', 'not_relevant', 'more_like_this', 'less_like_this')
            )
            SELECT f.item_id, f.action, i.topics, i.source_type, f.created_at
@@ -1128,7 +1529,7 @@ class D1RadarDb extends RadarDb {
            WHERE f.rank = 1
            ORDER BY f.created_at DESC`
         )
-        .bind(cutoff)
+        .bind(cutoff, this.userId)
         .all<FeedbackJoinRow>();
       return results.map((r) => ({
         itemId: r.item_id,
@@ -1144,13 +1545,14 @@ class D1RadarDb extends RadarDb {
   }
 
   async recordImpressions(itemIds: string[], impressionType = 'feed'): Promise<void> {
+    if (!this.userId || itemIds.length === 0) return;
     try {
       const batch = itemIds.map((id) =>
         this.db
-          .prepare('INSERT INTO item_impressions (id, item_id, impression_type) VALUES (?, ?, ?)')
-          .bind(crypto.randomUUID(), id, impressionType)
+          .prepare('INSERT INTO item_impressions (id, item_id, impression_type, user_id) VALUES (?, ?, ?, ?)')
+          .bind(crypto.randomUUID(), id, impressionType, this.userId)
       );
-      if (batch.length > 0) await this.db.batch(batch);
+      await this.db.batch(batch);
     } catch (error) {
       if (isMissingTableError(error)) return;
       throw error;
@@ -1159,12 +1561,12 @@ class D1RadarDb extends RadarDb {
 
   async getImpressionCounts(itemIds: string[]): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
-    if (itemIds.length === 0) return counts;
+    if (itemIds.length === 0 || !this.userId) return counts;
     try {
       const placeholders = itemIds.map(() => '?').join(',');
       const { results } = await this.db
-        .prepare(`SELECT item_id, COUNT(*) as cnt FROM item_impressions WHERE item_id IN (${placeholders}) GROUP BY item_id`)
-        .bind(...itemIds)
+        .prepare(`SELECT item_id, COUNT(*) as cnt FROM item_impressions WHERE user_id = ? AND item_id IN (${placeholders}) GROUP BY item_id`)
+        .bind(this.userId, ...itemIds)
         .all<{ item_id: string; cnt: number }>();
       for (const r of results) counts.set(r.item_id, r.cnt);
       return counts;
@@ -1262,7 +1664,7 @@ class D1RadarDb extends RadarDb {
         .bind(request.id, request.text, request.status, request.response, request.branch ?? null)
         .run();
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().insertDevRequest(request);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).insertDevRequest(request);
       throw error;
     }
   }
@@ -1277,8 +1679,7 @@ class D1RadarDb extends RadarDb {
       }
       sql += ' ORDER BY created_at DESC LIMIT ?';
       binds.push(options?.limit ?? 50);
-      const stmt = this.db.prepare(sql);
-      const { results } = await (binds.length === 1 ? stmt.bind(binds[0]) : stmt.bind(...binds)).all<DevRequestRow>();
+      const { results } = await this.db.prepare(sql).bind(...binds).all<DevRequestRow>();
       return results.map(devRequestFromRow);
     } catch (error) {
       if (isMissingTableError(error)) return [];
@@ -1312,7 +1713,7 @@ class D1RadarDb extends RadarDb {
         .first<ItemRow>();
       return row ? itemFromRow(row) : null;
     } catch (error) {
-      if (isMissingTableError(error)) return new MemoryRadarDb().getItemById(itemId);
+      if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).getItemById(itemId);
       throw error;
     }
   }
@@ -1348,65 +1749,36 @@ class D1RadarDb extends RadarDb {
   }
 }
 
-function withInitialEngagementState(item: RadarItem): RadarItem {
-  const timestamp = item.updatedAt ?? item.createdAt ?? new Date().toISOString();
-  if (item.status === 'tracking') {
-    return {
-      ...item,
-      savedAt: item.savedAt ?? timestamp,
-      trackingAt: item.trackingAt ?? timestamp
-    };
-  }
-  if (item.status === 'saved') {
-    return { ...item, savedAt: item.savedAt ?? timestamp };
-  }
-  if (item.status === 'viewed') {
-    return { ...item, viewedAt: item.viewedAt ?? timestamp };
-  }
-  return item;
-}
-
-function applyFeedbackState(item: RadarItem, action: FeedbackAction): RadarItem {
+function applyFeedbackState(state: MemoryUserItemState | undefined, action: FeedbackAction): MemoryUserItemState {
   const now = new Date().toISOString();
   if (action === 'save') {
-    return { ...item, status: 'saved', savedAt: now, trackingAt: undefined, updatedAt: now };
+    return { status: 'saved', savedAt: now, trackingAt: undefined, viewedAt: state?.viewedAt, updatedAt: now };
   }
   if (action === 'track') {
-    return {
-      ...item,
-      status: 'tracking',
-      savedAt: item.savedAt ?? now,
-      trackingAt: now,
-      updatedAt: now
-    };
+    return { status: 'tracking', savedAt: state?.savedAt ?? now, trackingAt: now, viewedAt: state?.viewedAt, updatedAt: now };
   }
   if (action === 'unsave') {
     return {
-      ...item,
-      status: item.viewedAt ? 'viewed' : 'new',
+      status: state?.viewedAt ? 'viewed' : 'new',
       savedAt: undefined,
       trackingAt: undefined,
+      viewedAt: state?.viewedAt,
       updatedAt: now
     };
   }
   if (action === 'not_relevant' || action === 'less_like_this') {
-    return {
-      ...item,
-      status: 'dismissed',
-      savedAt: undefined,
-      trackingAt: undefined,
-      updatedAt: now
-    };
+    return { status: 'dismissed', savedAt: undefined, trackingAt: undefined, viewedAt: state?.viewedAt, updatedAt: now };
   }
   if (action === 'viewed') {
     return {
-      ...item,
-      status: item.status === 'saved' || item.status === 'tracking' ? item.status : 'viewed',
+      status: state?.status === 'saved' || state?.status === 'tracking' ? state.status : 'viewed',
+      savedAt: state?.savedAt,
+      trackingAt: state?.trackingAt,
       viewedAt: now,
       updatedAt: now
     };
   }
-  return item;
+  return state ?? { status: 'new', updatedAt: now };
 }
 
 function isEffectivePreferenceAction(action: FeedbackAction): boolean {

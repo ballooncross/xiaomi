@@ -1,13 +1,15 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
+import { requireAdminUser } from '$lib/server/request-auth';
 import { runDailyDigestJob } from '$lib/server/jobs';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
 const cooldownMinutes = 5;
 
-export const POST: RequestHandler = async ({ platform }) => {
+export const POST: RequestHandler = async ({ platform, locals }) => {
+  requireAdminUser(locals);
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
   if (!env?.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
     return json({ error: 'Telegram 尚未配置。' }, { status: 400 });

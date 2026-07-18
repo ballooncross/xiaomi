@@ -3,40 +3,45 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { getDb } from '$lib/server/db';
 import { mergeLocalEnv } from '$lib/server/env';
 import { sortReminders } from '$lib/server/lunar';
+import { requireSessionUser } from '$lib/server/request-auth';
 import type { DateCategory, DateReminder, Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ platform }) => {
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+export const GET: RequestHandler = async ({ platform, locals }) => {
+  const user = requireSessionUser(locals);
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   return json({ reminders: sortReminders(await db.listReminders()) });
 };
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json()) as Partial<DateReminder>;
   if (!body.title) return json({ error: 'title is required' }, { status: 400 });
 
   const reminder = reminderFromBody(body);
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   await db.upsertReminder(reminder);
   return json({ reminder: sortReminders([reminder])[0], reminders: sortReminders(await db.listReminders()) });
 };
 
-export const PATCH: RequestHandler = async ({ request, platform }) => {
+export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json()) as Partial<DateReminder>;
   if (!body.id || !body.title) return json({ error: 'id and title are required' }, { status: 400 });
 
   const reminder = reminderFromBody(body);
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   await db.upsertReminder(reminder);
   return json({ reminder: sortReminders([reminder])[0], reminders: sortReminders(await db.listReminders()) });
 };
 
-export const DELETE: RequestHandler = async ({ request, url, platform }) => {
+export const DELETE: RequestHandler = async ({ request, url, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = await parseOptionalJson(request);
   const id = body.id || url.searchParams.get('id') || '';
   if (!id) return json({ error: 'id is required' }, { status: 400 });
 
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   await db.deleteReminder(id);
   return json({ ok: true, reminders: sortReminders(await db.listReminders()) });
 };

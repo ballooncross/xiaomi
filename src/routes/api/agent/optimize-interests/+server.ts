@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
-import { getDb } from '$lib/server/db';
+import { getAdminScopedDb } from '$lib/server/users';
 import { compileContext } from '$lib/server/context-compiler';
 import type { Env, WatchTopic } from '$lib/server/types';
 import type { RequestHandler } from './$types';
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ request, platform }) => {
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
   if (!isAuthorized(request, env)) return json({ error: 'Unauthorized' }, { status: 401 });
 
-  const db = getDb(env);
+  const db = await getAdminScopedDb(env);
   const topics = await db.listTopics();
   const pending = topics
     .filter((t) => (t.optimizeStatus ?? 'optimized') === 'pending')
@@ -57,7 +57,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   const optimizations = body.optimizations ?? [];
   if (optimizations.length === 0) return json({ error: 'no optimizations provided' }, { status: 400 });
 
-  const db = getDb(env);
+  const db = await getAdminScopedDb(env);
   const existing = await db.listTopics();
   const byId = new Map(existing.map((t) => [t.id, t]));
 

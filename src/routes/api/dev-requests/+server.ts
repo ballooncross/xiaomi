@@ -5,10 +5,10 @@ import { getDb } from '$lib/server/db';
 import type { DevRequest, Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
 	const body = (await request.json().catch(() => ({}))) as { text?: string; token?: string };
-	if (env?.ADMIN_TOKEN && body.token !== env.ADMIN_TOKEN) {
+	if (!authorizeDevRequests(locals, request, env, body.token)) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
@@ -31,9 +31,26 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	return json({ ok: true, request: request_ });
 };
 
-export const GET: RequestHandler = async ({ platform }) => {
+export const GET: RequestHandler = async ({ platform, locals, request }) => {
 	const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
+	if (!authorizeDevRequests(locals, request, env)) {
+		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
 	const db = getDb(env);
 	const requests = await db.listDevRequests({ limit: 20 });
 	return json({ requests });
 };
+
+function authorizeDevRequests(
+	locals: App.Locals,
+	request: Request,
+	env: Env,
+	bodyToken?: string
+): boolean {
+	if (locals.user?.isAdmin) return true;
+	if (!env.ADMIN_TOKEN) return false;
+	if (request.headers.get('x-admin-token') === env.ADMIN_TOKEN) return true;
+	if (bodyToken === env.ADMIN_TOKEN) return true;
+	return false;
+}

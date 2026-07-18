@@ -6,16 +6,26 @@ import { getCronJobStatuses } from '$lib/server/job-status';
 import { sortReminders } from '$lib/server/lunar';
 import type { Env } from '$lib/server/types';
 
-export async function loadRadarPageData(platformEnv: Env | undefined) {
+export async function loadRadarPageData(
+	platformEnv: Env | undefined,
+	user?: { id: string; email: string; name: string; picture: string; isAdmin: boolean } | null
+) {
 	const env = mergeLocalEnv(platformEnv, privateEnv);
-	const db = getDb(env);
-	const [items, savedItems, topics, reminders, icaTool, cronJobs] = await Promise.all([
+	const emptyIca: Awaited<ReturnType<typeof getIcaToolStatus>> = {
+		enabled: false,
+		targetBefore: env.ICA_TARGET_BEFORE || '2026-07-01',
+		checkerUrlConfigured: false,
+		fallbackConfigured: false
+	};
+	const db = getDb(env, user?.id);
+	const [items, savedItems, topics, reminders, icaTool, cronJobs, middleNav] = await Promise.all([
 		db.listItems(80),
 		db.listSavedItems(),
 		db.listTopics(),
 		db.listReminders(),
-		getIcaToolStatus(env),
-		getCronJobStatuses(env)
+		user?.isAdmin ? getIcaToolStatus(env) : Promise.resolve(emptyIca),
+		user?.isAdmin ? getCronJobStatuses(env) : Promise.resolve([]),
+		user?.id ? db.getMiddleNav(user.id) : Promise.resolve(null)
 	]);
 
 	return {
@@ -26,7 +36,17 @@ export async function loadRadarPageData(platformEnv: Env | undefined) {
 		icaTool,
 		cronJobs,
 		aiEnabled: (env?.AI_ENABLED ?? 'auto') !== 'false',
-		telegramConfigured: Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID)
+		telegramConfigured: Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID),
+		user: user
+			? {
+					id: user.id,
+					email: user.email,
+					name: user.name,
+					picture: user.picture,
+					isAdmin: user.isAdmin
+				}
+			: null,
+		middleNav
 	};
 }
 

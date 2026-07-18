@@ -2,29 +2,32 @@ import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
+import { requireSessionUser } from '$lib/server/request-auth';
 import { runConcertFetchJob, runTrendFetchJob } from '$lib/server/jobs';
 import type { Env, WatchTopic } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ platform }) => {
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+export const GET: RequestHandler = async ({ platform, locals }) => {
+  const user = requireSessionUser(locals);
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   return json({ topics: await db.listTopics() });
 };
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json()) as Partial<WatchTopic>;
   if (!body.name || !body.type) return json({ error: 'name and type are required' }, { status: 400 });
 
   const topic = topicFromBody(body);
-
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
-  const db = getDb(env);
+  const db = getDb(env, user.id);
   await db.upsertTopic(topic);
   await fetchForTopic(env, topic);
   return json({ topic, items: await db.listItems(24), topics: await db.listTopics() });
 };
 
-export const PATCH: RequestHandler = async ({ request, platform }) => {
+export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json()) as Partial<WatchTopic>;
   if (!body.id || !body.name || !body.type) {
     return json({ error: 'id, name and type are required' }, { status: 400 });
@@ -32,17 +35,18 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
 
   const topic = topicFromBody(body);
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
-  const db = getDb(env);
+  const db = getDb(env, user.id);
   await db.upsertTopic(topic);
   await fetchForTopic(env, topic);
   return json({ topic, items: await db.listItems(24), topics: await db.listTopics() });
 };
 
-export const DELETE: RequestHandler = async ({ request, platform }) => {
+export const DELETE: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json()) as { id?: string };
   if (!body.id) return json({ error: 'id is required' }, { status: 400 });
 
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   await db.deleteTopic(body.id);
   return json({ ok: true, items: await db.listItems(24), topics: await db.listTopics() });
 };
@@ -68,8 +72,6 @@ function topicFromBody(body: Partial<WatchTopic>): WatchTopic {
     priority: clampPriority(body.priority),
     mode: body.mode ?? 'follow',
     enabled: body.enabled ?? true,
-    // New interests default to open-for-optimization; the client sends 'locked'
-    // to opt out, or 'optimized' is set by the agent after it refines them.
     optimizeStatus: body.optimizeStatus ?? 'pending'
   };
 }
