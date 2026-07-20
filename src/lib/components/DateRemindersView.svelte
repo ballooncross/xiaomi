@@ -151,7 +151,8 @@
       </article>
     {:else}
       <div class="date-empty">
-        <strong>暂无日期提醒</strong>
+        <strong>还没有日期提醒</strong>
+        <p>新账号不会带入别人的生日或纪念日。添加后可在首页看到临近日期，并收到 Telegram 提醒。</p>
         <button class="btn btn-primary" type="button" onclick={onAdd}>添加生日或纪念日</button>
       </div>
     {/each}
@@ -171,6 +172,14 @@
     border: 1px solid var(--line);
     background: color-mix(in srgb, var(--surface) 92%, transparent);
     box-shadow: var(--shadow-md);
+  }
+
+  .date-empty p {
+    margin: 0.5rem 0 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    max-width: 28rem;
   }
 
   .dates-hero {

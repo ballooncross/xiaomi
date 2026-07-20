@@ -111,3 +111,17 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
   -d "url=https://personal-radar.pages.dev/api/telegram/webhook" \
   -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
 ```
+
+## Phase 2 — Account polish (implemented)
+
+- Home onboarding checklist when Telegram / interests / dates are incomplete
+- Clearer empty states (home feed, saved, dates, interests)
+- `POST /api/watchlist/starter` + Interests → **恢复基础兴趣** (upsert starter pack; keeps existing topics)
+- Allowlist invite copy explains isolation + first-login starter pack
+- Middle nav: server `user_settings` wins over `localStorage` on load/refresh
+
+## Phase 3 — Beyond (not started)
+
+- Email / web push if Telegram is not enough
+- Shared household calendars or watchlists
+- Open signup / promote admins in UI

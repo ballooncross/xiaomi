@@ -3,17 +3,22 @@ import { getDb } from '$lib/server/db';
 import { findDuplicatesForItem, isProtectedItem, protectedItemRank } from '$lib/server/dedup';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
+import { requireSessionUser } from '$lib/server/request-auth';
 import type { Env, RelatedSource } from '$lib/server/types';
 import type { DedupExisting } from '$lib/server/dedup';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
+  const user = requireSessionUser(locals);
   const body = (await request.json()) as { itemId?: string };
   if (!body.itemId) {
     return json({ error: 'Missing itemId' }, { status: 400 });
   }
 
-  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv));
+  // Must scope to the signed-in user: dismiss/feedback live in user_item_state.
+  // Without userId, updateItemStatus/recordFeedback are no-ops on D1 and marked
+  // duplicates reappear after the next pull or page refresh.
+  const db = getDb(mergeLocalEnv(platform?.env as Env | undefined, privateEnv), user.id);
   const triggerItem = await db.getItemById(body.itemId);
   if (!triggerItem) {
     return json({ error: 'Item not found' }, { status: 404 });

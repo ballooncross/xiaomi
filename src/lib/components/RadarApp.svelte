@@ -198,6 +198,28 @@
     }
   }
 
+  /** Server nav wins over localStorage; used on first paint / mount. */
+  function applyServerOrLocalNav(serverValue: unknown) {
+    const serverNav = normalizeMiddleNav(serverValue, { fallbackToDefault: false });
+    const storedNav = serverNav.length > 0 ? serverNav : readStoredMiddleNav();
+    middleNav = storedNav;
+    draftMiddleNav = [...storedNav];
+    if (serverNav.length > 0 && typeof window !== 'undefined') {
+      window.localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(serverNav));
+    }
+  }
+
+  /** Keep bar nav + localStorage aligned with server without clobbering settings draft. */
+  function syncNavFromServer(serverValue: unknown) {
+    const serverNav = normalizeMiddleNav(serverValue, { fallbackToDefault: false });
+    if (serverNav.length === 0) return;
+    const key = serverNav.join(',');
+    if (middleNav.join(',') !== key) middleNav = serverNav;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify(serverNav));
+    }
+  }
+
   function saveMiddleNav(next: NavSlotId[]) {
     const normalized = normalizeMiddleNav(next, { fallbackToDefault: false });
     if (normalized.length === 0) return;
@@ -266,6 +288,8 @@
   let allowlistNewEmail = $state('');
   let allowlistPending = $state(false);
   let allowlistMessage = $state('');
+  let starterPending = $state(false);
+  let starterMessage = $state('');
   let telegramLinked = $state(false);
   let telegramLinkPending = $state(false);
   let telegramLinkMessage = $state('');
@@ -299,10 +323,7 @@
 
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
-    const serverNav = normalizeMiddleNav(data.middleNav, { fallbackToDefault: false });
-    const storedNav = serverNav.length > 0 ? serverNav : readStoredMiddleNav();
-    middleNav = storedNav;
-    draftMiddleNav = [...storedNav];
+    applyServerOrLocalNav(data.middleNav);
     if (data.user?.isAdmin) {
       loadDevRequests();
       loadAllowlist();
@@ -335,7 +356,34 @@
     icaTool = data.icaTool;
     cronJobs = data.cronJobs;
     telegramLinked = data.telegramLinked;
+    syncNavFromServer(data.middleNav);
   });
+
+  async function restoreStarterPack() {
+    starterPending = true;
+    starterMessage = '';
+    try {
+      const response = await fetch('/api/watchlist/starter', { method: 'POST' });
+      const result = (await response.json().catch(() => ({}))) as {
+        topics?: WatchTopic[];
+        items?: RadarItem[];
+        added?: number;
+        error?: string;
+      };
+      if (!response.ok) {
+        starterMessage = result.error || '恢复失败';
+      } else {
+        if (result.topics) topics = result.topics;
+        if (result.items) items = result.items;
+        starterMessage =
+          (result.added ?? 0) > 0 ? `已加入 ${result.added} 个基础兴趣` : '基础兴趣已是最新';
+        await invalidateAll();
+      }
+    } catch {
+      starterMessage = '恢复失败';
+    }
+    starterPending = false;
+  }
 
   const barNavItems = $derived([
     { id: 'home' as const, label: '首页' },
@@ -437,6 +485,9 @@
   const filteredPreferenceTopics = $derived(filterPreferenceTopics(topics, preferenceQuery, preferenceView));
   const preferenceMatchCount = $derived(countPreferenceTopics(topics, preferenceQuery, preferenceView));
   const followedTopicCount = $derived(topics.filter((topic) => topic.mode !== 'blacklist').length);
+  const needsOnboarding = $derived(
+    Boolean(data.user) && (!telegramLinked || reminders.length === 0 || followedTopicCount === 0)
+  );
   const greeting = $derived(getGreeting(activeView, visibleItems.length));
   const digestPreview = $derived(buildDigestPreview(items));
   const addWatchTitle = $derived(getAddWatchTitle(newWatchType, newWatchMode));
@@ -600,7 +651,8 @@
       if (response.ok) {
         allowlistEmails = result.emails ?? [];
         allowlistNewEmail = '';
-        allowlistMessage = '已添加';
+        allowlistMessage =
+          '已添加。对方首次登录会获得基础兴趣包，日期为空，需自行连接 Telegram。';
       } else {
         allowlistMessage = result.error || '添加失败';
       }
@@ -805,6 +857,11 @@
     if (item.kind === 'opportunity') return '商业机会';
     if (item.topics.some((topic) => topic.toLowerCase().includes('job'))) return '职业信号';
     return '趋势信号';
+  }
+
+  /** Short stable id for display / feedback; full UUID in title attribute. */
+  function itemIdLabel(id: string) {
+    return id.length > 8 ? id.slice(0, 8) : id;
   }
 
   function sourceLabel(item: RadarItem) {
@@ -1767,12 +1824,34 @@
             <div>
               <div class="eyebrow">偏好</div>
               <h1>兴趣与关注</h1>
-              <p>管理音乐人、趋势主题、来源和屏蔽规则。首页不再展示兴趣列表。</p>
+              <p>管理音乐人、趋势主题、来源和屏蔽规则。新账号会带一份基础兴趣包，可随时增删。</p>
             </div>
-            <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>
-              添加关注
-            </button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button
+                class="small-button"
+                type="button"
+                disabled={starterPending}
+                onclick={restoreStarterPack}
+              >
+                {starterPending ? '…' : '恢复基础兴趣'}
+              </button>
+              <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>
+                添加关注
+              </button>
+            </div>
           </div>
+          {#if starterMessage}
+            <p class="quiet-copy">{starterMessage}</p>
+          {/if}
+          {#if followedTopicCount === 0}
+            <section class="empty-state" style="margin-bottom:1rem">
+              <h3>还没有关注</h3>
+              <p>可以一键恢复基础兴趣包（新加坡生活、AI 岗位、热门演出等），或手动添加你关心的主题。</p>
+              <button class="small-button primary" type="button" disabled={starterPending} onclick={restoreStarterPack}>
+                {starterPending ? '…' : '恢复基础兴趣包'}
+              </button>
+            </section>
+          {/if}
           <div class="settings-grid compact">
             <button class:active={preferenceView === 'artist'} type="button" onclick={() => (preferenceView = 'artist')}>
               <strong>{watchTopics.length}</strong>
@@ -1961,6 +2040,9 @@
                   </div>
                   <img class="timeline-image" src={imageForItem(item)} alt="" loading="lazy" />
                   <div>
+                    <div class="story-kicker">
+                      <span class="item-id" title={item.id}>id {itemIdLabel(item.id)}</span>
+                    </div>
                     <h3>{item.title}</h3>
                     <p>{item.summary}</p>
                     <div class="timeline-links">
@@ -2002,7 +2084,14 @@
           {:else}
             <section class="empty-state">
               <h3>{savedItemCount > 0 ? '没有匹配的收藏' : '还没有保存内容'}</h3>
-              <p>{savedItemCount > 0 ? '试试其他搜索关键词。' : '在趋势或演出内容上点击“保存”，之后就能从这里查看。'}</p>
+              <p>
+                {savedItemCount > 0
+                  ? '试试其他搜索关键词。'
+                  : '在首页或趋势里点「保存」或「重点跟踪」。新账号的收藏是空的，与其他人互不影响。'}
+              </p>
+              {#if savedItemCount === 0}
+                <button class="small-button primary" type="button" onclick={() => setView('home')}>去首页看看</button>
+              {/if}
             </section>
           {/if}
         </section>
@@ -2094,7 +2183,10 @@
             <div class="job-run-copy">
               <span>访问控制</span>
               <strong>允许登录的邮箱</strong>
-              <p>添加朋友的 Google 邮箱后，对方即可登录；各自数据互相隔离。</p>
+              <p>
+                添加朋友的 Google 邮箱后即可登录。对方会看到自己的基础兴趣包；日期、收藏、Telegram
+                需自行设置，与你的数据互不影响。
+              </p>
             </div>
             <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
               <input
@@ -2343,6 +2435,36 @@
         </aside>
       </div>
 
+      {#if needsOnboarding && activeView === 'home'}
+        <section class="job-run-card" style="margin-bottom:1rem">
+          <div class="job-run-copy">
+            <span>开始使用</span>
+            <strong>完善你的个人雷达</strong>
+            <p>每个账号的数据互相隔离。完成下面几步后，摘要和提醒会更有用。</p>
+          </div>
+          <div style="padding:0 14px 14px;display:grid;gap:8px;font-size:13px">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+              <span>{telegramLinked ? '✓' : '○'} 连接 Telegram 接收摘要</span>
+              {#if !telegramLinked}
+                <button class="small-button" type="button" onclick={() => setView('me')}>去连接</button>
+              {/if}
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+              <span>{followedTopicCount > 0 ? '✓' : '○'} 确认兴趣主题（{followedTopicCount} 个）</span>
+              <button class="small-button" type="button" onclick={() => setView('interests')}>
+                {followedTopicCount > 0 ? '管理' : '设置'}
+              </button>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+              <span>{reminders.length > 0 ? '✓' : '○'} 添加生日或纪念日</span>
+              {#if reminders.length === 0}
+                <button class="small-button" type="button" onclick={() => setView('dates')}>去添加</button>
+              {/if}
+            </div>
+          </div>
+        </section>
+      {/if}
+
       {#if activeView === 'home' && upcomingReminders.length > 0}
         <section class="reminder-strip" aria-label="临近日期">
           <div>
@@ -2387,7 +2509,10 @@
               <img src={imageForItem(topItem)} alt="" loading="lazy" />
             </figure>
             <div class="story-body">
-              <div class="story-kicker">{itemKicker(topItem)}</div>
+              <div class="story-kicker">
+                <span>{itemKicker(topItem)}</span>
+                <span class="item-id" title={topItem.id}>id {itemIdLabel(topItem.id)}</span>
+              </div>
               <h3>{topItem.title}</h3>
               <p>{topItem.summary}</p>
               <div class="chips">
@@ -2441,7 +2566,10 @@
                 <img src={imageForItem(item)} alt="" loading="lazy" />
               </figure>
               <div class="story-body">
-                <div class="story-kicker">{itemKicker(item)}</div>
+                <div class="story-kicker">
+                  <span>{itemKicker(item)}</span>
+                  <span class="item-id" title={item.id}>id {itemIdLabel(item.id)}</span>
+                </div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
                 <div class="chips">
@@ -2466,7 +2594,18 @@
       {:else}
         <section class="empty-state">
           <h3>暂无匹配信号</h3>
-          <p>添加关注主题，或运行抓取任务来填充你的个人信息流。</p>
+          <p>
+            {#if followedTopicCount === 0}
+              先恢复或添加兴趣，雷达才有主题可匹配。
+            {:else}
+              关注已设置；新内容会在定时抓取后出现。也可在「兴趣」里调整主题。
+            {/if}
+          </p>
+          {#if followedTopicCount === 0}
+            <button class="small-button primary" type="button" onclick={() => setView('interests')}>去设置兴趣</button>
+          {:else}
+            <button class="small-button" type="button" onclick={() => setView('interests')}>调整兴趣</button>
+          {/if}
         </section>
       {/if}
 
@@ -2483,6 +2622,9 @@
               </div>
               <img class="timeline-image" src={imageForItem(item)} alt="" loading="lazy" />
               <div>
+                <div class="story-kicker">
+                  <span class="item-id" title={item.id}>id {itemIdLabel(item.id)}</span>
+                </div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
                 <div class="timeline-links">
@@ -2558,6 +2700,9 @@
               </div>
               <img class="timeline-image" src={imageForItem(item)} alt="" loading="lazy" />
               <div>
+                <div class="story-kicker">
+                  <span class="item-id" title={item.id}>id {itemIdLabel(item.id)}</span>
+                </div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>
                 {#if item.url}
@@ -3993,6 +4138,19 @@
     font-size: 12px;
     font-weight: 950;
     margin-bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .item-id {
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    user-select: all;
   }
 
   .story h3 {
