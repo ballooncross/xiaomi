@@ -78,9 +78,13 @@ export function userDb(env: Env | undefined, userId: string): RadarDb {
 /** Resolve the first ADMIN_EMAILS account for shared digests until per-user Telegram exists. */
 export async function getDigestOwnerUserId(db: RadarDb, env: Env): Promise<string | undefined> {
 	const adminEmail = parseEmailList(env.ADMIN_EMAILS)[0];
-	if (!adminEmail) return undefined;
-	const user = await db.getUserByEmail(adminEmail);
-	return user?.id;
+	if (adminEmail) {
+		const user = await db.getUserByEmail(adminEmail);
+		if (user?.id) return user.id;
+	}
+	// Fallback: cron worker may not have ADMIN_EMAILS. Never silently produce an
+	// empty digest — use the earliest-created (primary) account instead.
+	return db.getPrimaryUserId();
 }
 
 /** DB scoped to the primary admin — used by local agent + digests in Phase 1. */

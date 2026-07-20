@@ -27,3 +27,5 @@ AI_MONTHLY_BUDGET_USD = "1"
 BANDSINTOWN_APP_ID = "personal-radar"
 ICA_CHECK_ENABLED = "false"
 ICA_TARGET_BEFORE = "2026-07-01"
+# Digests run in this cron worker and need the owner account to scope the feed.
+ADMIN_EMAILS = "tofu.hike@gmail.com"

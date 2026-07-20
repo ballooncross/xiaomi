@@ -257,6 +257,8 @@ export abstract class RadarDb {
   abstract addAllowedEmail(email: string, createdBy?: string): Promise<void>;
   abstract removeAllowedEmail(email: string): Promise<void>;
   abstract getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; picture: string } | null>;
+  /** Earliest-created user id — safe fallback owner for cron jobs (e.g. digests) when ADMIN_EMAILS is unset. */
+  abstract getPrimaryUserId(): Promise<string | undefined>;
   abstract createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void>;
   abstract updateUserProfile(id: string, name: string, picture: string): Promise<void>;
 
@@ -499,6 +501,10 @@ class MemoryRadarDb extends RadarDb {
     const normalized = email.trim().toLowerCase();
     const user = memory.users.find((candidate) => candidate.email === normalized);
     return user ? { id: user.id, email: user.email, name: user.name, picture: user.picture } : null;
+  }
+
+  async getPrimaryUserId(): Promise<string | undefined> {
+    return memory.users[0]?.id ?? this.userId ?? DEFAULT_MEMORY_USER;
   }
 
   async createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void> {
@@ -1216,6 +1222,18 @@ class D1RadarDb extends RadarDb {
       return row ?? null;
     } catch (error) {
       if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async getPrimaryUserId(): Promise<string | undefined> {
+    try {
+      const row = await this.db
+        .prepare('SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1')
+        .first<{ id: string }>();
+      return row?.id ?? undefined;
+    } catch (error) {
+      if (isMissingTableError(error)) return undefined;
       throw error;
     }
   }
