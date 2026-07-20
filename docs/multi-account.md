@@ -82,6 +82,20 @@ Per-user Telegram bind + digest fan-out.
 5. Me → **允许登录的邮箱** → add friend Gmail
 6. Friend logs in → starter interests, empty dates, no admin tools
 
-## Phase 1.5
+## Phase 1.5 — Per-user Telegram (implemented)
 
-Per-user Telegram bind + digest fan-out (not in this cut). Digests still use the first `ADMIN_EMAILS` account + shared `TELEGRAM_CHAT_ID`.
+- Migration `0017_telegram_link.sql`: `users.telegram_chat_id`, `telegram_link_tokens`
+- Me → **连接 Telegram** → deep link `t.me/<bot>?start=<token>` → webhook `/api/telegram/webhook`
+- Daily digest fans out to every linked user (their own feed + reminders)
+- Manual “发送摘要” sends to the signed-in user’s chat
+- Env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
+- `TELEGRAM_CHAT_ID` remains for COE/ICA ops alerts and as digest fallback when nobody has linked yet
+
+Set webhook once (production):
+
+```bash
+# Generate secret: openssl rand -hex 24
+curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  -d "url=https://personal-radar.pages.dev/api/telegram/webhook" \
+  -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+```

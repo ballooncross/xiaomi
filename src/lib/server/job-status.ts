@@ -25,7 +25,7 @@ const scheduledJobs: CronJobDefinition[] = [
     label: '每日 Telegram 摘要',
     description: '发送每日雷达摘要，并附带当天生日/纪念日提醒。',
     schedule: '每天 08:30',
-    enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
+    enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN)
   },
   {
     jobName: 'coe-check',

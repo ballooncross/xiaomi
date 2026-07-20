@@ -18,15 +18,19 @@ export async function loadRadarPageData(
 		fallbackConfigured: false
 	};
 	const db = getDb(env, user?.id);
-	const [items, savedItems, topics, reminders, icaTool, cronJobs, middleNav] = await Promise.all([
-		db.listItems(80),
-		db.listSavedItems(),
-		db.listTopics(),
-		db.listReminders(),
-		user?.isAdmin ? getIcaToolStatus(env) : Promise.resolve(emptyIca),
-		user?.isAdmin ? getCronJobStatuses(env) : Promise.resolve([]),
-		user?.id ? db.getMiddleNav(user.id) : Promise.resolve(null)
-	]);
+	const [items, savedItems, topics, reminders, icaTool, cronJobs, middleNav, telegramChatId] =
+		await Promise.all([
+			db.listItems(80),
+			db.listSavedItems(),
+			db.listTopics(),
+			db.listReminders(),
+			user?.isAdmin ? getIcaToolStatus(env) : Promise.resolve(emptyIca),
+			user?.isAdmin ? getCronJobStatuses(env) : Promise.resolve([]),
+			user?.id ? db.getMiddleNav(user.id) : Promise.resolve(null),
+			user?.id ? db.getUserTelegramChatId(user.id) : Promise.resolve(null)
+		]);
+
+	const telegramBotConfigured = Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_BOT_USERNAME);
 
 	return {
 		items,
@@ -36,7 +40,10 @@ export async function loadRadarPageData(
 		icaTool,
 		cronJobs,
 		aiEnabled: (env?.AI_ENABLED ?? 'auto') !== 'false',
-		telegramConfigured: Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID),
+		/** Bot is configured (can link + send). */
+		telegramConfigured: telegramBotConfigured || Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID),
+		telegramBotConfigured,
+		telegramLinked: Boolean(telegramChatId),
 		user: user
 			? {
 					id: user.id,

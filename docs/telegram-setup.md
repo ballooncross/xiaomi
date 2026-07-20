@@ -12,64 +12,68 @@ This keeps local experiments from spamming your real production notification cha
 1. Open Telegram.
 2. Search for `@BotFather`.
 3. Send `/newbot`.
-4. Pick a name and username.
+4. Pick a name and username (e.g. `MyPersonalRadarBot`).
 5. Copy the bot token.
 
-For local development, put the development bot values in `.env.local`:
+## Per-user digests (recommended)
+
+Each account connects their own Telegram chat from **我的 → 连接 Telegram**. Daily digests fan out to every linked user with that user’s feed and dates.
+
+### Env / secrets
 
 ```env
-TELEGRAM_BOT_TOKEN=123456789:your_dev_bot_token_suffix
-TELEGRAM_CHAT_ID=your_dev_chat_id
+TELEGRAM_BOT_TOKEN=123456789:your_bot_token
+TELEGRAM_BOT_USERNAME=MyPersonalRadarBot
+TELEGRAM_WEBHOOK_SECRET=<openssl rand -hex 24>
+# Optional: ops fallback for COE/ICA alerts, and digests before anyone links
+TELEGRAM_CHAT_ID=
 ```
 
-Use the full BotFather token, including the numeric prefix before `:`. The number before `:` is part of the bot token; it is not your chat ID.
-
-For production, set the production bot token as Cloudflare secrets:
+Sync secrets (filtered):
 
 ```bash
-npx wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name personal-radar
-npx wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.cron.toml
+npm run secrets:sync:pages
+npm run secrets:sync:cron
 ```
 
-## Get Your Chat ID
-
-1. Open your bot in Telegram.
-2. Send `/start` or any message to the bot.
-3. Open this URL in a browser, replacing `<TOKEN>` with the full bot token:
-
-```text
-https://api.telegram.org/bot<TOKEN>/getUpdates
-```
-
-4. Find `message.chat.id`.
-
-For local development:
-
-```env
-TELEGRAM_CHAT_ID=your_dev_chat_id
-```
-
-For production:
+### Set webhook (production, once)
 
 ```bash
-npx wrangler pages secret put TELEGRAM_CHAT_ID --project-name personal-radar
-npx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.cron.toml
+curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  -d "url=https://personal-radar.pages.dev/api/telegram/webhook" \
+  -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
 ```
 
-## Test Daily Digest
+Verify: `curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"`
 
-For local testing:
+### Link a user
+
+1. Sign in to Personal Radar.
+2. Open **我的 → 连接 Telegram** (opens `t.me/<bot>?start=<token>`).
+3. Tap **Start** in Telegram.
+4. Refresh the Me page — status should show connected.
+5. Use **发送摘要到 Telegram** to test.
+
+## Optional shared chat ID (ops / fallback)
+
+Still useful for COE/ICA alerts and as a digest fallback when **no** user has linked yet.
+
+1. Message the bot, then open  
+   `https://api.telegram.org/bot<TOKEN>/getUpdates`
+2. Copy `message.chat.id` into `TELEGRAM_CHAT_ID`.
+
+## Test
+
+Local:
 
 ```bash
 npm run telegram:test -- "hello from Personal Radar"
 ```
 
-Check the private Telegram chat with your bot. If you are testing a group chat, add the bot to the group and use that group chat ID.
-
-After deployment:
+Cron / admin fan-out (all linked users):
 
 ```bash
-curl -X POST https://your-app.pages.dev/api/admin/jobs \
+curl -X POST https://personal-radar.pages.dev/api/admin/jobs \
   -H 'content-type: application/json' \
   -H 'x-admin-token: YOUR_ADMIN_TOKEN' \
   -d '{"job":"daily-digest"}'

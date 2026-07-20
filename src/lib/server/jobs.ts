@@ -92,26 +92,81 @@ export async function runItemDedupJob(env: Env): Promise<JobResult> {
 }
 
 export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual_digest' = 'daily_digest'): Promise<JobResult> {
-  // Phase 1: digests use the first admin account's feed/reminders + shared Telegram chat.
   const base = getDb(env);
-  const ownerId = await getDigestOwnerUserId(base, env);
-  const db = getDb(env, ownerId);
+  const linked = await base.listUsersWithTelegram();
+
+  // No linked users yet → single digest to TELEGRAM_CHAT_ID using admin feed (backward compat).
+  if (linked.length === 0) {
+    const ownerId = await getDigestOwnerUserId(base, env);
+    return sendDigestForUser(env, ownerId, env.TELEGRAM_CHAT_ID, type, base, true);
+  }
+
+  let notified = 0;
+  const details: string[] = [];
+  for (const user of linked) {
+    const result = await sendDigestForUser(env, user.id, user.telegramChatId, type, base, false);
+    notified += result.notified;
+    details.push(`${user.email}:${result.detail}`);
+  }
+
+  const detail = `fan-out users=${linked.length} notified=${notified}; ${details.join('; ')}`;
+  await base.logJob({
+    jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
+    status: notified > 0 ? 'ok' : 'skipped',
+    detail
+  });
+  return { inserted: 0, updated: 0, considered: linked.length, notified, detail };
+}
+
+/** Manual digest for one signed-in user (their feed → their Telegram). */
+export async function runUserDigestJob(env: Env, userId: string): Promise<JobResult> {
+  const base = getDb(env);
+  const chatId = await base.getUserTelegramChatId(userId);
+  if (!chatId) {
+    return {
+      inserted: 0,
+      updated: 0,
+      considered: 0,
+      notified: 0,
+      detail: 'Telegram 尚未连接。请先在「我的」里连接。'
+    };
+  }
+  return sendDigestForUser(env, userId, chatId, 'manual_digest', base, true);
+}
+
+async function sendDigestForUser(
+  env: Env,
+  userId: string | undefined,
+  chatId: string | null | undefined,
+  type: 'daily_digest' | 'manual_digest',
+  logDb = getDb(env),
+  logJob = true
+): Promise<JobResult> {
+  const db = getDb(env, userId);
   const [items, reminders] = await Promise.all([db.listItems(12), db.listReminders()]);
   const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
   const message = appendReminderDigest(renderTelegramDigest(digest), reminders);
-  const telegram = await sendTelegramMessage(env, message);
-  await db.logNotification({
+  const telegram = await sendTelegramMessage(env, message, chatId);
+  await logDb.logNotification({
     channel: 'telegram',
-    type,
+    type: userId ? `${type}:${userId}` : type,
     status: telegram.ok ? 'sent' : 'skipped',
     message
   });
-  await db.logJob({
-    jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
-    status: telegram.ok ? 'ok' : 'skipped',
+  if (logJob) {
+    await logDb.logJob({
+      jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
+      status: telegram.ok ? 'ok' : 'skipped',
+      detail: telegram.detail
+    });
+  }
+  return {
+    inserted: 0,
+    updated: 0,
+    considered: items.length,
+    notified: telegram.ok ? 1 : 0,
     detail: telegram.detail
-  });
-  return { inserted: 0, updated: 0, considered: items.length, notified: telegram.ok ? 1 : 0, detail: telegram.detail };
+  };
 }
 
 function appendReminderDigest(message: string, reminders: DateReminder[]): string {

@@ -109,7 +109,12 @@ export type Env = {
   ICA_CHECKER_URL?: string;
   PUBLIC_APP_NAME?: string;
   TELEGRAM_BOT_TOKEN?: string;
+  /** Fallback chat for ops alerts (COE/ICA) when not sending per-user digests. */
   TELEGRAM_CHAT_ID?: string;
+  /** Bot username without @ — used for t.me deep links. */
+  TELEGRAM_BOT_USERNAME?: string;
+  /** Secret token passed to setWebhook; verified on inbound updates. */
+  TELEGRAM_WEBHOOK_SECRET?: string;
   EXTENSION_NOTIFY_TOKEN?: string;
   TICKETMASTER_API_KEY?: string;
   BANDSINTOWN_APP_ID?: string;

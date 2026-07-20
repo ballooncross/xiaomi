@@ -136,7 +136,16 @@ type DevRequestRow = {
   branch: string | null; created_at: string; updated_at: string;
 };
 
-type UserRow = { id: string; email: string; name: string; picture: string };
+type UserRow = {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+  telegram_chat_id?: string | null;
+  telegram_linked_at?: string | null;
+};
+
+export type TelegramLinkedUser = { id: string; email: string; telegramChatId: string };
 
 /** Per-user overlay on top of the shared items catalog. */
 type MemoryUserItemState = {
@@ -150,7 +159,17 @@ type MemoryUserItemState = {
 const DEFAULT_MEMORY_USER = 'memory-user';
 
 const memory = {
-  users: [] as Array<{ id: string; email: string; name: string; picture: string; createdAt: string; updatedAt: string }>,
+  users: [] as Array<{
+    id: string;
+    email: string;
+    name: string;
+    picture: string;
+    telegramChatId?: string | null;
+    telegramLinkedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>,
+  telegramLinkTokens: [] as Array<{ token: string; userId: string; expiresAt: string }>,
   allowedEmails: [] as Array<{ email: string; createdAt: string; createdBy?: string }>,
   topicsByUser: new Map<string, WatchTopic[]>(),
   items: [...demoItems],
@@ -261,6 +280,12 @@ export abstract class RadarDb {
   abstract getPrimaryUserId(): Promise<string | undefined>;
   abstract createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void>;
   abstract updateUserProfile(id: string, name: string, picture: string): Promise<void>;
+  abstract getUserTelegramChatId(userId: string): Promise<string | null>;
+  abstract setUserTelegramChatId(userId: string, chatId: string | null): Promise<void>;
+  abstract listUsersWithTelegram(): Promise<TelegramLinkedUser[]>;
+  abstract createTelegramLinkToken(userId: string, token: string, expiresAt: string): Promise<void>;
+  /** Returns user id if token is valid and not expired; consumes the token. */
+  abstract consumeTelegramLinkToken(token: string): Promise<string | null>;
 
   // User settings
   abstract getMiddleNav(userId?: string): Promise<string[] | null>;
@@ -525,6 +550,38 @@ class MemoryRadarDb extends RadarDb {
     if (name) user.name = name;
     if (picture) user.picture = picture;
     user.updatedAt = new Date().toISOString();
+  }
+
+  async getUserTelegramChatId(userId: string): Promise<string | null> {
+    return memory.users.find((u) => u.id === userId)?.telegramChatId ?? null;
+  }
+
+  async setUserTelegramChatId(userId: string, chatId: string | null): Promise<void> {
+    const user = memory.users.find((u) => u.id === userId);
+    if (!user) return;
+    user.telegramChatId = chatId;
+    user.telegramLinkedAt = chatId ? new Date().toISOString() : null;
+    user.updatedAt = new Date().toISOString();
+  }
+
+  async listUsersWithTelegram(): Promise<TelegramLinkedUser[]> {
+    return memory.users
+      .filter((u) => u.telegramChatId)
+      .map((u) => ({ id: u.id, email: u.email, telegramChatId: u.telegramChatId! }));
+  }
+
+  async createTelegramLinkToken(userId: string, token: string, expiresAt: string): Promise<void> {
+    memory.telegramLinkTokens = memory.telegramLinkTokens.filter((t) => t.userId !== userId);
+    memory.telegramLinkTokens.push({ token, userId, expiresAt });
+  }
+
+  async consumeTelegramLinkToken(token: string): Promise<string | null> {
+    const index = memory.telegramLinkTokens.findIndex((t) => t.token === token);
+    if (index < 0) return null;
+    const entry = memory.telegramLinkTokens[index];
+    memory.telegramLinkTokens.splice(index, 1);
+    if (new Date(entry.expiresAt).getTime() < Date.now()) return null;
+    return entry.userId;
   }
 
   async getMiddleNav(userId?: string): Promise<string[] | null> {
@@ -1262,6 +1319,85 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async getUserTelegramChatId(userId: string): Promise<string | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT telegram_chat_id FROM users WHERE id = ?')
+        .bind(userId)
+        .first<{ telegram_chat_id: string | null }>();
+      return row?.telegram_chat_id ?? null;
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) return null;
+      throw error;
+    }
+  }
+
+  async setUserTelegramChatId(userId: string, chatId: string | null): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `UPDATE users SET
+            telegram_chat_id = ?,
+            telegram_linked_at = CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`
+        )
+        .bind(chatId, chatId, userId)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) return;
+      throw error;
+    }
+  }
+
+  async listUsersWithTelegram(): Promise<TelegramLinkedUser[]> {
+    try {
+      const { results } = await this.db
+        .prepare(
+          `SELECT id, email, telegram_chat_id FROM users
+           WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id != ''`
+        )
+        .all<{ id: string; email: string; telegram_chat_id: string }>();
+      return (results ?? []).map((row) => ({
+        id: row.id,
+        email: row.email,
+        telegramChatId: row.telegram_chat_id
+      }));
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) return [];
+      throw error;
+    }
+  }
+
+  async createTelegramLinkToken(userId: string, token: string, expiresAt: string): Promise<void> {
+    try {
+      await this.db.prepare('DELETE FROM telegram_link_tokens WHERE user_id = ?').bind(userId).run();
+      await this.db
+        .prepare('INSERT INTO telegram_link_tokens (token, user_id, expires_at) VALUES (?, ?, ?)')
+        .bind(token, userId, expiresAt)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async consumeTelegramLinkToken(token: string): Promise<string | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT user_id, expires_at FROM telegram_link_tokens WHERE token = ?')
+        .bind(token)
+        .first<{ user_id: string; expires_at: string }>();
+      if (!row) return null;
+      await this.db.prepare('DELETE FROM telegram_link_tokens WHERE token = ?').bind(token).run();
+      if (new Date(row.expires_at).getTime() < Date.now()) return null;
+      return row.user_id;
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
   async getMiddleNav(userId?: string): Promise<string[] | null> {
     const uid = userId ?? this.userId;
     if (!uid) return null;
@@ -1941,4 +2077,8 @@ function devRequestFromRow(row: DevRequestRow): DevRequest {
 
 function isMissingTableError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('no such table');
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('no such column');
 }

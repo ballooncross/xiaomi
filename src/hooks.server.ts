@@ -7,7 +7,7 @@ import { ensureUser, isEmailAllowed } from '$lib/server/users';
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Env } from '$lib/server/types';
 
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/logout'];
+	const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/logout', '/api/telegram/webhook'];
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const env = mergeLocalEnv(event.platform?.env as Env | undefined, privateEnv);

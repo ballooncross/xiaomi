@@ -266,6 +266,10 @@
   let allowlistNewEmail = $state('');
   let allowlistPending = $state(false);
   let allowlistMessage = $state('');
+  let telegramLinked = $state(false);
+  let telegramLinkPending = $state(false);
+  let telegramLinkMessage = $state('');
+  let telegramDeepLink = $state('');
   let dedupPending = $state<string | null>(null);
   let dedupResult = $state<{ itemId: string; found: number } | null>(null);
   let nlInterestText = $state('');
@@ -330,6 +334,7 @@
     reminders = data.reminders;
     icaTool = data.icaTool;
     cronJobs = data.cronJobs;
+    telegramLinked = data.telegramLinked;
   });
 
   const barNavItems = $derived([
@@ -653,10 +658,57 @@
   async function sendTelegramSummary() {
     digestSendPending = true;
     digestSendMessage = '';
+    if (!telegramLinked) {
+      digestSendMessage = '请先在「我的」里连接 Telegram。';
+      digestSendPending = false;
+      return;
+    }
     const response = await fetch('/api/digest', { method: 'POST' });
     const result = (await response.json().catch(() => ({}))) as { error?: string };
-    digestSendMessage = response.ok ? '已发送到 Telegram。' : result.error || '发送失败，请稍后再试。';
+    digestSendMessage = response.ok ? '已发送到你的 Telegram。' : result.error || '发送失败，请稍后再试。';
     digestSendPending = false;
+  }
+
+  async function startTelegramLink() {
+    telegramLinkPending = true;
+    telegramLinkMessage = '';
+    telegramDeepLink = '';
+    try {
+      const response = await fetch('/api/telegram/link', { method: 'POST' });
+      const result = (await response.json().catch(() => ({}))) as {
+        deepLink?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.deepLink) {
+        telegramLinkMessage = result.error || '无法生成连接链接';
+      } else {
+        telegramDeepLink = result.deepLink;
+        telegramLinkMessage = '在 Telegram 打开链接并点 Start 完成绑定（15 分钟内有效）。绑定后请刷新本页。';
+        window.open(result.deepLink, '_blank', 'noopener');
+      }
+    } catch {
+      telegramLinkMessage = '无法生成连接链接';
+    }
+    telegramLinkPending = false;
+  }
+
+  async function disconnectTelegram() {
+    telegramLinkPending = true;
+    telegramLinkMessage = '';
+    try {
+      const response = await fetch('/api/telegram/link', { method: 'DELETE' });
+      if (response.ok) {
+        telegramLinked = false;
+        telegramDeepLink = '';
+        telegramLinkMessage = '已断开 Telegram';
+        await invalidateAll();
+      } else {
+        telegramLinkMessage = '断开失败';
+      }
+    } catch {
+      telegramLinkMessage = '断开失败';
+    }
+    telegramLinkPending = false;
   }
 
   async function runManualFetchJob() {
@@ -1520,10 +1572,10 @@
                 <button
                   class="small-button primary"
                   type="button"
-                  disabled={digestSendPending || !data.telegramConfigured || !data.user?.isAdmin}
+                  disabled={digestSendPending || !telegramLinked}
                   onclick={sendTelegramSummary}
                 >
-                  {digestSendPending ? '发送中...' : data.user?.isAdmin ? '发送到 Telegram' : '仅管理员可发送'}
+                  {digestSendPending ? '发送中...' : telegramLinked ? '发送到 Telegram' : '请先连接 Telegram'}
                 </button>
                 {#if digestSendMessage}<span>{digestSendMessage}</span>{/if}
                 {#if !data.telegramConfigured}<span>Telegram 尚未配置。</span>{/if}
@@ -1981,6 +2033,62 @@
             </button>
           </div>
 
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>通知</span>
+              <strong>Telegram</strong>
+              <p>
+                {#if telegramLinked}
+                  已连接 — 每日摘要会发到你的 Telegram。
+                {:else if data.telegramBotConfigured}
+                  连接后，摘要会发到你自己的聊天（不再共用一个群）。
+                {:else}
+                  管理员尚未配置 Telegram Bot（TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME）。
+                {/if}
+              </p>
+            </div>
+            <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
+              {#if telegramLinked}
+                <button
+                  class="small-button"
+                  type="button"
+                  disabled={telegramLinkPending}
+                  onclick={disconnectTelegram}
+                >
+                  {telegramLinkPending ? '…' : '断开连接'}
+                </button>
+                <button
+                  class="small-button"
+                  type="button"
+                  disabled={telegramLinkPending}
+                  onclick={async () => {
+                    await invalidateAll();
+                    telegramLinkMessage = telegramLinked ? '仍为已连接' : '尚未连接，请完成 Telegram Start';
+                  }}
+                >
+                  刷新状态
+                </button>
+              {:else}
+                <button
+                  class="small-button primary"
+                  type="button"
+                  disabled={telegramLinkPending || !data.telegramBotConfigured}
+                  onclick={startTelegramLink}
+                >
+                  {telegramLinkPending ? '…' : '连接 Telegram'}
+                </button>
+              {/if}
+            </div>
+            {#if telegramLinkMessage}
+              <p style="font-size:12px;color:var(--muted);padding:0 14px 12px">{telegramLinkMessage}</p>
+            {/if}
+            {#if telegramDeepLink}
+              <p style="font-size:12px;padding:0 14px 12px;word-break:break-all">
+                <a href={telegramDeepLink} target="_blank" rel="noopener">打开绑定链接</a>
+              </p>
+            {/if}
+          </section>
+
           {#if data.user?.isAdmin}
           <section class="job-run-card">
             <div class="job-run-copy">
@@ -2221,15 +2329,15 @@
         <aside class="daily-card">
           <strong>每日摘要已就绪</strong>
           <span>
-            Telegram {data.telegramConfigured ? '已启用' : '未配置'} · 反馈会记录为后续排序优化数据。
+            Telegram {telegramLinked ? '已连接' : data.telegramBotConfigured ? '未连接' : '未配置'} · 反馈会记录为后续排序优化数据。
           </span>
           <button
             class="small-button primary"
             type="button"
-            disabled={digestSendPending || !data.telegramConfigured}
+            disabled={digestSendPending || !telegramLinked}
             onclick={sendTelegramSummary}
           >
-            {digestSendPending ? '发送中...' : '发送摘要到 Telegram'}
+            {digestSendPending ? '发送中...' : telegramLinked ? '发送摘要到 Telegram' : '请先连接 Telegram'}
           </button>
           {#if digestSendMessage}<small>{digestSendMessage}</small>{/if}
         </aside>
