@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
+import { getDb } from '$lib/server/db';
 import { mergeLocalEnv } from '$lib/server/env';
+import { isFeatureAllowed } from '$lib/server/features';
 import { requireSessionUser } from '$lib/server/request-auth';
 import { runUserDigestJob } from '$lib/server/jobs';
 import { isTelegramBotConfigured } from '$lib/server/telegram';
@@ -12,6 +14,9 @@ const cooldownMinutes = 5;
 export const POST: RequestHandler = async ({ platform, locals }) => {
   const user = requireSessionUser(locals);
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
+  if (!(await isFeatureAllowed(getDb(env), 'telegram_digest', user.isAdmin))) {
+    return json({ error: 'Feature telegram_digest is disabled' }, { status: 403 });
+  }
   if (!isTelegramBotConfigured(env) && !env.TELEGRAM_BOT_TOKEN) {
     return json({ error: 'Telegram 尚未配置。' }, { status: 400 });
   }

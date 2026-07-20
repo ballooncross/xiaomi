@@ -170,6 +170,7 @@ const memory = {
     updatedAt: string;
   }>,
   telegramLinkTokens: [] as Array<{ token: string; userId: string; expiresAt: string }>,
+  featureFlags: [] as Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>,
   allowedEmails: [] as Array<{ email: string; createdAt: string; createdBy?: string }>,
   topicsByUser: new Map<string, WatchTopic[]>(),
   items: [...demoItems],
@@ -286,6 +287,14 @@ export abstract class RadarDb {
   abstract createTelegramLinkToken(userId: string, token: string, expiresAt: string): Promise<void>;
   /** Returns user id if token is valid and not expired; consumes the token. */
   abstract consumeTelegramLinkToken(token: string): Promise<string | null>;
+
+  abstract listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>>;
+  abstract upsertFeatureFlag(
+    id: string,
+    enabled: boolean,
+    minRole: 'member' | 'admin',
+    updatedBy?: string
+  ): Promise<void>;
 
   // User settings
   abstract getMiddleNav(userId?: string): Promise<string[] | null>;
@@ -582,6 +591,21 @@ class MemoryRadarDb extends RadarDb {
     memory.telegramLinkTokens.splice(index, 1);
     if (new Date(entry.expiresAt).getTime() < Date.now()) return null;
     return entry.userId;
+  }
+
+  async listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>> {
+    return [...memory.featureFlags];
+  }
+
+  async upsertFeatureFlag(
+    id: string,
+    enabled: boolean,
+    minRole: 'member' | 'admin',
+    _updatedBy?: string
+  ): Promise<void> {
+    const index = memory.featureFlags.findIndex((f) => f.id === id);
+    if (index >= 0) memory.featureFlags[index] = { id, enabled, minRole };
+    else memory.featureFlags.push({ id, enabled, minRole });
   }
 
   async getMiddleNav(userId?: string): Promise<string[] | null> {
@@ -1394,6 +1418,47 @@ class D1RadarDb extends RadarDb {
       return row.user_id;
     } catch (error) {
       if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
+  async listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>> {
+    try {
+      const { results } = await this.db
+        .prepare('SELECT id, enabled, min_role FROM feature_flags ORDER BY id ASC')
+        .all<{ id: string; enabled: number; min_role: 'member' | 'admin' }>();
+      return (results ?? []).map((row) => ({
+        id: row.id,
+        enabled: Boolean(row.enabled),
+        minRole: row.min_role
+      }));
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async upsertFeatureFlag(
+    id: string,
+    enabled: boolean,
+    minRole: 'member' | 'admin',
+    updatedBy?: string
+  ): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO feature_flags (id, enabled, min_role, updated_at, updated_by)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             enabled = excluded.enabled,
+             min_role = excluded.min_role,
+             updated_at = CURRENT_TIMESTAMP,
+             updated_by = excluded.updated_by`
+        )
+        .bind(id, enabled ? 1 : 0, minRole, updatedBy ?? null)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
       throw error;
     }
   }

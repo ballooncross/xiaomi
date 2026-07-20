@@ -8,6 +8,7 @@ import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
 import { buildTrendSearchItems } from './fetchers/trends';
 import { sortReminders, todayInSingapore } from './lunar';
 import { getAllUpcomingMilestones } from './milestones';
+import { isCronJobFeatureEnabled } from './features';
 import { isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
 import type { DateReminder, Env, JobResult, RadarItem } from './types';
@@ -92,6 +93,12 @@ export async function runItemDedupJob(env: Env): Promise<JobResult> {
 
 export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual_digest' = 'daily_digest'): Promise<JobResult> {
   const base = getDb(env);
+  if (!(await isCronJobFeatureEnabled(base, 'daily-digest'))) {
+    const detail = 'feature telegram_digest disabled';
+    await base.logJob({ jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest', status: 'skipped', detail });
+    return { inserted: 0, updated: 0, considered: 0, notified: 0, detail };
+  }
+
   const linked = await base.listUsersWithTelegram();
 
   if (linked.length === 0) {

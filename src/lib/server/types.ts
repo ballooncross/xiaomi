@@ -138,6 +138,8 @@ export type Env = {
   SESSION_SECRET?: string;
   ALLOWED_EMAILS?: string;
   ADMIN_EMAILS?: string;
+  /** Optional JSON overrides for feature flags, e.g. {"ica_check":{"enabled":true}}. */
+  FEATURE_FLAGS_JSON?: string;
 };
 
 export type JobResult = {

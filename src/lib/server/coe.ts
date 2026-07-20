@@ -2,6 +2,7 @@
 
 import { formatCoeTelegramMessage, type CoeBiddingRound, type CoeCategory, type CoeCategoryResult, type CoePayload } from '$lib/coe';
 import { getDb } from './db';
+import { isFeatureEnabled } from './features';
 import { sendTelegramToAdmins } from './telegram';
 import type { Env, JobResult } from './types';
 
@@ -135,6 +136,11 @@ export async function fetchCoePayload(fetchImpl: typeof fetch = fetch): Promise<
  */
 export async function runCoeCheckJob(env: Env): Promise<JobResult> {
 	const db = getDb(env);
+	if (!(await isFeatureEnabled(db, 'coe_notify'))) {
+		const detail = 'feature coe_notify disabled';
+		await db.logJob({ jobName: 'coe-check', status: 'skipped', detail });
+		return { inserted: 0, updated: 0, considered: 0, notified: 0, detail };
+	}
 
 	try {
 		const payload = await fetchCoePayload();

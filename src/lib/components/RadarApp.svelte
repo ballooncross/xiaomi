@@ -9,9 +9,14 @@
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { RadarPageData } from '$lib/server/radar-page-load';
+  import type { FeatureId } from '$lib/server/features';
 
   type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
   type NavSlotId = 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
+
+  function featureAllowed(id: FeatureId): boolean {
+    return Boolean(data.features?.[id]?.allowed);
+  }
   type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
   type ReminderView = DateReminder & {
     nextDate: string;
@@ -294,6 +299,15 @@
   let telegramLinkPending = $state(false);
   let telegramLinkMessage = $state('');
   let telegramDeepLink = $state('');
+  let featureRows = $state<Array<{
+    id: FeatureId;
+    label: string;
+    description: string;
+    enabled: boolean;
+    minRole: 'member' | 'admin';
+  }>>([]);
+  let featurePendingId = $state<string | null>(null);
+  let featureMessage = $state('');
   let dedupPending = $state<string | null>(null);
   let dedupResult = $state<{ itemId: string; found: number } | null>(null);
   let nlInterestText = $state('');
@@ -327,6 +341,7 @@
     if (data.user?.isAdmin) {
       loadDevRequests();
       loadAllowlist();
+      loadFeatures();
     }
 
     const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -359,6 +374,19 @@
     syncNavFromServer(data.middleNav);
   });
 
+  $effect(() => {
+    if (activeView === 'coe' && !featureAllowed('coe_page')) setView('home');
+    if (activeView === 'gym' && !featureAllowed('gym_page')) setView('home');
+  });
+
+  const visibleNavOptions = $derived(
+    ALL_NAV_OPTIONS.filter((option) => {
+      if (option.id === 'coe') return featureAllowed('coe_page');
+      if (option.id === 'gym') return featureAllowed('gym_page');
+      return true;
+    })
+  );
+
   async function restoreStarterPack() {
     starterPending = true;
     starterMessage = '';
@@ -387,22 +415,28 @@
 
   const barNavItems = $derived([
     { id: 'home' as const, label: '首页' },
-    ...middleNav.map((id) => {
-      const option = ALL_NAV_OPTIONS.find((item) => item.id === id);
-      return { id, label: option?.label ?? id };
-    }),
+    ...middleNav
+      .filter((id) => visibleNavOptions.some((o) => o.id === id))
+      .map((id) => {
+        const option = visibleNavOptions.find((item) => item.id === id);
+        return { id, label: option?.label ?? id };
+      }),
     { id: 'more' as const, label: '更多' }
   ]);
   const moreMenuItems = $derived.by(() => {
     const fixedIds = new Set(MORE_MENU_ITEMS.map((item) => item.id));
-    const extras = ALL_NAV_OPTIONS.filter(
-      (option) => !middleNav.includes(option.id) && !fixedIds.has(option.id)
-    ).map((option) => ({
-      id: option.id as View,
-      label: option.label,
-      hint: '未固定在导航栏'
-    }));
-    return [...MORE_MENU_ITEMS, ...extras];
+    const base = MORE_MENU_ITEMS.filter((item) => {
+      if (item.id === 'coe') return featureAllowed('coe_page');
+      return true;
+    });
+    const extras = visibleNavOptions
+      .filter((option) => !middleNav.includes(option.id) && !fixedIds.has(option.id))
+      .map((option) => ({
+        id: option.id as View,
+        label: option.label,
+        hint: '未固定在导航栏'
+      }));
+    return [...base, ...extras];
   });
   const navigationView = $derived.by(() => {
     if (activeView === 'home') return 'home';
@@ -618,6 +652,50 @@
     } catch {
       // ignore
     }
+  }
+
+  async function loadFeatures() {
+    if (!data.user?.isAdmin) return;
+    try {
+      const response = await fetch('/api/admin/features');
+      if (response.ok) {
+        const result = (await response.json()) as { features: typeof featureRows };
+        featureRows = result.features;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function patchFeature(id: FeatureId, patch: { enabled?: boolean; minRole?: 'member' | 'admin' }) {
+    featurePendingId = id;
+    featureMessage = '';
+    const current = featureRows.find((f) => f.id === id);
+    try {
+      const response = await fetch('/api/admin/features', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          enabled: patch.enabled ?? current?.enabled ?? true,
+          minRole: patch.minRole ?? current?.minRole ?? 'member'
+        })
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        features?: typeof featureRows;
+        error?: string;
+      };
+      if (response.ok && result.features) {
+        featureRows = result.features;
+        featureMessage = '已保存';
+        await invalidateAll();
+      } else {
+        featureMessage = result.error || '保存失败';
+      }
+    } catch {
+      featureMessage = '保存失败';
+    }
+    featurePendingId = null;
   }
 
   async function loadAllowlist() {
@@ -1888,7 +1966,7 @@
               </div>
             </div>
             <div class="nav-config-list">
-              {#each ALL_NAV_OPTIONS as option}
+              {#each visibleNavOptions as option}
                 {@const selectedIndex = draftMiddleNav.indexOf(option.id)}
                 {@const selected = selectedIndex >= 0}
                 <div class:selected class="nav-config-row">
@@ -2122,6 +2200,7 @@
             </button>
           </div>
 
+          {#if featureAllowed('telegram_digest')}
           <section class="job-run-card">
             <div class="job-run-copy">
               <span>通知</span>
@@ -2177,8 +2256,60 @@
               </p>
             {/if}
           </section>
+          {/if}
 
           {#if data.user?.isAdmin}
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>配置</span>
+              <strong>功能开关</strong>
+              <p>开关控制页面是否展示，以及对应 cron 是否运行。权限决定普通用户或仅管理员可用。</p>
+            </div>
+            {#if featureMessage}
+              <p style="font-size:12px;color:var(--muted);padding:0 14px">{featureMessage}</p>
+            {/if}
+            <div style="padding:8px 14px 14px;display:grid;gap:10px">
+              {#each featureRows as feat}
+                <div style="border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px">
+                  <div>
+                    <strong style="font-size:13px">{feat.label}</strong>
+                    <p style="font-size:12px;color:var(--muted);margin:4px 0 0">{feat.description}</p>
+                    <p style="font-size:11px;color:var(--muted);margin:4px 0 0"><code>{feat.id}</code></p>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                    <label class="check-row" style="font-size:12px">
+                      <input
+                        type="checkbox"
+                        checked={feat.enabled}
+                        disabled={featurePendingId === feat.id}
+                        onchange={(e) => patchFeature(feat.id, { enabled: e.currentTarget.checked })}
+                      />
+                      启用
+                    </label>
+                    <label style="font-size:12px;display:flex;gap:6px;align-items:center">
+                      权限
+                      <select
+                        value={feat.minRole}
+                        disabled={featurePendingId === feat.id}
+                        onchange={(e) =>
+                          patchFeature(feat.id, {
+                            minRole: e.currentTarget.value as 'member' | 'admin'
+                          })}
+                      >
+                        <option value="member">所有登录用户</option>
+                        <option value="admin">仅管理员</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              {:else}
+                <p style="font-size:12px;color:var(--muted)">加载中或暂无配置…</p>
+              {/each}
+            </div>
+          </section>
+          {/if}
+
+          {#if featureAllowed('admin_ops')}
           <section class="job-run-card">
             <div class="job-run-copy">
               <span>访问控制</span>
@@ -2268,6 +2399,7 @@
               </div>
             </section>
 
+            {#if featureAllowed('ica_check')}
             <section class:running={icaJobStatus === 'running'} class={`job-run-card ica-tool-card ${icaJobStatus}`}>
               <div class="job-run-copy">
                 <span>ICA 预约检查</span>
@@ -2328,6 +2460,7 @@
                 </p>
               </div>
             </section>
+            {/if}
 
             <section class:running={manualJobStatus === 'running'} class={`job-run-card ${manualJobStatus}`}>
               <div class="job-run-copy">
@@ -2350,7 +2483,9 @@
               </div>
             </section>
           </section>
+          {/if}
 
+          {#if featureAllowed('dev_requests')}
           <section class="job-run-card">
             <div class="job-run-copy">
               <span>开发请求</span>
@@ -2401,10 +2536,12 @@
                 <strong>{watchTopics.length}</strong>
                 <span>音乐人</span>
               </button>
+              {#if featureAllowed('coe_page')}
               <button type="button" onclick={() => setView('coe')}>
                 <strong>COE</strong>
                 <span>官方报价</span>
               </button>
+              {/if}
             </div>
           </section>
         </section>
@@ -2418,6 +2555,7 @@
             {data.aiEnabled ? '已配置可用' : '已关闭'}；规则评分会一直启用。
           </p>
         </div>
+        {#if featureAllowed('telegram_digest')}
         <aside class="daily-card">
           <strong>每日摘要已就绪</strong>
           <span>
@@ -2433,6 +2571,7 @@
           </button>
           {#if digestSendMessage}<small>{digestSendMessage}</small>{/if}
         </aside>
+        {/if}
       </div>
 
       {#if needsOnboarding && activeView === 'home'}

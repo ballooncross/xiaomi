@@ -1,4 +1,5 @@
 import { getDb } from './db';
+import { isCronJobFeatureEnabled } from './features';
 import type { CronJobStatus, Env } from './types';
 
 type CronJobDefinition = Omit<CronJobStatus, 'enabled' | 'lastRun'> & {
@@ -48,12 +49,13 @@ export async function getCronJobStatuses(env: Env): Promise<CronJobStatus[]> {
   return Promise.all(
     scheduledJobs.map(async (job) => {
       const [lastRun] = await db.listJobRuns(job.jobName, 1);
+      const featureOn = await isCronJobFeatureEnabled(db, job.jobName);
       return {
         jobName: job.jobName,
         label: job.label,
         description: job.description,
         schedule: job.schedule,
-        enabled: job.enabled(env),
+        enabled: featureOn && job.enabled(env),
         lastRun
       };
     })

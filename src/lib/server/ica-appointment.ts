@@ -1,5 +1,6 @@
 import puppeteer from '@cloudflare/puppeteer';
 import { getDb } from './db';
+import { isFeatureEnabled } from './features';
 import { sendTelegramToAdmins } from './telegram';
 import type { Env, JobResult, RadarItem } from './types';
 
@@ -31,6 +32,18 @@ type CalendarDate = {
 type BrowserPage = Awaited<ReturnType<Awaited<ReturnType<typeof puppeteer.launch>>['newPage']>>;
 
 export async function runIcaAppointmentCheckJob(env: Env): Promise<JobResult> {
+  const db = getDb(env);
+  if (!(await isFeatureEnabled(db, 'ica_check'))) {
+    return recordSkipped(env, {
+      status: 'not_configured',
+      targetBefore: targetBefore(env),
+      earlierDates: [],
+      checkedAt: new Date().toISOString(),
+      detail: 'feature ica_check disabled',
+      runner: 'cloudflare-browser-run'
+    });
+  }
+
   if (env.ICA_CHECK_ENABLED !== 'true') {
     return recordSkipped(env, {
       status: 'not_configured',

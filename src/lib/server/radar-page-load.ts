@@ -1,6 +1,7 @@
 import { getDb } from '$lib/server/db';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
+import { getFeatureAccess, type FeatureAccess, type FeatureId } from '$lib/server/features';
 import { getIcaToolStatus } from '$lib/server/ica-tool';
 import { getCronJobStatuses } from '$lib/server/job-status';
 import { sortReminders } from '$lib/server/lunar';
@@ -18,14 +19,19 @@ export async function loadRadarPageData(
 		fallbackConfigured: false
 	};
 	const db = getDb(env, user?.id);
+	const features = await getFeatureAccess(db, Boolean(user?.isAdmin));
+
+	const showAdminOps = features.admin_ops?.allowed ?? false;
+	const showIca = features.ica_check?.allowed ?? false;
+
 	const [items, savedItems, topics, reminders, icaTool, cronJobs, middleNav, telegramChatId] =
 		await Promise.all([
 			db.listItems(80),
 			db.listSavedItems(),
 			db.listTopics(),
 			db.listReminders(),
-			user?.isAdmin ? getIcaToolStatus(env) : Promise.resolve(emptyIca),
-			user?.isAdmin ? getCronJobStatuses(env) : Promise.resolve([]),
+			showIca ? getIcaToolStatus(env) : Promise.resolve(emptyIca),
+			showAdminOps ? getCronJobStatuses(env) : Promise.resolve([]),
 			user?.id ? db.getMiddleNav(user.id) : Promise.resolve(null),
 			user?.id ? db.getUserTelegramChatId(user.id) : Promise.resolve(null)
 		]);
@@ -40,10 +46,10 @@ export async function loadRadarPageData(
 		icaTool,
 		cronJobs,
 		aiEnabled: (env?.AI_ENABLED ?? 'auto') !== 'false',
-		/** Bot is configured (can link + send). */
 		telegramConfigured: telegramBotConfigured,
 		telegramBotConfigured,
 		telegramLinked: Boolean(telegramChatId),
+		features,
 		user: user
 			? {
 					id: user.id,
@@ -58,3 +64,5 @@ export async function loadRadarPageData(
 }
 
 export type RadarPageData = Awaited<ReturnType<typeof loadRadarPageData>>;
+
+export type PageFeatures = Record<FeatureId, FeatureAccess>;
