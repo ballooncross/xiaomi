@@ -1,7 +1,7 @@
 import { json, text } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
-import { sendTelegramMessage } from '$lib/server/telegram';
+import { sendTelegramToAdmins } from '$lib/server/telegram';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -49,7 +49,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   }
 
   const message = formatMessage(body);
-  const telegram = await sendTelegramMessage(env, message);
+  const telegram = await sendTelegramToAdmins(env, message);
   if (!telegram.ok) {
     return json({ error: telegram.detail }, { status: 502, headers: corsHeaders });
   }

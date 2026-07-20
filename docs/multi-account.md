@@ -20,8 +20,19 @@ Google login → session email
 | Feedback / signals / impressions / AI context | — | `user_id` column |
 | COE / gym exercises | shared | — |
 | Ingestion jobs | union of all users’ follow topics for fetch | score/filter applied at read time per user |
-| Digests / Telegram | stay single shared chat until Phase 1.5 | — |
+| Digests / Telegram | one shared **bot** (API identity) | each user links their own chat |
+| Ops alerts (COE / ICA) | — | linked **admin** Telegrams only (`ADMIN_EMAILS`) |
 | Admin tools | global | gated by `ADMIN_EMAILS` |
+
+### Authorization map (not a flexible ACL UI)
+
+| Control | Where | Purpose |
+|---------|--------|---------|
+| Who can log in | DB `allowed_emails` (Me UI) + bootstrap `ALLOWED_EMAILS` env | Access gate |
+| Who is admin | `ADMIN_EMAILS` env | Me admin tools, COE/ICA Telegram, allowlist API |
+| Feature visibility | Hardcoded in app (`isAdmin` checks) | Not env-configurable per feature today |
+
+The Telegram **bot** is not a broadcast channel. It is the app’s identity for calling Telegram’s API so the server can DM each linked chat.
 
 ## Schema (`migrations/0016_multi_account.sql`)
 
@@ -89,7 +100,8 @@ Per-user Telegram bind + digest fan-out.
 - Daily digest fans out to every linked user (their own feed + reminders)
 - Manual “发送摘要” sends to the signed-in user’s chat
 - Env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
-- `TELEGRAM_CHAT_ID` remains for COE/ICA ops alerts and as digest fallback when nobody has linked yet
+- COE / ICA / extension alerts → `sendTelegramToAdmins` (admins in `ADMIN_EMAILS` who linked Telegram)
+- `TELEGRAM_CHAT_ID` deprecated / unused
 
 Set webhook once (production):
 

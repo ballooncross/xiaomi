@@ -109,7 +109,7 @@ export type Env = {
   ICA_CHECKER_URL?: string;
   PUBLIC_APP_NAME?: string;
   TELEGRAM_BOT_TOKEN?: string;
-  /** Fallback chat for ops alerts (COE/ICA) when not sending per-user digests. */
+  /** @deprecated Unused. Ops alerts go to linked admin Telegrams; digests to each linked user. */
   TELEGRAM_CHAT_ID?: string;
   /** Bot username without @ — used for t.me deep links. */
   TELEGRAM_BOT_USERNAME?: string;

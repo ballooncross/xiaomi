@@ -41,7 +41,7 @@ export async function loadRadarPageData(
 		cronJobs,
 		aiEnabled: (env?.AI_ENABLED ?? 'auto') !== 'false',
 		/** Bot is configured (can link + send). */
-		telegramConfigured: telegramBotConfigured || Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID),
+		telegramConfigured: telegramBotConfigured,
 		telegramBotConfigured,
 		telegramLinked: Boolean(telegramChatId),
 		user: user

@@ -1,6 +1,6 @@
 import puppeteer from '@cloudflare/puppeteer';
 import { getDb } from './db';
-import { sendTelegramMessage } from './telegram';
+import { sendTelegramToAdmins } from './telegram';
 import type { Env, JobResult, RadarItem } from './types';
 
 const ICA_URL = 'https://eservices.ica.gov.sg/eappt/serviceselection';
@@ -319,8 +319,8 @@ async function recordResult(env: Env, result: IcaCheckResult): Promise<JobResult
       `Application: ${redactApplicationId(env.ICA_APPLICATION_ID)}`,
       ICA_URL
     ].join('\n');
-    const telegram = await sendTelegramMessage(env, message);
-    notified = telegram.ok ? 1 : 0;
+    const telegram = await sendTelegramToAdmins(env, message);
+    notified = telegram.notified;
     await db.logNotification({
       itemId: item.id,
       channel: 'telegram',

@@ -10,7 +10,6 @@ import { sortReminders, todayInSingapore } from './lunar';
 import { getAllUpcomingMilestones } from './milestones';
 import { isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
-import { getDigestOwnerUserId } from './users';
 import type { DateReminder, Env, JobResult, RadarItem } from './types';
 
 export { runCoeCheckJob } from './coe';
@@ -95,10 +94,14 @@ export async function runDailyDigestJob(env: Env, type: 'daily_digest' | 'manual
   const base = getDb(env);
   const linked = await base.listUsersWithTelegram();
 
-  // No linked users yet → single digest to TELEGRAM_CHAT_ID using admin feed (backward compat).
   if (linked.length === 0) {
-    const ownerId = await getDigestOwnerUserId(base, env);
-    return sendDigestForUser(env, ownerId, env.TELEGRAM_CHAT_ID, type, base, true);
+    const detail = 'no users have linked Telegram';
+    await base.logJob({
+      jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
+      status: 'skipped',
+      detail
+    });
+    return { inserted: 0, updated: 0, considered: 0, notified: 0, detail };
   }
 
   let notified = 0;
@@ -146,6 +149,9 @@ async function sendDigestForUser(
   const [items, reminders] = await Promise.all([db.listItems(12), db.listReminders()]);
   const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
   const message = appendReminderDigest(renderTelegramDigest(digest), reminders);
+  if (!chatId) {
+    return { inserted: 0, updated: 0, considered: items.length, notified: 0, detail: 'missing telegram chat id' };
+  }
   const telegram = await sendTelegramMessage(env, message, chatId);
   await logDb.logNotification({
     channel: 'telegram',

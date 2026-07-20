@@ -32,7 +32,7 @@ const scheduledJobs: CronJobDefinition[] = [
     label: 'COE 结果检查',
     description: '拉取 LTA 官方报价；发现新一轮时 Telegram 通知 Cat A/B。',
     schedule: '每 6 小时 · 周三/四 18:00 SGT',
-    enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
+    enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN && env.ADMIN_EMAILS)
   },
   {
     jobName: 'ica-appointment-check',
