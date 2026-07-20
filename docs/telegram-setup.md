@@ -20,7 +20,8 @@ No shared `TELEGRAM_CHAT_ID` is required.
 
 ```env
 TELEGRAM_BOT_TOKEN=123456789:AA...
-TELEGRAM_BOT_USERNAME=MyPersonalRadarBot
+TELEGRAM_BOT_USERNAME=xiaomiRadarBot
+# username only — not t.me/xiaomiRadarBot, not @xiaomiRadarBot
 TELEGRAM_WEBHOOK_SECRET=<openssl rand -hex 24>
 ADMIN_EMAILS=tofu.hike@gmail.com
 ```

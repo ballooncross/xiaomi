@@ -69,11 +69,23 @@ export async function sendTelegramToAdmins(
 	return { ok: notified > 0, detail: details.join('; '), notified };
 }
 
+/** Normalize BotFather username: "xiaomiRadarBot", not "t.me/..." or "@...". */
+export function normalizeTelegramBotUsername(raw: string): string {
+	return raw
+		.trim()
+		.replace(/^https?:\/\//i, '')
+		.replace(/^t\.me\//i, '')
+		.replace(/^telegram\.me\//i, '')
+		.replace(/^@/, '')
+		.split(/[/?#]/)[0]
+		.trim();
+}
+
 export function telegramDeepLink(botUsername: string, token: string): string {
-	const user = botUsername.replace(/^@/, '');
+	const user = normalizeTelegramBotUsername(botUsername);
 	return `https://t.me/${user}?start=${encodeURIComponent(token)}`;
 }
 
 export function isTelegramBotConfigured(env: Env): boolean {
-	return Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_USERNAME);
+	return Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_USERNAME && normalizeTelegramBotUsername(env.TELEGRAM_BOT_USERNAME));
 }
