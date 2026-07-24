@@ -5,7 +5,7 @@ import { getFeatureAccess, type FeatureAccess, type FeatureId } from '$lib/serve
 import { getIcaToolStatus } from '$lib/server/ica-tool';
 import { getCronJobStatuses } from '$lib/server/job-status';
 import { sortReminders } from '$lib/server/lunar';
-import { DEFAULT_NOTIFY_PREFS } from '$lib/server/notify-prefs';
+import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
 import type { Env } from '$lib/server/types';
 
 export async function loadRadarPageData(

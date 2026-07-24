@@ -1,5 +1,5 @@
 import type { DedupExisting, MergeAction } from './dedup';
-import { DEFAULT_NOTIFY_PREFS, parseNotifyPrefs, type NotifyPrefs } from './notify-prefs';
+import { DEFAULT_NOTIFY_PREFS, parseNotifyPrefs, type NotifyPrefs } from '$lib/notify-prefs';
 import { MAX_TREND_AGE_DAYS, scoreItem } from './scoring';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
 import type {

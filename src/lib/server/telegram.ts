@@ -1,5 +1,5 @@
 import { getDb } from './db';
-import type { NotifyChannel } from './notify-prefs';
+import type { NotifyChannel } from '$lib/notify-prefs';
 import { parseEmailList } from './users';
 import type { Env } from './types';
 

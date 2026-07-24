@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { mergeLocalEnv } from '$lib/server/env';
-import { DEFAULT_NOTIFY_PREFS, mergeNotifyPrefs, parseNotifyPrefs, type NotifyPrefs } from '$lib/server/notify-prefs';
+import { DEFAULT_NOTIFY_PREFS, mergeNotifyPrefs, parseNotifyPrefs, type NotifyPrefs } from '$lib/notify-prefs';
 import { requireSessionUser } from '$lib/server/request-auth';
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Env } from '$lib/server/types';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_NOTIFY_PREFS, mergeNotifyPrefs, parseNotifyPrefs } from './notify-prefs';
+import { DEFAULT_NOTIFY_PREFS, mergeNotifyPrefs, parseNotifyPrefs } from '$lib/notify-prefs';
 
 describe('notify prefs', () => {
 	it('defaults digest on and COE off', () => {

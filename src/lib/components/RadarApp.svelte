@@ -10,8 +10,8 @@
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { RadarPageData } from '$lib/server/radar-page-load';
   import type { FeatureId } from '$lib/server/features';
-  import type { NotifyPrefs } from '$lib/server/notify-prefs';
-  import { DEFAULT_NOTIFY_PREFS } from '$lib/server/notify-prefs';
+  import type { NotifyPrefs } from '$lib/notify-prefs';
+  import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
 
   type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
   type NavSlotId = 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';

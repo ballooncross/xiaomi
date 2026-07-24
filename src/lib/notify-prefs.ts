@@ -1,4 +1,4 @@
-/** Per-user Telegram notification preferences. */
+/** Per-user Telegram notification preferences (shared client + server). */
 
 export type NotifyPrefs = {
 	/** Daily / manual radar digest (concerts + trends). */
