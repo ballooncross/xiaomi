@@ -114,12 +114,14 @@ The repository includes `.github/workflows/deploy.yml`. It runs when `main` rece
 The workflow does the production path end to end:
 
 1. Install dependencies with `npm ci`.
-2. Run `npm run check`.
-3. Run `npm test`.
-4. Run `npm run build`.
-5. Apply remote D1 migrations.
-6. Deploy Cloudflare Pages.
-7. Deploy the cron Worker.
+2. Bump the app patch version (`npm version patch`) so the footer matches the deploy.
+3. Run `npm run check`.
+4. Run `npm test`.
+5. Run `npm run build`.
+6. Apply remote D1 migrations.
+7. Deploy Cloudflare Pages.
+8. Deploy the cron Worker.
+9. Commit `package.json` / `package-lock.json` with `[skip ci]` so git stays aligned without another deploy loop.
 
 Add these repository secrets in GitHub > repository Settings > Secrets and variables > Actions:
 
