@@ -50,6 +50,14 @@ describe('exercise fuzzy search', () => {
 		expect(topName('barbel bench pres')).toBe('barbell bench press');
 	});
 
+	it('matches Garmin identifiers stored as aliases', () => {
+		const garminExercise: Searchable = {
+			...ex('90/90 Hip Switch with Reach', 'hips', 'body weight'),
+			aliases: ['WARM_UP', 'NINETY_NINETY_HIP_SWITCH']
+		};
+		expect(rankExercises('warm up hip switch', [garminExercise], 5)).toEqual([garminExercise]);
+	});
+
 	it('computes edit distance correctly', () => {
 		expect(levenshtein('barbell', 'barbbbell')).toBe(2);
 		expect(levenshtein('press', 'pres')).toBe(1);

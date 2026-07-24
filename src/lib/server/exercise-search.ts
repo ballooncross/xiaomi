@@ -21,6 +21,7 @@ export type Searchable = {
 	equipment: string;
 	target: string;
 	secondaryMuscles: string[];
+	aliases?: string[];
 };
 
 const WORD_RE = /[a-z0-9]+/g;
@@ -99,7 +100,14 @@ export function rankExercises<T extends Searchable>(query: string, items: T[], l
 	for (const item of items) {
 		const nameWords = tokenize(item.name);
 		const docWords = tokenize(
-			[item.name, item.target, item.equipment, item.bodyPart, ...item.secondaryMuscles].join(' ')
+			[
+				item.name,
+				item.target,
+				item.equipment,
+				item.bodyPart,
+				...item.secondaryMuscles,
+				...(item.aliases ?? [])
+			].join(' ')
 		);
 
 		let total = 0;

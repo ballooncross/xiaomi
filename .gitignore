@@ -11,3 +11,4 @@ dist
 coverage
 scripts/.agent-state.json
 scripts/seed-exercises.sql
+scripts/seed-garmin-exercises.sql

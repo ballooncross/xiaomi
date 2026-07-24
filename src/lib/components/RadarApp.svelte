@@ -124,8 +124,12 @@
     target: string;
     secondaryMuscles: string[];
     instructions: string;
-    gifUrl: string;
+    gifUrl: string | null;
     imageUrl: string | null;
+    source: 'exercise-dataset' | 'garmin';
+    sourceCategory: string | null;
+    sourceKey: string | null;
+    catalogs: string[];
   };
   const gymBodyParts: Array<{ id: string; label: string }> = [
     { id: 'back', label: '背部' },
@@ -2086,7 +2090,7 @@
         <section class="gym">
           <header class="gym-head">
             <h1>健身动作库</h1>
-            <p>搜索 1,300+ 训练动作 · 动图、目标肌群与所需器械（数据来自 exercises-dataset）</p>
+            <p>搜索 3,000+ 训练动作 · Garmin 动作名称、目标肌群与所需器械</p>
           </header>
           <div class="gym-search">
             <input
@@ -2112,13 +2116,29 @@
             <div class="gym-grid">
               {#each gymResults as exercise (exercise.id)}
                 <button type="button" class="gym-card" onclick={() => (gymDetail = exercise)}>
-                  <img class="gym-gif" src={exercise.gifUrl} alt={exercise.name} loading="lazy" />
+                  {#if exercise.gifUrl || exercise.imageUrl}
+                    <img
+                      class="gym-gif"
+                      src={exercise.gifUrl ?? exercise.imageUrl ?? ''}
+                      alt={exercise.name}
+                      loading="lazy"
+                    />
+                  {:else}
+                    <span class="gym-media-placeholder" aria-hidden="true">G</span>
+                  {/if}
                   <div class="gym-card-body">
-                    <strong>{exercise.name}</strong>
+                    <div class="gym-card-title">
+                      <strong>{exercise.name}</strong>
+                      <span class:garmin={exercise.source === 'garmin'} class="gym-source">
+                        {exercise.source === 'garmin' ? 'Garmin' : '动作库'}
+                      </span>
+                    </div>
                     <div class="gym-tags">
                       <span class="gym-tag part">{exercise.bodyPart}</span>
                       <span class="gym-tag target">{exercise.target}</span>
-                      <span class="gym-tag gear">{exercise.equipment}</span>
+                      {#if exercise.equipment}
+                        <span class="gym-tag gear">{exercise.equipment}</span>
+                      {/if}
                     </div>
                     {#if exercise.instructions}
                       <p class="gym-instructions">{exercise.instructions}</p>
@@ -3258,18 +3278,34 @@
       <div class="modal-head">
         <div>
           <h2 id="gym-detail-title">{gymDetail.name}</h2>
-          <p>{gymBodyParts.find((bp) => bp.id === gymDetail?.bodyPart)?.label ?? gymDetail.bodyPart}</p>
+          <p>
+            {gymBodyParts.find((bp) => bp.id === gymDetail?.bodyPart)?.label ?? gymDetail.bodyPart}
+            · {gymDetail.source === 'garmin' ? 'Garmin Connect' : 'exercises-dataset'}
+          </p>
         </div>
         <button class="close-button" type="button" aria-label="关闭" onclick={() => (gymDetail = null)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
         </button>
       </div>
-      <img class="gym-modal-gif" src={gymDetail.gifUrl} alt={gymDetail.name} />
+      {#if gymDetail.gifUrl || gymDetail.imageUrl}
+        <img
+          class="gym-modal-gif"
+          src={gymDetail.gifUrl ?? gymDetail.imageUrl ?? ''}
+          alt={gymDetail.name}
+        />
+      {:else}
+        <div class="gym-modal-placeholder" aria-hidden="true">Garmin</div>
+      {/if}
       <div class="gym-tags">
         <span class="gym-tag part">{gymDetail.bodyPart}</span>
         <span class="gym-tag target">{gymDetail.target}</span>
-        <span class="gym-tag gear">{gymDetail.equipment}</span>
+        {#if gymDetail.equipment}
+          <span class="gym-tag gear">{gymDetail.equipment}</span>
+        {/if}
       </div>
+      {#if gymDetail.source === 'garmin' && gymDetail.sourceCategory && gymDetail.sourceKey}
+        <p class="gym-source-key">{gymDetail.sourceCategory} / {gymDetail.sourceKey}</p>
+      {/if}
       {#if gymDetail.secondaryMuscles.length}
         <p class="gym-modal-secondary">协同肌群：{gymDetail.secondaryMuscles.join('、')}</p>
       {/if}
@@ -4044,6 +4080,20 @@
     border-radius: 12px;
   }
 
+  .gym-media-placeholder {
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(31, 111, 91, 0.2);
+    border-radius: 12px;
+    background: rgba(31, 111, 91, 0.08);
+    color: var(--jade);
+    font-size: 28px;
+    font-weight: 800;
+  }
+
   .gym-card-body {
     padding: 0;
     display: flex;
@@ -4052,9 +4102,31 @@
     min-width: 0;
   }
 
+  .gym-card-title {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   .gym-card-body strong {
     font-size: 14px;
     text-transform: capitalize;
+  }
+
+  .gym-source {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(120, 90, 40, 0.1);
+    color: #7a5a28;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .gym-source.garmin {
+    background: rgba(31, 111, 91, 0.12);
+    color: var(--jade);
   }
 
   .gym-more {
@@ -4072,6 +4144,28 @@
     background: #fff;
     border: 1px solid var(--line);
     border-radius: 16px;
+  }
+
+  .gym-modal-placeholder {
+    display: grid;
+    place-items: center;
+    width: min(240px, 70%);
+    aspect-ratio: 1 / 1;
+    margin: 0 auto 14px;
+    border: 1px solid rgba(31, 111, 91, 0.2);
+    border-radius: 16px;
+    background: rgba(31, 111, 91, 0.08);
+    color: var(--jade);
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .gym-source-key {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    overflow-wrap: anywhere;
   }
 
   .gym-modal-secondary {

@@ -18,6 +18,20 @@ type ExerciseRow = {
 	image_url: string | null;
 };
 
+type GarminExerciseRow = {
+	id: string;
+	category: string;
+	exercise_key: string;
+	name: string;
+	body_part: string;
+	primary_muscles: string;
+	secondary_muscles: string;
+	equipment: string;
+	catalogs: string;
+	description: string | null;
+	image_url: string | null;
+};
+
 type Exercise = {
 	id: string;
 	name: string;
@@ -26,23 +40,37 @@ type Exercise = {
 	target: string;
 	secondaryMuscles: string[];
 	instructions: string;
-	gifUrl: string;
+	gifUrl: string | null;
 	imageUrl: string | null;
+	source: 'exercise-dataset' | 'garmin';
+	sourceCategory: string | null;
+	sourceKey: string | null;
+	catalogs: string[];
+	aliases: string[];
 };
 
-// The dataset is static and small (~1,300 rows), so we cache the whole thing in
-// the isolate and rank in memory instead of hitting D1 on every keystroke.
+// Both datasets are static and small, so we cache them in the isolate and rank
+// in memory instead of hitting D1 on every keystroke.
 const INDEX_TTL_MS = 5 * 60 * 1000;
 let indexCache: { rows: Exercise[]; at: number } | null = null;
 
 async function loadIndex(db: D1Database): Promise<Exercise[]> {
 	if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) return indexCache.rows;
-	const { results } = await db
-		.prepare(
-			'SELECT id, name, body_part, equipment, target, secondary_muscles, instructions_en, instructions_zh, gif_url, image_url FROM exercises'
-		)
-		.all<ExerciseRow>();
-	const rows = (results ?? []).map((row) => ({
+
+	const [exerciseResult, garminResult] = await Promise.all([
+		db
+			.prepare(
+				'SELECT id, name, body_part, equipment, target, secondary_muscles, instructions_en, instructions_zh, gif_url, image_url FROM exercises'
+			)
+			.all<ExerciseRow>(),
+		db
+			.prepare(
+				'SELECT id, category, exercise_key, name, body_part, primary_muscles, secondary_muscles, equipment, catalogs, description, image_url FROM garmin_exercises'
+			)
+			.all<GarminExerciseRow>()
+	]);
+
+	const exerciseRows: Exercise[] = (exerciseResult.results ?? []).map((row) => ({
 		id: row.id,
 		name: row.name,
 		bodyPart: row.body_part,
@@ -51,8 +79,36 @@ async function loadIndex(db: D1Database): Promise<Exercise[]> {
 		secondaryMuscles: parseJsonArray(row.secondary_muscles),
 		instructions: row.instructions_zh || row.instructions_en || '',
 		gifUrl: row.gif_url,
-		imageUrl: row.image_url
+		imageUrl: row.image_url,
+		source: 'exercise-dataset',
+		sourceCategory: null,
+		sourceKey: null,
+		catalogs: [],
+		aliases: []
 	}));
+
+	const garminRows: Exercise[] = (garminResult.results ?? []).map((row) => {
+		const primaryMuscles = parseJsonArray(row.primary_muscles);
+		const equipment = parseJsonArray(row.equipment);
+		return {
+			id: row.id,
+			name: row.name,
+			bodyPart: row.body_part,
+			equipment: equipment.map(humanizeGarmin).join(', '),
+			target: primaryMuscles.map(humanizeGarmin).join(', ') || humanizeGarmin(row.category),
+			secondaryMuscles: parseJsonArray(row.secondary_muscles).map(humanizeGarmin),
+			instructions: row.description ?? '',
+			gifUrl: null,
+			imageUrl: row.image_url,
+			source: 'garmin',
+			sourceCategory: row.category,
+			sourceKey: row.exercise_key,
+			catalogs: parseJsonArray(row.catalogs),
+			aliases: [row.category, row.exercise_key, `${row.category}_${row.exercise_key}`]
+		};
+	});
+
+	const rows = [...exerciseRows, ...garminRows];
 	indexCache = { rows, at: Date.now() };
 	return rows;
 }
@@ -70,7 +126,15 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 	try {
 		let items = await loadIndex(db);
 		if (bodyPart) items = items.filter((item) => item.bodyPart === bodyPart);
-		if (equipment) items = items.filter((item) => item.equipment === equipment);
+		if (equipment) {
+			const normalizedEquipment = equipment.toLowerCase();
+			items = items.filter((item) =>
+				item.equipment
+					.toLowerCase()
+					.split(', ')
+					.includes(normalizedEquipment)
+			);
+		}
 
 		const exercises = rankExercises(q, items, limit);
 		return json({ exercises });
@@ -87,4 +151,13 @@ function parseJsonArray(value: string | null): string[] {
 	} catch {
 		return [];
 	}
+}
+
+function humanizeGarmin(value: string): string {
+	return value
+		.toLowerCase()
+		.split('_')
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
 }
