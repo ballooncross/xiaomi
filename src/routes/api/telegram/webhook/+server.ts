@@ -55,7 +55,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	await db.setUserTelegramChatId(userId, String(chatId));
 	await sendTelegramMessage(
 		env,
-		'已连接 Personal Radar。每日摘要会发送到这里。可在网页「我的」里断开连接。',
+		'已连接 Personal Radar。趋势摘要与日期提醒会分开发到这里；可在网页「我的」里调整订阅或断开连接。',
 		String(chatId)
 	);
 	return json({ ok: true });

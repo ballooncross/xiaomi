@@ -10,6 +10,8 @@
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { RadarPageData } from '$lib/server/radar-page-load';
   import type { FeatureId } from '$lib/server/features';
+  import type { NotifyPrefs } from '$lib/server/notify-prefs';
+  import { DEFAULT_NOTIFY_PREFS } from '$lib/server/notify-prefs';
 
   type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
   type NavSlotId = 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
@@ -299,6 +301,9 @@
   let telegramLinkPending = $state(false);
   let telegramLinkMessage = $state('');
   let telegramDeepLink = $state('');
+  let notifyPrefs = $state<NotifyPrefs>({ ...DEFAULT_NOTIFY_PREFS });
+  let notifyPrefsPending = $state(false);
+  let notifyPrefsMessage = $state('');
   let featureRows = $state<Array<{
     id: FeatureId;
     label: string;
@@ -371,6 +376,7 @@
     icaTool = data.icaTool;
     cronJobs = data.cronJobs;
     telegramLinked = data.telegramLinked;
+    notifyPrefs = { ...(data.notifyPrefs ?? DEFAULT_NOTIFY_PREFS) };
     syncNavFromServer(data.middleNav);
   });
 
@@ -820,6 +826,33 @@
       telegramLinkMessage = '无法生成连接链接';
     }
     telegramLinkPending = false;
+  }
+
+  async function saveNotifyPrefs(patch: Partial<NotifyPrefs>) {
+    const previous = { ...notifyPrefs };
+    notifyPrefs = { ...notifyPrefs, ...patch };
+    notifyPrefsPending = true;
+    notifyPrefsMessage = '';
+    try {
+      const response = await fetch('/api/settings/notify', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prefs: patch })
+      });
+      const result = (await response.json().catch(() => ({}))) as { prefs?: NotifyPrefs; error?: string };
+      if (!response.ok) {
+        notifyPrefs = previous;
+        notifyPrefsMessage = result.error || '保存失败，请稍后再试。';
+        return;
+      }
+      if (result.prefs) notifyPrefs = result.prefs;
+      notifyPrefsMessage = '已保存通知设置';
+    } catch {
+      notifyPrefs = previous;
+      notifyPrefsMessage = '保存失败，请稍后再试。';
+    } finally {
+      notifyPrefsPending = false;
+    }
   }
 
   async function disconnectTelegram() {
@@ -1895,7 +1928,18 @@
       {/if}
 
       {#if activeView === 'coe'}
-        <CoePriceView data={coeData} loading={coeLoading} error={coeError} onRefresh={() => loadCoe(true)} />
+        <CoePriceView
+          data={coeData}
+          loading={coeLoading}
+          error={coeError}
+          onRefresh={() => loadCoe(true)}
+          notifyEnabled={featureAllowed('coe_notify') || featureAllowed('coe_page')}
+          telegramLinked={telegramLinked}
+          telegramConfigured={data.telegramBotConfigured}
+          subscribed={notifyPrefs.coe}
+          subscribePending={notifyPrefsPending}
+          onSubscribeChange={(next) => saveNotifyPrefs({ coe: next })}
+        />
       {:else if activeView === 'interests'}
         <section class="interests-workspace">
           <div class="interests-head">
@@ -2200,16 +2244,16 @@
             </button>
           </div>
 
-          {#if featureAllowed('telegram_digest')}
+          {#if featureAllowed('telegram_digest') || featureAllowed('coe_notify') || featureAllowed('coe_page')}
           <section class="job-run-card">
             <div class="job-run-copy">
               <span>通知</span>
               <strong>Telegram</strong>
               <p>
                 {#if telegramLinked}
-                  已连接 — 每日摘要会发到你的 Telegram。
+                  已连接。趋势摘要与日期提醒分开发送，共享功能可单独订阅。
                 {:else if data.telegramBotConfigured}
-                  连接后，摘要会发到你自己的聊天（不再共用一个群）。
+                  连接后，通知会发到你自己的聊天（不再共用一个群）。
                 {:else}
                   管理员尚未配置 Telegram Bot（TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME）。
                 {/if}
@@ -2255,6 +2299,48 @@
                 <a href={telegramDeepLink} target="_blank" rel="noopener">打开绑定链接</a>
               </p>
             {/if}
+            <div style="padding:0 14px 14px;display:grid;gap:8px">
+              {#if featureAllowed('telegram_digest')}
+                <label class="check-row" style="font-size:12px">
+                  <input
+                    type="checkbox"
+                    checked={notifyPrefs.digestTrends}
+                    disabled={notifyPrefsPending || !telegramLinked}
+                    onchange={(event) =>
+                      saveNotifyPrefs({ digestTrends: (event.currentTarget as HTMLInputElement).checked })
+                    }
+                  />
+                  趋势与演出摘要（单独一条消息）
+                </label>
+                <label class="check-row" style="font-size:12px">
+                  <input
+                    type="checkbox"
+                    checked={notifyPrefs.digestDates}
+                    disabled={notifyPrefsPending || !telegramLinked}
+                    onchange={(event) =>
+                      saveNotifyPrefs({ digestDates: (event.currentTarget as HTMLInputElement).checked })
+                    }
+                  />
+                  日期提醒（生日 / 纪念日 / 里程碑，单独一条消息）
+                </label>
+              {/if}
+              {#if featureAllowed('coe_notify') || featureAllowed('coe_page')}
+                <label class="check-row" style="font-size:12px">
+                  <input
+                    type="checkbox"
+                    checked={notifyPrefs.coe}
+                    disabled={notifyPrefsPending || !telegramLinked}
+                    onchange={(event) =>
+                      saveNotifyPrefs({ coe: (event.currentTarget as HTMLInputElement).checked })
+                    }
+                  />
+                  COE 新结果通知（默认关闭，需订阅）
+                </label>
+              {/if}
+              {#if notifyPrefsMessage}
+                <p style="font-size:12px;color:var(--muted);margin:0">{notifyPrefsMessage}</p>
+              {/if}
+            </div>
           </section>
           {/if}
 
@@ -2583,7 +2669,7 @@
           </div>
           <div style="padding:0 14px 14px;display:grid;gap:8px;font-size:13px">
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-              <span>{telegramLinked ? '✓' : '○'} 连接 Telegram 接收摘要</span>
+              <span>{telegramLinked ? '✓' : '○'} 连接 Telegram 接收通知</span>
               {#if !telegramLinked}
                 <button class="small-button" type="button" onclick={() => setView('me')}>去连接</button>
               {/if}

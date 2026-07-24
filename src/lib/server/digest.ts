@@ -1,5 +1,7 @@
+import { sortReminders, todayInSingapore } from './lunar';
+import { getAllUpcomingMilestones } from './milestones';
 import { reasonForItem } from './scoring';
-import type { Digest, RadarItem } from './types';
+import type { DateReminder, Digest, RadarItem } from './types';
 
 export function buildTemplateDigest(items: RadarItem[]): Digest {
   const activeItems = items.filter((item) => item.status !== 'dismissed').slice(0, 8);
@@ -34,6 +36,40 @@ export function renderTelegramDigest(digest: Digest): string {
     lines.push('');
   }
   lines.push('打开应用可保存、重点跟踪或标记不相关。');
+  return lines.join('\n').trim();
+}
+
+/** Standalone dates Telegram message (not appended under the bulky trend digest). */
+export function buildReminderDigestMessage(reminders: DateReminder[]): string | null {
+  const sorted = sortReminders(reminders);
+  const upcoming = sorted
+    .filter((reminder) => reminder.remindDaysBefore.includes(reminder.daysLeft))
+    .slice(0, 6);
+
+  const today = todayInSingapore();
+  const milestones = getAllUpcomingMilestones(sorted, today, 1).slice(0, 4);
+
+  if (upcoming.length === 0 && milestones.length === 0) return null;
+
+  const lines: string[] = ['个人雷达 · 日期提醒', ''];
+  if (upcoming.length > 0) {
+    lines.push('生日与纪念日');
+    for (const reminder of upcoming) {
+      const dayText = reminder.daysLeft === 0 ? '今天' : `${reminder.daysLeft} 天后`;
+      const ageText = reminder.ageLabel ? ` · ${reminder.ageLabel}` : '';
+      lines.push(`${reminder.title} · ${dayText} · ${reminder.dateLabel}${ageText}`);
+    }
+  }
+
+  if (milestones.length > 0) {
+    if (upcoming.length > 0) lines.push('');
+    lines.push('里程碑');
+    for (const m of milestones) {
+      const dayText = m.daysFromNow === 0 ? '今天' : `${m.daysFromNow} 天后`;
+      lines.push(`${m.reminderTitle} · ${m.label} · 第${m.dayNumber}天 · ${dayText}`);
+    }
+  }
+
   return lines.join('\n').trim();
 }
 

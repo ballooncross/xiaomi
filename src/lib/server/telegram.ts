@@ -1,4 +1,5 @@
 import { getDb } from './db';
+import type { NotifyChannel } from './notify-prefs';
 import { parseEmailList } from './users';
 import type { Env } from './types';
 
@@ -34,7 +35,57 @@ export async function sendTelegramMessage(
 	return { ok: true, detail: 'sent' };
 }
 
-/** Ops alerts (COE / ICA / extension) → every ADMIN_EMAILS account that has linked Telegram. */
+/** Shared-feature alerts (e.g. COE) → users who opted in and linked Telegram. */
+export async function sendTelegramToSubscribers(
+	env: Env,
+	message: string,
+	channel: NotifyChannel
+): Promise<{ ok: boolean; detail: string; notified: number }> {
+	if (!env.TELEGRAM_BOT_TOKEN) {
+		return { ok: false, detail: 'Telegram bot token is not configured', notified: 0 };
+	}
+
+	const db = getDb(env);
+	const linked = await db.listUsersWithTelegram();
+	const subscribers = [];
+	for (const user of linked) {
+		const prefs = await db.getNotifyPrefs(user.id);
+		if (prefs[channel]) subscribers.push(user);
+	}
+
+	// Until someone opts in, keep ops continuity for linked admins (pre-subscription era).
+	let targets = subscribers;
+	let mode = 'subscribers';
+	if (targets.length === 0) {
+		const adminEmails = new Set(parseEmailList(env.ADMIN_EMAILS));
+		targets = linked.filter((u) => adminEmails.has(u.email.toLowerCase()));
+		mode = 'admin-fallback';
+	}
+
+	if (targets.length === 0) {
+		return {
+			ok: false,
+			detail: `No ${channel} subscribers (and no admin Telegram fallback)`,
+			notified: 0
+		};
+	}
+
+	let notified = 0;
+	const details: string[] = [];
+	for (const user of targets) {
+		const result = await sendTelegramMessage(env, message, user.telegramChatId);
+		if (result.ok) notified += 1;
+		details.push(`${user.email}:${result.detail}`);
+	}
+
+	return {
+		ok: notified > 0,
+		detail: `${mode} ${details.join('; ')}`,
+		notified
+	};
+}
+
+/** Ops alerts (ICA / extension) → every ADMIN_EMAILS account that has linked Telegram. */
 export async function sendTelegramToAdmins(
 	env: Env,
 	message: string

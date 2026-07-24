@@ -20,8 +20,9 @@ Google login → session email
 | Feedback / signals / impressions / AI context | — | `user_id` column |
 | COE / gym exercises | shared | — |
 | Ingestion jobs | union of all users’ follow topics for fetch | score/filter applied at read time per user |
-| Digests / Telegram | one shared **bot** (API identity) | each user links their own chat |
-| Ops alerts (COE / ICA) | — | linked **admin** Telegrams only (`ADMIN_EMAILS`) |
+| Digests / Telegram | one shared **bot** (API identity) | each user links their own chat; trend vs dates are separate messages + prefs |
+| Shared alerts (COE) | shared check job | per-user subscribe in `user_settings.notify_prefs_json` |
+| Ops alerts (ICA / extension) | — | linked **admin** Telegrams only (`ADMIN_EMAILS`) |
 | Admin tools | global | gated by `ADMIN_EMAILS` |
 
 ### Authorization map (not a flexible ACL UI)
@@ -29,7 +30,7 @@ Google login → session email
 | Control | Where | Purpose |
 |---------|--------|---------|
 | Who can log in | DB `allowed_emails` (Me UI) + bootstrap `ALLOWED_EMAILS` env | Access gate |
-| Who is admin | `ADMIN_EMAILS` env | Me admin tools, COE/ICA Telegram, allowlist API |
+| Who is admin | `ADMIN_EMAILS` env | Me admin tools, ICA/extension Telegram, allowlist API |
 | Feature visibility | DB `feature_flags` (Me → 功能开关) | Enable/disable + min role (`member` \| `admin`); see `docs/feature-gates.md` |
 
 The Telegram **bot** is not a broadcast channel. It is the app’s identity for calling Telegram’s API so the server can DM each linked chat.

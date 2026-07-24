@@ -152,7 +152,7 @@
     {:else}
       <div class="date-empty">
         <strong>还没有日期提醒</strong>
-        <p>新账号不会带入别人的生日或纪念日。添加后可在首页看到临近日期，并收到 Telegram 提醒。</p>
+        <p>新账号不会带入别人的生日或纪念日。添加后可在首页看到临近日期；在「我的」打开日期提醒后，会单独收到 Telegram 提醒（不跟趋势摘要混在一起）。</p>
         <button class="btn btn-primary" type="button" onclick={onAdd}>添加生日或纪念日</button>
       </div>
     {/each}

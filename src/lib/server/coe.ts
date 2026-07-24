@@ -3,7 +3,7 @@
 import { formatCoeTelegramMessage, type CoeBiddingRound, type CoeCategory, type CoeCategoryResult, type CoePayload } from '$lib/coe';
 import { getDb } from './db';
 import { isFeatureEnabled } from './features';
-import { sendTelegramToAdmins } from './telegram';
+import { sendTelegramToSubscribers } from './telegram';
 import type { Env, JobResult } from './types';
 
 export type { CoeBiddingRound, CoeCategory, CoeCategoryResult, CoePayload } from '$lib/coe';
@@ -172,7 +172,7 @@ export async function runCoeCheckJob(env: Env): Promise<JobResult> {
 		}
 
 		const message = formatCoeTelegramMessage(latest, payload.sourceUrl);
-		const telegram = await sendTelegramToAdmins(env, message);
+		const telegram = await sendTelegramToSubscribers(env, message, 'coe');
 		await db.logNotification({
 			itemId: latest.id,
 			channel: 'telegram',
@@ -184,7 +184,7 @@ export async function runCoeCheckJob(env: Env): Promise<JobResult> {
 			jobName: 'coe-check',
 			status: telegram.ok ? 'ok' : 'skipped',
 			detail: telegram.ok
-				? `notified admins ${telegram.notified} ${latest.id}`
+				? `notified ${telegram.notified} ${latest.id}`
 				: `notify failed ${latest.id}: ${telegram.detail}`
 		});
 
@@ -193,7 +193,7 @@ export async function runCoeCheckJob(env: Env): Promise<JobResult> {
 			updated: 0,
 			considered: 1,
 			notified: telegram.notified,
-			detail: telegram.ok ? `notified admins ${telegram.notified} ${latest.id}` : telegram.detail
+			detail: telegram.ok ? `notified ${telegram.notified} ${latest.id}` : telegram.detail
 		};
 	} catch (error) {
 		const detail = `coe check failed: ${String(error)}`;

@@ -1,4 +1,5 @@
 import type { DedupExisting, MergeAction } from './dedup';
+import { DEFAULT_NOTIFY_PREFS, parseNotifyPrefs, type NotifyPrefs } from './notify-prefs';
 import { MAX_TREND_AGE_DAYS, scoreItem } from './scoring';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
 import type {
@@ -177,6 +178,7 @@ const memory = {
   itemStateByUser: new Map<string, Map<string, MemoryUserItemState>>(),
   remindersByUser: new Map<string, DateReminder[]>(),
   middleNavByUser: new Map<string, string[]>(),
+  notifyPrefsByUser: new Map<string, NotifyPrefs>(),
   feedbackByUser: new Map<string, Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string; createdAt: string }>>(),
   jobs: [] as JobRun[],
   agentFeeds: [] as AgentFeedItem[],
@@ -299,6 +301,8 @@ export abstract class RadarDb {
   // User settings
   abstract getMiddleNav(userId?: string): Promise<string[] | null>;
   abstract setMiddleNav(nav: string[], userId?: string): Promise<void>;
+  abstract getNotifyPrefs(userId?: string): Promise<NotifyPrefs>;
+  abstract setNotifyPrefs(prefs: NotifyPrefs, userId?: string): Promise<void>;
 
   // Agent feed methods
   abstract insertAgentFeed(feed: AgentFeedItem): Promise<void>;
@@ -614,6 +618,14 @@ class MemoryRadarDb extends RadarDb {
 
   async setMiddleNav(nav: string[], userId?: string): Promise<void> {
     memory.middleNavByUser.set(userId ?? this.uid, [...nav]);
+  }
+
+  async getNotifyPrefs(userId?: string): Promise<NotifyPrefs> {
+    return { ...(memory.notifyPrefsByUser.get(userId ?? this.uid) ?? DEFAULT_NOTIFY_PREFS) };
+  }
+
+  async setNotifyPrefs(prefs: NotifyPrefs, userId?: string): Promise<void> {
+    memory.notifyPrefsByUser.set(userId ?? this.uid, { ...prefs });
   }
 
   async insertAgentFeed(feed: AgentFeedItem): Promise<void> {
@@ -1492,6 +1504,46 @@ class D1RadarDb extends RadarDb {
         .run();
     } catch (error) {
       if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).setMiddleNav(nav, userId);
+      throw error;
+    }
+  }
+
+  async getNotifyPrefs(userId?: string): Promise<NotifyPrefs> {
+    const uid = userId ?? this.userId;
+    if (!uid) return { ...DEFAULT_NOTIFY_PREFS };
+    try {
+      const row = await this.db
+        .prepare('SELECT notify_prefs_json FROM user_settings WHERE user_id = ?')
+        .bind(uid)
+        .first<{ notify_prefs_json: string | null }>();
+      if (!row?.notify_prefs_json) return { ...DEFAULT_NOTIFY_PREFS };
+      return parseNotifyPrefs(row.notify_prefs_json);
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) {
+        return new MemoryRadarDb(this.userId).getNotifyPrefs(userId);
+      }
+      throw error;
+    }
+  }
+
+  async setNotifyPrefs(prefs: NotifyPrefs, userId?: string): Promise<void> {
+    const uid = userId ?? this.userId;
+    if (!uid) return;
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO user_settings (user_id, middle_nav_json, notify_prefs_json, updated_at)
+           VALUES (?, '[]', ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(user_id) DO UPDATE SET
+             notify_prefs_json = excluded.notify_prefs_json,
+             updated_at = CURRENT_TIMESTAMP`
+        )
+        .bind(uid, JSON.stringify(prefs))
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) {
+        return new MemoryRadarDb(this.userId).setNotifyPrefs(prefs, userId);
+      }
       throw error;
     }
   }

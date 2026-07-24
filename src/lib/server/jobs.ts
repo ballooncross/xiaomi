@@ -1,17 +1,15 @@
 import { enhanceItemWithAi, generateDigestWithAi } from './ai';
 import { runCoeCheckJob } from './coe';
 import { clusterForBackfill, dedupeBatch } from './dedup';
-import { buildTemplateDigest, renderTelegramDigest } from './digest';
+import { buildReminderDigestMessage, buildTemplateDigest, renderTelegramDigest } from './digest';
 import { getDb } from './db';
 import { fetchBandsintownConcerts } from './fetchers/bandsintown';
 import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
 import { buildTrendSearchItems } from './fetchers/trends';
-import { sortReminders, todayInSingapore } from './lunar';
-import { getAllUpcomingMilestones } from './milestones';
 import { isCronJobFeatureEnabled } from './features';
 import { isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
-import type { DateReminder, Env, JobResult, RadarItem } from './types';
+import type { Env, JobResult, RadarItem } from './types';
 
 export { runCoeCheckJob } from './coe';
 
@@ -153,64 +151,71 @@ async function sendDigestForUser(
   logJob = true
 ): Promise<JobResult> {
   const db = getDb(env, userId);
-  const [items, reminders] = await Promise.all([db.listItems(12), db.listReminders()]);
-  const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
-  const message = appendReminderDigest(renderTelegramDigest(digest), reminders);
+  const [items, reminders, prefs] = await Promise.all([
+    db.listItems(12),
+    db.listReminders(),
+    userId ? db.getNotifyPrefs(userId) : Promise.resolve(null)
+  ]);
+  const wantTrends = prefs?.digestTrends ?? true;
+  const wantDates = prefs?.digestDates ?? true;
+
   if (!chatId) {
     return { inserted: 0, updated: 0, considered: items.length, notified: 0, detail: 'missing telegram chat id' };
   }
-  const telegram = await sendTelegramMessage(env, message, chatId);
-  await logDb.logNotification({
-    channel: 'telegram',
-    type: userId ? `${type}:${userId}` : type,
-    status: telegram.ok ? 'sent' : 'skipped',
-    message
-  });
+
+  let notified = 0;
+  const details: string[] = [];
+
+  if (wantTrends) {
+    const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
+    const trendMessage = renderTelegramDigest(digest);
+    const telegram = await sendTelegramMessage(env, trendMessage, chatId);
+    if (telegram.ok) notified += 1;
+    details.push(`trends:${telegram.detail}`);
+    await logDb.logNotification({
+      channel: 'telegram',
+      type: userId ? `${type}_trends:${userId}` : `${type}_trends`,
+      status: telegram.ok ? 'sent' : 'skipped',
+      message: trendMessage
+    });
+  } else {
+    details.push('trends:skipped-unsubscribed');
+  }
+
+  if (wantDates) {
+    const datesMessage = buildReminderDigestMessage(reminders);
+    if (datesMessage) {
+      const telegram = await sendTelegramMessage(env, datesMessage, chatId);
+      if (telegram.ok) notified += 1;
+      details.push(`dates:${telegram.detail}`);
+      await logDb.logNotification({
+        channel: 'telegram',
+        type: userId ? `${type}_dates:${userId}` : `${type}_dates`,
+        status: telegram.ok ? 'sent' : 'skipped',
+        message: datesMessage
+      });
+    } else {
+      details.push('dates:empty');
+    }
+  } else {
+    details.push('dates:skipped-unsubscribed');
+  }
+
+  const detail = details.join('; ');
   if (logJob) {
     await logDb.logJob({
       jobName: type === 'manual_digest' ? 'manual-digest' : 'daily-digest',
-      status: telegram.ok ? 'ok' : 'skipped',
-      detail: telegram.detail
+      status: notified > 0 ? 'ok' : 'skipped',
+      detail
     });
   }
   return {
     inserted: 0,
     updated: 0,
     considered: items.length,
-    notified: telegram.ok ? 1 : 0,
-    detail: telegram.detail
+    notified,
+    detail
   };
-}
-
-function appendReminderDigest(message: string, reminders: DateReminder[]): string {
-  const sorted = sortReminders(reminders);
-  const upcoming = sorted
-    .filter((reminder) => reminder.remindDaysBefore.includes(reminder.daysLeft))
-    .slice(0, 6);
-
-  const today = todayInSingapore();
-  const milestones = getAllUpcomingMilestones(sorted, today, 1)
-    .slice(0, 4);
-
-  if (upcoming.length === 0 && milestones.length === 0) return message;
-
-  const lines: string[] = ['', '生日与纪念日'];
-  for (const reminder of upcoming) {
-    const dayText = reminder.daysLeft === 0 ? '今天' : `${reminder.daysLeft} 天后`;
-    const ageText = reminder.ageLabel ? ` · ${reminder.ageLabel}` : '';
-    lines.push(`${reminder.title} · ${dayText} · ${reminder.dateLabel}${ageText}`);
-  }
-
-  if (milestones.length > 0) {
-    lines.push('');
-    lines.push('里程碑');
-    for (const m of milestones) {
-      const dayText = m.daysFromNow === 0 ? '今天' : `${m.daysFromNow} 天后`;
-      lines.push(`${m.reminderTitle} · ${m.label} · 第${m.dayNumber}天 · ${dayText}`);
-    }
-  }
-
-  return `${message}\n${lines.join('\n')}`;
 }
 
 export async function runAllFetchJobs(env: Env): Promise<JobResult> {

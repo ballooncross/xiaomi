@@ -8,8 +8,10 @@ It is the app’s API identity: Personal Radar calls Telegram as that bot to sen
 
 | Message type | Who receives it |
 |--------------|-----------------|
-| Daily digest / manual digest | Every user who linked Telegram (their own feed) |
-| COE / ICA / extension ops alerts | Only users in `ADMIN_EMAILS` who linked Telegram |
+| Trend digest (concerts / trends) | Linked users with `digestTrends` on (default on); separate Telegram message |
+| Dates reminder | Linked users with `digestDates` on (default on); separate Telegram message when there is something due |
+| COE new-round alert | Linked users who subscribed (`coe` on; default off). If nobody subscribed yet, falls back to linked `ADMIN_EMAILS` |
+| ICA / extension ops alerts | Only users in `ADMIN_EMAILS` who linked Telegram |
 
 No shared `TELEGRAM_CHAT_ID` is required.
 
@@ -45,7 +47,7 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
 2. Telegram opens → tap **Start**
 3. That user’s digests go to that chat only
 
-Admins use the same flow. After an admin links, COE/ICA alerts reach them.
+Admins use the same flow. After linking, open **我的 → 通知** to choose trend digest, dates reminder, and COE subscription. ICA/extension alerts still go to linked admins only.
 
 ## Authorization (related)
 

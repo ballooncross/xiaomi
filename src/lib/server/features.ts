@@ -44,9 +44,9 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
 	{
 		id: 'coe_notify',
 		label: 'COE 结果通知',
-		description: '新一轮 COE 结果的 Telegram 通知与检查 cron。',
+		description: '新一轮 COE 结果的检查 cron；接收人由各用户在「我的」里订阅。',
 		defaultEnabled: true,
-		defaultMinRole: 'admin',
+		defaultMinRole: 'member',
 		cronJobName: 'coe-check'
 	},
 	{
@@ -59,7 +59,7 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
 	{
 		id: 'telegram_digest',
 		label: 'Telegram 摘要',
-		description: '每日摘要与手动发送摘要。',
+		description: '每日趋势摘要与日期提醒（可分开订阅），以及手动发送。',
 		defaultEnabled: true,
 		defaultMinRole: 'member',
 		cronJobName: 'daily-digest'

@@ -6,12 +6,24 @@
     data,
     loading = false,
     error = '',
-    onRefresh
+    onRefresh,
+    notifyEnabled = false,
+    telegramLinked = false,
+    telegramConfigured = false,
+    subscribed = false,
+    subscribePending = false,
+    onSubscribeChange
   }: {
     data: CoePayload | null;
     loading?: boolean;
     error?: string;
     onRefresh?: () => void;
+    notifyEnabled?: boolean;
+    telegramLinked?: boolean;
+    telegramConfigured?: boolean;
+    subscribed?: boolean;
+    subscribePending?: boolean;
+    onSubscribeChange?: (next: boolean) => void;
   } = $props();
 
   let showAllCategories = $state(false);
@@ -66,7 +78,7 @@
         {:else}
           LTA · data.gov.sg
         {/if}
-        · 打开页面时拉取；后台每 6 小时检查，周三/四约 18:00 SGT 再查一次；新结果会 Telegram 通知
+        · 打开页面时拉取；后台每 6 小时检查，周三/四约 18:00 SGT 再查一次
       </p>
     </div>
     {#if onRefresh}
@@ -92,6 +104,34 @@
       </button>
     {/if}
   </header>
+
+  {#if notifyEnabled}
+    <section class="card coe-subscribe" aria-label="COE 通知订阅">
+      <div>
+        <strong>新结果 Telegram 通知</strong>
+        <p class="quiet-copy">
+          {#if !telegramConfigured}
+            管理员尚未配置 Telegram Bot。
+          {:else if !telegramLinked}
+            先在「我的」连接 Telegram，再订阅新一轮结果。
+          {:else if subscribed}
+            已订阅：新一轮结果会单独发到你的 Telegram。
+          {:else}
+            默认关闭。打开后，新一轮结果会发到你的 Telegram。
+          {/if}
+        </p>
+      </div>
+      <label class="coe-subscribe-toggle">
+        <input
+          type="checkbox"
+          checked={subscribed}
+          disabled={subscribePending || !telegramConfigured || !telegramLinked || !onSubscribeChange}
+          onchange={(event) => onSubscribeChange?.((event.currentTarget as HTMLInputElement).checked)}
+        />
+        <span>{subscribed ? '已订阅' : '订阅通知'}</span>
+      </label>
+    </section>
+  {/if}
 
   {#if loading && !latest}
     <p class="quiet-copy">正在拉取官方报价…</p>
@@ -242,6 +282,44 @@
 
   .coe-refresh {
     flex-shrink: 0;
+  }
+
+  .coe-subscribe {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .coe-subscribe strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: var(--text-md);
+  }
+
+  .coe-subscribe .quiet-copy {
+    margin: 0;
+  }
+
+  .coe-subscribe-toggle {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    cursor: pointer;
+  }
+
+  .coe-subscribe-toggle input {
+    width: 16px;
+    height: 16px;
+  }
+
+  .coe-subscribe-toggle:has(input:disabled) {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
   .coe-latest,
