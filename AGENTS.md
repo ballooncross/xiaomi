@@ -15,5 +15,6 @@
 
 ## Versioned Deployments
 
-- Commit the intended app version before production deployment. The GitHub production workflow builds the committed `package.json` version and does not run the local auto-bump script.
-- After merging, confirm the GitHub deployment succeeded, Cloudflare production references the merged commit, and the live footer shows the intended version.
+- Production deploys via GitHub Actions on `main`. The workflow runs `npm version patch` before build/deploy, then commits `package.json` / `package-lock.json` with `[skip ci]` after a successful deploy so the live footer and git stay aligned.
+- Do not manually bump the patch version just for a normal production deploy; CI owns that. Prefer intentional pre-bumps only for special releases.
+- After merging, confirm the GitHub deployment succeeded, Cloudflare production references the merged commit, and the live footer shows the new patch version.
