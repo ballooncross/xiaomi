@@ -8,8 +8,10 @@ The importer fills each field from the first available source:
 
 1. Garmin detail JSON provides descriptions, difficulty, hero images, and some videos.
 2. `hasaneyldrm/exercises-dataset` provides GIFs and English and Chinese instructions.
-3. `yuhonas/free-exercise-db` provides English instructions and movement images.
+3. `harshvishu/free-exercise-db-with-videos` provides English instructions, thumbnails, and HD movement videos.
 4. wger provides aliases, descriptions, images, and some videos.
+5. `yuhonas/free-exercise-db` provides English instructions and movement images.
+6. `Glowupp-app/open-exercisedb` provides English descriptions and execution tips.
 
 Garmin details do not require movement matching because the URL contains the Garmin category and exercise key. Other sources require matching.
 
@@ -20,7 +22,9 @@ flowchart LR
   GarminCatalog[GarminCatalog] --> BaseImport[BaseImport]
   GarminDetails[GarminDetails] --> Enrichment[EnrichmentImport]
   ExistingDataset[ExistingDataset] --> Matcher[DeterministicMatcher]
+  FreeVideoDb[FreeVideoDb] --> Matcher
   FreeExerciseDb[FreeExerciseDb] --> Matcher
+  OpenExerciseDb[OpenExerciseDb] --> Matcher
   Wger[Wger] --> Matcher
   Matcher --> Accepted[AcceptedMatches]
   Matcher --> ReviewQueue[ReviewQueue]
@@ -37,7 +41,7 @@ flowchart LR
 
 ## Request controls
 
-Bulk files are fetched once and cached. Wger uses its `exerciseinfo` collection endpoint rather than one request per exercise.
+Bulk files are fetched once and cached. Wger and the free video database use collection endpoints rather than one request per exercise.
 
 Garmin detail pages require fan-out requests. The importer applies these limits:
 
@@ -63,6 +67,8 @@ Candidate names are normalized before comparison:
 - Garmin keys and source aliases are included.
 
 The score is primarily name similarity, with smaller contributions from muscles, equipment, body part, and description. An automatic match needs a score of at least 0.90 and a margin of at least 0.08 over the next candidate. Exact ties remain unresolved.
+
+The free HD video source has stricter rules. Its name or an alias must exactly match after normalization, equipment must agree, and known variant conflicts are denied explicitly.
 
 The matcher stores the source ID and confidence. This makes every selected record traceable.
 

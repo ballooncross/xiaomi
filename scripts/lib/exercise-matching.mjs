@@ -1,7 +1,12 @@
 const TOKEN_ALIASES = new Map([
   ['bb', 'barbell'],
+  ['bodyweight', 'body weight'],
+  ['bw', 'body weight'],
   ['db', 'dumbbell'],
+  ['ezbar', 'ez bar'],
   ['kb', 'kettlebell'],
+  ['ohp', 'overhead press'],
+  ['rdl', 'romanian deadlift'],
   ['trx', 'suspension'],
   ['ninety', '90'],
   ['pressups', 'push up'],
@@ -57,6 +62,47 @@ export function normalizeName(value = '') {
 /** @param {string} value */
 export function nameTokens(value) {
   return new Set(normalizeName(value).split(' ').filter(Boolean));
+}
+
+/**
+ * @param {ExerciseRecord} target
+ * @param {ExerciseRecord} candidate
+ */
+export function hasExactNameMatch(target, candidate) {
+  const targetNames = [target.name, ...(target.aliases ?? [])]
+    .map(normalizeName)
+    .filter(Boolean);
+  const candidateNames = new Set(
+    [candidate.name, ...(candidate.aliases ?? [])].map(normalizeName).filter(Boolean)
+  );
+  return targetNames.some((name) => candidateNames.has(name));
+}
+
+/**
+ * @param {ExerciseRecord} target
+ * @param {ExerciseRecord} candidate
+ */
+export function hasCompatibleEquipment(target, candidate) {
+  const targetEquipment = equipmentTokens(target.equipment ?? []);
+  const candidateEquipment = equipmentTokens(candidate.equipment ?? []);
+  if (!candidateEquipment.size) return true;
+
+  const bodyWeightOnly = [...candidateEquipment].every((token) =>
+    ['body', 'weight', 'bodyweight', 'none'].includes(token)
+  );
+  if (bodyWeightOnly) return targetEquipment.size === 0 || targetEquipment.has('body');
+
+  const targetNameTokens = new Set(
+    [target.name, ...(target.aliases ?? [])].flatMap((name) => [...nameTokens(name)])
+  );
+  if (targetEquipment.size) {
+    return (
+      intersectionSize(targetEquipment, candidateEquipment) > 0 ||
+      intersectionSize(targetNameTokens, candidateEquipment) > 0
+    );
+  }
+
+  return intersectionSize(targetNameTokens, candidateEquipment) > 0;
 }
 
 /**
@@ -210,6 +256,15 @@ function descriptionTokens(value) {
     normalizeName(value)
       .split(' ')
       .filter((token) => token.length > 3 && !STOP_WORDS.has(token))
+  );
+}
+
+/** @param {string[]} values */
+function equipmentTokens(values) {
+  return new Set(
+    values
+      .flatMap((value) => normalizeName(value).split(' '))
+      .filter((token) => token && !['equipment', 'machine'].includes(token))
   );
 }
 
