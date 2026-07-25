@@ -12,7 +12,7 @@
  *   wrangler d1 execute personal-radar --remote --file scripts/seed-garmin-exercises.sql
  */
 import { writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BASE_URL = 'https://connect.garmin.com';
@@ -68,7 +68,7 @@ const BODY_PART_BY_MUSCLE = {
   UPPER_BACK: 'back'
 };
 
-async function fetchText(url) {
+export async function fetchText(url) {
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
@@ -86,7 +86,7 @@ async function fetchText(url) {
   throw new Error(`Failed to fetch ${url}: ${lastError}`);
 }
 
-async function fetchJson(url) {
+export async function fetchJson(url) {
   return JSON.parse(await fetchText(url));
 }
 
@@ -113,7 +113,7 @@ function parseProperties(text) {
   return properties;
 }
 
-function humanize(value) {
+export function humanize(value) {
   return value
     .toLowerCase()
     .split('_')
@@ -174,7 +174,7 @@ function sqlStr(value) {
 }
 
 function toSql(entries, importedAt) {
-  const lines = ['DELETE FROM garmin_exercises;'];
+  const lines = [];
   for (const entry of entries) {
     const columns = [
       sqlStr(entry.id),
@@ -191,16 +191,21 @@ function toSql(entries, importedAt) {
       sqlStr(importedAt)
     ];
     lines.push(
-      'INSERT OR REPLACE INTO garmin_exercises ' +
+      'INSERT INTO garmin_exercises ' +
         '(id,category,exercise_key,name,body_part,primary_muscles,secondary_muscles,' +
         'equipment,catalogs,description,image_url,source_updated_at) ' +
-        `VALUES (${columns.join(',')});`
+        `VALUES (${columns.join(',')}) ` +
+        'ON CONFLICT(id) DO UPDATE SET ' +
+        'category=excluded.category,exercise_key=excluded.exercise_key,name=excluded.name,' +
+        'body_part=excluded.body_part,primary_muscles=excluded.primary_muscles,' +
+        'secondary_muscles=excluded.secondary_muscles,equipment=excluded.equipment,' +
+        'catalogs=excluded.catalogs,source_updated_at=excluded.source_updated_at;'
     );
   }
   return `${lines.join('\n')}\n`;
 }
 
-async function main() {
+export async function collectGarminExercises() {
   const entries = new Map();
 
   for (const catalog of CATALOGS) {
@@ -249,7 +254,6 @@ async function main() {
     mergeEntry(entries, { category, exerciseKey, catalogs: ['translations'] });
   }
 
-  const importedAt = new Date().toISOString();
   const completed = [...entries.values()]
     .map((entry) => ({
       ...entry,
@@ -266,11 +270,19 @@ async function main() {
         a.exerciseKey.localeCompare(b.exerciseKey)
     );
 
+  return completed;
+}
+
+async function main() {
+  const completed = await collectGarminExercises();
+  const importedAt = new Date().toISOString();
   writeFileSync(outFile, toSql(completed, importedAt));
   console.log(`Wrote ${completed.length} Garmin exercises to ${outFile}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

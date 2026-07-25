@@ -126,10 +126,14 @@
     instructions: string;
     gifUrl: string | null;
     imageUrl: string | null;
+    videoUrl: string | null;
     source: 'exercise-dataset' | 'garmin';
     sourceCategory: string | null;
     sourceKey: string | null;
     catalogs: string[];
+    enrichmentSources: Array<{ source: string; id: string }>;
+    matchConfidence: number | null;
+    difficulty: string | null;
   };
   const gymBodyParts: Array<{ id: string; label: string }> = [
     { id: 'back', label: '背部' },
@@ -3287,7 +3291,18 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
         </button>
       </div>
-      {#if gymDetail.gifUrl || gymDetail.imageUrl}
+      {#if gymDetail.videoUrl}
+        <video
+          class="gym-modal-gif"
+          src={gymDetail.videoUrl}
+          poster={gymDetail.imageUrl ?? undefined}
+          controls
+          playsinline
+          preload="metadata"
+        >
+          <track kind="captions" />
+        </video>
+      {:else if gymDetail.gifUrl || gymDetail.imageUrl}
         <img
           class="gym-modal-gif"
           src={gymDetail.gifUrl ?? gymDetail.imageUrl ?? ''}
@@ -3302,9 +3317,20 @@
         {#if gymDetail.equipment}
           <span class="gym-tag gear">{gymDetail.equipment}</span>
         {/if}
+        {#if gymDetail.difficulty}
+          <span class="gym-tag gear">{gymDetail.difficulty}</span>
+        {/if}
       </div>
       {#if gymDetail.source === 'garmin' && gymDetail.sourceCategory && gymDetail.sourceKey}
         <p class="gym-source-key">{gymDetail.sourceCategory} / {gymDetail.sourceKey}</p>
+      {/if}
+      {#if gymDetail.enrichmentSources.length}
+        <p class="gym-source-key">
+          详情来源：{gymDetail.enrichmentSources.map((item) => item.source).join('、')}
+          {#if gymDetail.matchConfidence != null}
+            · 匹配度 {Math.round(gymDetail.matchConfidence * 100)}%
+          {/if}
+        </p>
       {/if}
       {#if gymDetail.secondaryMuscles.length}
         <p class="gym-modal-secondary">协同肌群：{gymDetail.secondaryMuscles.join('、')}</p>
