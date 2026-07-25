@@ -10,7 +10,18 @@ export type { CoeBiddingRound, CoeCategory, CoeCategoryResult, CoePayload } from
 export { formatSgd } from '$lib/coe';
 
 export const COE_RESOURCE_ID = 'd_69b3380ad7e51aff3a7dcc84eba52b8a';
-const COE_API_URL = `https://data.gov.sg/api/action/datastore_search?resource_id=${COE_RESOURCE_ID}&limit=10000`;
+const COE_API_BASE = 'https://data.gov.sg/api/action/datastore_search';
+const COE_HISTORY_API_URL =
+	`${COE_API_BASE}?resource_id=${COE_RESOURCE_ID}&limit=10000`;
+const COE_LATEST_API_URL =
+	`${COE_API_BASE}?resource_id=${COE_RESOURCE_ID}&limit=10&sort=${encodeURIComponent('month desc,bidding_no desc')}`;
+const COE_SOURCE = 'LTA · data.gov.sg';
+const COE_SOURCE_URL = `https://data.gov.sg/datasets/${COE_RESOURCE_ID}/view`;
+
+type CoeStore = Pick<
+	ReturnType<typeof getDb>,
+	'listCoeRounds' | 'upsertCoeRounds'
+>;
 
 type RawRecord = {
 	month: string;
@@ -100,8 +111,11 @@ function groupRecords(records: RawRecord[]): CoeBiddingRound[] {
 	return rounds;
 }
 
-export async function fetchCoePayload(fetchImpl: typeof fetch = fetch): Promise<CoePayload> {
-	const response = await fetchImpl(COE_API_URL, {
+async function fetchCoeRecords(
+	url: string,
+	fetchImpl: typeof fetch
+): Promise<RawRecord[]> {
+	const response = await fetchImpl(url, {
 		headers: { Accept: 'application/json' }
 	});
 
@@ -118,14 +132,73 @@ export async function fetchCoePayload(fetchImpl: typeof fetch = fetch): Promise<
 		throw new Error('COE API returned an unexpected payload');
 	}
 
-	const history = groupRecords(payload.result.records);
+	return payload.result.records;
+}
+
+export async function fetchCoePayload(fetchImpl: typeof fetch = fetch): Promise<CoePayload> {
+	const history = groupRecords(await fetchCoeRecords(COE_HISTORY_API_URL, fetchImpl));
 	return {
-		source: 'LTA · data.gov.sg',
-		sourceUrl: `https://data.gov.sg/datasets/${COE_RESOURCE_ID}/view`,
+		source: COE_SOURCE,
+		sourceUrl: COE_SOURCE_URL,
 		fetchedAt: new Date().toISOString(),
 		latest: history[0] ?? null,
 		history
 	};
+}
+
+export async function fetchLatestCoeRound(
+	fetchImpl: typeof fetch = fetch
+): Promise<CoeBiddingRound | null> {
+	const rounds = groupRecords(await fetchCoeRecords(COE_LATEST_API_URL, fetchImpl));
+	return rounds[0] ?? null;
+}
+
+function mergeRounds(
+	fresh: CoeBiddingRound[],
+	stored: CoeBiddingRound[]
+): CoeBiddingRound[] {
+	const byId = new Map(stored.map((round) => [round.id, round]));
+	for (const round of fresh) byId.set(round.id, round);
+	return [...byId.values()].sort(
+		(a, b) => b.month.localeCompare(a.month) || b.biddingNo - a.biddingNo
+	);
+}
+
+export async function loadCoePayload(
+	store: CoeStore,
+	fetchImpl: typeof fetch = fetch
+): Promise<CoePayload> {
+	const stored = await store.listCoeRounds();
+
+	if (stored.length === 0) {
+		const initial = await fetchCoePayload(fetchImpl);
+		await store.upsertCoeRounds(initial.history, initial.fetchedAt);
+		return initial;
+	}
+
+	try {
+		const fetchedAt = new Date().toISOString();
+		const latest = await fetchLatestCoeRound(fetchImpl);
+		if (latest) await store.upsertCoeRounds([latest], fetchedAt, true);
+		const history = mergeRounds(latest ? [latest] : [], stored);
+		return {
+			source: COE_SOURCE,
+			sourceUrl: COE_SOURCE_URL,
+			fetchedAt,
+			latest: history[0] ?? null,
+			history
+		};
+	} catch (error) {
+		return {
+			source: COE_SOURCE,
+			sourceUrl: COE_SOURCE_URL,
+			fetchedAt: stored[0]?.sourceUpdatedAt ?? new Date().toISOString(),
+			latest: stored[0] ?? null,
+			history: stored,
+			stale: true,
+			error: `Latest COE refresh failed: ${String(error)}`
+		};
+	}
 }
 
 /**
@@ -143,7 +216,7 @@ export async function runCoeCheckJob(env: Env): Promise<JobResult> {
 	}
 
 	try {
-		const payload = await fetchCoePayload();
+		const payload = await loadCoePayload(db);
 		const latest = payload.latest;
 		if (!latest) {
 			const detail = 'no latest COE round';

@@ -15,6 +15,7 @@ export type CoeBiddingRound = {
 	biddingNo: number;
 	label: string;
 	categories: CoeCategoryResult[];
+	sourceUpdatedAt?: string;
 };
 
 export type CoePayload = {
@@ -23,6 +24,8 @@ export type CoePayload = {
 	fetchedAt: string;
 	latest: CoeBiddingRound | null;
 	history: CoeBiddingRound[];
+	stale?: boolean;
+	error?: string;
 };
 
 export function formatSgd(value: number): string {
