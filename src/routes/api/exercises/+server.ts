@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
-import { rankExercises } from '$lib/server/exercise-search';
+import { hasUsefulExerciseDetails, rankExercises } from '$lib/server/exercise-search';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -166,6 +166,7 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 	const q = (url.searchParams.get('q') ?? '').trim();
 	const bodyPart = (url.searchParams.get('bodyPart') ?? '').trim();
 	const equipment = (url.searchParams.get('equipment') ?? '').trim();
+	const hasDetails = url.searchParams.get('hasDetails') === 'true';
 	const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 40, 1), 60);
 
 	try {
@@ -179,6 +180,9 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 					.split(', ')
 					.includes(normalizedEquipment)
 			);
+		}
+		if (hasDetails) {
+			items = items.filter(hasUsefulExerciseDetails);
 		}
 
 		const exercises = rankExercises(q, items, limit);

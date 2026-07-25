@@ -24,7 +24,21 @@ export type Searchable = {
 	aliases?: string[];
 };
 
+export type ExerciseDetails = {
+	instructions: string;
+	gifUrl: string | null;
+	imageUrl: string | null;
+	videoUrl: string | null;
+};
+
 const WORD_RE = /[a-z0-9]+/g;
+
+export function hasUsefulExerciseDetails(exercise: ExerciseDetails): boolean {
+	return (
+		Boolean(exercise.instructions.trim()) &&
+		Boolean(exercise.gifUrl || exercise.imageUrl || exercise.videoUrl)
+	);
+}
 
 export function tokenize(text: string): string[] {
 	return text.toLowerCase().match(WORD_RE) ?? [];

@@ -149,6 +149,7 @@
   ];
   let gymQuery = $state('');
   let gymBodyPart = $state('');
+  let gymUsefulOnly = $state(true);
   let gymResults = $state<GymExercise[]>([]);
   let gymLoading = $state(false);
   let gymLoaded = $state(false);
@@ -171,6 +172,7 @@
       const query = gymQuery.trim();
       if (query) params.set('q', query);
       if (gymBodyPart) params.set('bodyPart', gymBodyPart);
+      if (gymUsefulOnly) params.set('hasDetails', 'true');
       const response = await fetch(`/api/exercises?${params.toString()}`);
       const data = (await response.json()) as { exercises?: GymExercise[] };
       gymResults = data.exercises ?? [];
@@ -188,6 +190,11 @@
 
   function setGymBodyPart(bodyPart: string) {
     gymBodyPart = bodyPart;
+    loadExercises();
+  }
+
+  function toggleGymUsefulOnly() {
+    gymUsefulOnly = !gymUsefulOnly;
     loadExercises();
   }
 
@@ -2104,7 +2111,16 @@
               oninput={onGymSearch}
             />
           </div>
-          <div class="gym-filters" role="group" aria-label="按部位筛选">
+          <div class="gym-filters" role="group" aria-label="筛选动作">
+            <button
+              type="button"
+              class="gym-useful-filter"
+              class:active={gymUsefulOnly}
+              aria-pressed={gymUsefulOnly}
+              onclick={toggleGymUsefulOnly}
+            >
+              有详情
+            </button>
             <button type="button" class:active={gymBodyPart === ''} onclick={() => setGymBodyPart('')}>全部</button>
             {#each gymBodyParts as bp}
               <button type="button" class:active={gymBodyPart === bp.id} onclick={() => setGymBodyPart(bp.id)}>
