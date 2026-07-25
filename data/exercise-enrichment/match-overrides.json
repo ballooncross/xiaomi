@@ -1,0 +1,1002 @@
+{
+  "garmin:CALF_RAISE:_3_WAY_CALF_RAISE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.9,
+        "reason": "No candidate matches the bodyweight three-position calf raise without changing position or equipment."
+      },
+      "claude": {
+        "candidateId": "wger:58ca3e51-ea64-4771-a74a-a74d29f5c40c",
+        "confidence": 0.4,
+        "reason": "Both are standing bodyweight double-leg calf raises; 3-way just varies foot angle"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.498Z"
+  },
+  "garmin:CALF_RAISE:_3_WAY_SINGLE_LEG_CALF_RAISE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.88,
+        "reason": "Single-leg candidates require a dumbbell or band, while the Garmin movement has no equipment."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "Garmin is bodyweight single-leg; all single-leg candidates require dumbbell or band"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:CALF_RAISE:_3_WAY_WEIGHTED_CALF_RAISE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "free-exercise-db:Standing_Dumbbell_Calf_Raise",
+        "confidence": 0.96,
+        "reason": "Matches standing dumbbell calf raises and explicitly supports straight, inward, and outward toe positions."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Standing_Dumbbell_Calf_Raise",
+        "confidence": 0.7,
+        "reason": "Standing dumbbell calf raise; description explicitly covers toes straight/in/out (the 3-way)"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:CALF_RAISE:_3_WAY_WEIGHTED_SINGLE_LEG_CALF_RAISE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:0409",
+        "confidence": 0.8,
+        "reason": "Matches the standing single-leg dumbbell calf raise, though the three toe positions are not specified."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0409",
+        "confidence": 0.7,
+        "reason": "Standing single-leg calf raise with dumbbell matches laterality and equipment"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:PULL_UP:_30_DEGREE_LAT_PULLDOWN": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "free-exercise-db:Wide-Grip_Lat_Pulldown",
+        "confidence": 0.82,
+        "reason": "Matches the cable lat pulldown, target muscles, and characteristic leaned-back pulling position."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Wide-Grip_Lat_Pulldown",
+        "confidence": 0.5,
+        "reason": "Cable lat pulldown matches equipment and movement; 30-degree is torso lean variant"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:LATERAL_RAISE:_45_DEGREE_CABLE_EXTERNAL_ROTATION": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.85,
+        "reason": "Generic cable rotations do not establish the required 45-degree shoulder position."
+      },
+      "claude": {
+        "candidateId": "wger:dc3a2072-abc3-4ef9-b8e6-f5ae6b11bc7f",
+        "confidence": 0.7,
+        "reason": "Cable shoulder external rotation matches equipment and movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:PLANK:_45_DEGREE_PLANK": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.95,
+        "reason": "Candidates describe floor planks or different movements, not an inclined 45-degree plank."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Plank",
+        "confidence": 0.45,
+        "reason": "Bodyweight core plank; 45-degree is an incline progression of the same hold"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:SHOULDER_STABILITY:_90_DEGREE_CABLE_EXTERNAL_ROTATION": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:0235",
+        "confidence": 0.74,
+        "reason": "Matches cable shoulder external rotation with the arm held parallel to the ground."
+      },
+      "claude": {
+        "candidateId": "wger:dc3a2072-abc3-4ef9-b8e6-f5ae6b11bc7f",
+        "confidence": 0.75,
+        "reason": "Cable external rotation with elbow bent 90 degrees matches exactly"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:PLANK:_90_DEGREE_STATIC_HOLD": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "free-exercise-db:Plank",
+        "confidence": 0.82,
+        "reason": "A forearm plank is a static core hold with the elbows bent beneath the shoulders."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "Ambiguous hold; no candidate clearly matches a 90-degree static hold"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:WARM_UP:90_90_HIP_SWITCH": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.98,
+        "reason": "No candidate describes a seated 90/90 hip switch with reach."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate matches the 90/90 hip switch mobility drill"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:WARM_UP:NINETY_NINETY_HIP_SWITCH": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.98,
+        "reason": "No candidate describes a seated 90/90 hip switch with reach."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate matches the 90/90 hip switch mobility drill"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:WARM_UP:STRETCH_90_90": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.91,
+        "reason": "Pigeon and other listed stretches are related but are not the same 90/90 hip position."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "90/90 hip stretch; candidates are unrelated stretches (90/90 hamstring is a different movement)"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:CORE:ABS_JABS": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.97,
+        "reason": "None of the candidates describes the abdominal punching movement."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate corresponds to Abs Jabs"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:WARM_UP:STRETCH_ABS": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:d8d1b919-94e1-4e91-b37e-29bb8a479740",
+        "confidence": 0.94,
+        "reason": "The bodyweight cobra position directly stretches the abdominals through trunk extension."
+      },
+      "claude": {
+        "candidateId": "wger:d8d1b919-94e1-4e91-b37e-29bb8a479740",
+        "confidence": 0.55,
+        "reason": "Cobra stretch primarily stretches the abs, matching an abs stretch"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:WARM_UP:ACTIVE_FROG": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:a37001e9-b4b3-45db-8ee3-046f40350efa",
+        "confidence": 0.95,
+        "reason": "Matches the equipment-free frog position with active forward and backward rocking."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:2571",
+        "confidence": 0.5,
+        "reason": "Rocking frog stretch matches the active (rocking) frog mobility drill"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:LADDER:AGILITY": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.99,
+        "reason": "No candidate describes agility-ladder footwork."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No agility ladder candidate present"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:INDOOR_BIKE:AIR_BIKE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.94,
+        "reason": "The named Air Bike candidates are abdominal bicycles, while stationary and recumbent bikes omit the fan-bike arm action."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "Name-matching candidates are ab bicycle crunches; no candidate is a fan/air bike"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:SQUAT:AIR_SQUAT": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.87,
+        "reason": "Available squats use equipment, split stance, specialized mechanics, or explicitly partial depth."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Sit_Squats",
+        "confidence": 0.5,
+        "reason": "Bodyweight squat with no equipment matches air squat"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:POSE:ALL_FOURS": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.94,
+        "reason": "All-fours stretch candidates add limb movement and are not the static tabletop starting pose."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "Garmin is the tabletop all-fours pose; candidates are quad stretches or child's pose, different movements"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:LUNGE:ALTERNATING_BARBELL_FORWARD_LUNGE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:0054",
+        "confidence": 0.99,
+        "reason": "Exact alternating forward lunge pattern with a barbell and matching muscles."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0054",
+        "confidence": 0.85,
+        "reason": "Barbell lunge stepping forward and alternating legs matches exactly"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:SQUAT:ALTERNATING_BOX_DUMBBELL_STEP_UPS": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "free-exercise-db:Dumbbell_Step_Ups",
+        "confidence": 0.96,
+        "reason": "Matches dumbbell step-ups onto an elevated platform with the same lower-body muscles."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0431",
+        "confidence": 0.75,
+        "reason": "Dumbbell step-up onto a bench/box, alternating legs, matches equipment and movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:CURL:ALTERNATING_DUMBBELL_BICEPS_CURL": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:94238bef-15ee-42b6-8035-79854b3c6e65",
+        "confidence": 0.99,
+        "reason": "Exact alternating dumbbell biceps curl with matching equipment and muscles."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Dumbbell_Alternate_Bicep_Curl",
+        "confidence": 0.85,
+        "reason": "Alternating dumbbell biceps curl matches name, equipment, and movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:CURL:ALTERNATING_DUMBBELL_BICEPS_CURL_ON_SWISS_BALL": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:1650",
+        "confidence": 0.99,
+        "reason": "Exact alternating dumbbell curl performed seated on an exercise ball."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:1650",
+        "confidence": 0.8,
+        "reason": "Alternating seated dumbbell biceps curl on exercise ball matches equipment and laterality"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:BENCH_PRESS:ALTERNATING_DUMBBELL_CHEST_PRESS": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:0289",
+        "confidence": 0.79,
+        "reason": "Matches the flat-bench dumbbell chest press, though alternating execution is not specified."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0289",
+        "confidence": 0.55,
+        "reason": "Dumbbell bench press on bench matches equipment/movement; alternating is arm-timing variant"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:BENCH_PRESS:ALTERNATING_DUMBBELL_CHEST_PRESS_ON_SWISS_BALL": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:1293",
+        "confidence": 0.85,
+        "reason": "Matches dumbbell chest pressing on an exercise ball, though alternating execution is not specified."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:1293",
+        "confidence": 0.65,
+        "reason": "Dumbbell chest press on exercise ball matches equipment (ball) and movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:55:37.500Z"
+  },
+  "garmin:LUNGE:ALTERNATING_DUMBBELL_LUNGE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:0336",
+        "confidence": 0.96,
+        "reason": "Exact alternating dumbbell lunge movement, equipment, and muscles."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0336",
+        "confidence": 0.87,
+        "reason": "Dumbbell lunge with alternating-legs description; exact movement/equipment/muscles"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.501Z"
+  },
+  "garmin:LUNGE:ALTERNATING_DUMBBELL_LUNGE_WITH_REACH": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.92,
+        "reason": "Candidates omit the materially distinct reach component."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0336",
+        "confidence": 0.4,
+        "reason": "Core dumbbell lunge matches but no candidate captures the added overhead reach"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:TRICEPS_EXTENSION:ALTERNATING_DUMBBELL_LYING_TRICEPS_EXTENSION": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.82,
+        "reason": "Lying extensions match generally, but candidates use both arms simultaneously rather than alternating."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0351",
+        "confidence": 0.85,
+        "reason": "Dumbbell lying triceps extension; same position, equipment, target"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:ROW:ALTERNATING_DUMBBELL_ROW": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:81015468-545f-4170-9b46-701afe77848e",
+        "confidence": 0.76,
+        "reason": "Alternating bent-over dumbbell row with matching back emphasis."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:One-Arm_Dumbbell_Row",
+        "confidence": 0.5,
+        "reason": "Bent-over dumbbell row targeting lats/back; alternating is essentially single-arm rows"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:SHOULDER_PRESS:ALTERNATING_DUMBBELL_SHOULDER_PRESS": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "free-exercise-db:Standing_Alternating_Dumbbell_Press",
+        "confidence": 0.99,
+        "reason": "Exact standing alternating dumbbell shoulder press."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Standing_Alternating_Dumbbell_Press",
+        "confidence": 0.78,
+        "reason": "Explicitly alternating dumbbell overhead press; matches laterality"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:CURL:ALTERNATING_INCLINE_DUMBBELL_BICEPS_CURL": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "free-exercise-db:Alternate_Incline_Dumbbell_Curl",
+        "confidence": 0.99,
+        "reason": "Exact alternating incline dumbbell curl."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Alternate_Incline_Dumbbell_Curl",
+        "confidence": 0.82,
+        "reason": "Alternating incline dumbbell curl; matches incline, alternating, muscles"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:PLYO:ALTERNATING_JUMP_LUNGE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "exercise-dataset:3582",
+        "confidence": 0.99,
+        "reason": "Description explicitly alternates lunge legs during each jump."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:3582",
+        "confidence": 0.7,
+        "reason": "Lunge with jump, alternating switch of feet mid-air; same plyometric movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:LATERAL_RAISE:ALTERNATING_LATERAL_RAISE_WITH_STATIC_HOLD": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.94,
+        "reason": "No candidate includes both alternating raises and the static hold."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0334",
+        "confidence": 0.5,
+        "reason": "Base dumbbell lateral raise; alternating/static-hold modifiers not represented"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:CORE:ALTERNATING_PLATE_REACH": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.98,
+        "reason": "No candidate matches the plate-loaded alternating core reach."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate matches a plate reach core movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:SIT_UP:ALTERNATING_SIT_UP": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:eaf6f39e-d46d-4460-b5a9-71e814b18f89",
+        "confidence": 0.72,
+        "reason": "Alternating twisting sit-up pattern matches the abdominal and oblique emphasis."
+      },
+      "claude": {
+        "candidateId": "wger:eaf6f39e-d46d-4460-b5a9-71e814b18f89",
+        "confidence": 0.45,
+        "reason": "Splinter sit-ups: twisting sit-up alternating sides, matching abs/obliques"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:CORE:ALTERNATING_SLIDE_OUT": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.99,
+        "reason": "No candidate describes an alternating slide-out."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate matches an alternating slide-out"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:PUSH_UP:ALTERNATING_HANDS_MEDICINE_BALL_PUSH_UP": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.96,
+        "reason": "Medicine-ball candidates keep both hands on the ball and do not alternate hand placement."
+      },
+      "claude": {
+        "candidateId": "exercise-dataset:0663",
+        "confidence": 0.65,
+        "reason": "Medicine ball push-up; alternating hands is a variation of same movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:POSE:ALTERNATIVE_SKIING_WHEELCHAIR": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.99,
+        "reason": "No candidate represents the adaptive skiing pose."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate matches a wheelchair skiing pose"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:SQUAT:SQUAT_AMERICAN_SWING": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.9,
+        "reason": "Generic candidates describe Russian-style shoulder-height swings, not the overhead American swing."
+      },
+      "claude": {
+        "candidateId": "wger:d813ef7c-b10a-4c5c-ba55-6b9518e7ff4c",
+        "confidence": 0.55,
+        "reason": "Kettlebell swing; American (overhead) variant engaging shoulders matches best"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:WARM_UP:ANKLE_DORSIFLEXION_WITH_BAND": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:29a361d5-1300-4fb4-90d6-d6350bec9cb9",
+        "confidence": 0.99,
+        "reason": "Exact band-resisted ankle dorsiflexion."
+      },
+      "claude": {
+        "candidateId": "wger:29a361d5-1300-4fb4-90d6-d6350bec9cb9",
+        "confidence": 0.85,
+        "reason": "Exercise band dorsiflexion; same movement and equipment"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:WARM_UP:ANKLE_INTERNAL_ROTATION": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.99,
+        "reason": "Candidates describe hip or shoulder rotation, not ankle rotation."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "Candidates are hip/shoulder rotation, not ankle"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:WARM_UP:ANKLE_LUNGES": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.93,
+        "reason": "Candidates are conventional leg lunges or ankle circles, not ankle-mobility lunges."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "Ankle mobility drill; candidates are strength lunges or ankle circles"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:WARM_UP:ANKLE_STRETCH": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.98,
+        "reason": "No candidate specifically describes an ankle stretch."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No ankle-specific stretch among candidates"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:POSE:ANKLE_TO_KNEE": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.93,
+        "reason": "The named candidate is a lying figure-four stretch, while Garmin specifies seated Double Pigeon pose."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Ankle_On_The_Knee",
+        "confidence": 0.55,
+        "reason": "Figure-4 glute/hip stretch matching ankle-to-knee hip opener target"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:MOVE:ARCH_AND_CURL": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.99,
+        "reason": "Candidates describe abdominal or arm curls rather than the combined spinal arch-and-curl movement."
+      },
+      "claude": {
+        "candidateId": null,
+        "confidence": 0,
+        "reason": "No candidate matches spinal arch-and-curl movement"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:CORE:ARM_AND_LEG_EXTENSION_ON_KNEES": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": "wger:80c167b9-3749-48a1-8686-fc2163a1e7fb",
+        "confidence": 0.97,
+        "reason": "Exact quadruped opposite arm and leg extension, commonly called bird dog."
+      },
+      "claude": {
+        "candidateId": "wger:80c167b9-3749-48a1-8686-fc2163a1e7fb",
+        "confidence": 0.7,
+        "reason": "Quadruped opposite arm/leg raise (bird-dog); matches description and muscles"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:MOVE:ARM_CIRCLES_WITH_BALL_BAND_AND_WEIGHT": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.95,
+        "reason": "Generic arm circles omit the specified ball, band, and weighted setup."
+      },
+      "claude": {
+        "candidateId": "free-exercise-db:Arm_Circles",
+        "confidence": 0.55,
+        "reason": "Same arm circle movement; equipment differs but motion identical"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:MOVE:ARM_CIRCLES_HIGH_BACKWARD_WHEELCHAIR": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.86,
+        "reason": "Backward circles match direction, but candidates omit the high wheelchair-position variation."
+      },
+      "claude": {
+        "candidateId": "wger:69b3da17-11cc-41fe-bbc1-ee6c45ced41c",
+        "confidence": 0.7,
+        "reason": "Backward arm circles; direction matches"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:MOVE:ARM_CIRCLES_HIGH_FORWARD_WHEELCHAIR": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.86,
+        "reason": "Forward circles match direction, but candidates omit the high wheelchair-position variation."
+      },
+      "claude": {
+        "candidateId": "wger:9d9c4c9f-045f-4af5-adf2-8bb07c3516dc",
+        "confidence": 0.7,
+        "reason": "Forward arm circles; direction matches"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  },
+  "garmin:MOVE:ARM_CIRCLES_LOW_BACKWARD_WHEELCHAIR": {
+    "status": "needs-manual",
+    "reviewedBy": [
+      "codex-cli",
+      "claude-cli"
+    ],
+    "reviews": {
+      "codex": {
+        "candidateId": null,
+        "confidence": 0.9,
+        "reason": "Backward circles match direction, but candidates omit the low wheelchair-position variation."
+      },
+      "claude": {
+        "candidateId": "wger:69b3da17-11cc-41fe-bbc1-ee6c45ced41c",
+        "confidence": 0.6,
+        "reason": "Backward arm circles; direction matches, height not distinguished"
+      }
+    },
+    "updatedAt": "2026-07-25T07:58:43.503Z"
+  }
+}

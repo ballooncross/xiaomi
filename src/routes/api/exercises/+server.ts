@@ -30,6 +30,23 @@ type GarminExerciseRow = {
 	catalogs: string;
 	description: string | null;
 	image_url: string | null;
+	matched_exercise_id: string | null;
+	enrichment_sources: string;
+	match_confidence: number | null;
+	instructions_en: string | null;
+	instructions_zh: string | null;
+	gif_url: string | null;
+	video_url: string | null;
+	difficulty: string | null;
+	matched_instructions_en: string | null;
+	matched_instructions_zh: string | null;
+	matched_gif_url: string | null;
+	matched_image_url: string | null;
+};
+
+type EnrichmentSource = {
+	source: string;
+	id: string;
 };
 
 type Exercise = {
@@ -42,11 +59,15 @@ type Exercise = {
 	instructions: string;
 	gifUrl: string | null;
 	imageUrl: string | null;
+	videoUrl: string | null;
 	source: 'exercise-dataset' | 'garmin';
 	sourceCategory: string | null;
 	sourceKey: string | null;
 	catalogs: string[];
 	aliases: string[];
+	enrichmentSources: EnrichmentSource[];
+	matchConfidence: number | null;
+	difficulty: string | null;
 };
 
 // Both datasets are static and small, so we cache them in the isolate and rank
@@ -65,7 +86,17 @@ async function loadIndex(db: D1Database): Promise<Exercise[]> {
 			.all<ExerciseRow>(),
 		db
 			.prepare(
-				'SELECT id, category, exercise_key, name, body_part, primary_muscles, secondary_muscles, equipment, catalogs, description, image_url FROM garmin_exercises'
+				`SELECT g.id, g.category, g.exercise_key, g.name, g.body_part,
+					g.primary_muscles, g.secondary_muscles, g.equipment, g.catalogs,
+					g.description, g.image_url, g.matched_exercise_id,
+					g.enrichment_sources, g.match_confidence, g.instructions_en,
+					g.instructions_zh, g.gif_url, g.video_url, g.difficulty,
+					m.instructions_en AS matched_instructions_en,
+					m.instructions_zh AS matched_instructions_zh,
+					m.gif_url AS matched_gif_url,
+					m.image_url AS matched_image_url
+				FROM garmin_exercises g
+				LEFT JOIN exercises m ON m.id = g.matched_exercise_id`
 			)
 			.all<GarminExerciseRow>()
 	]);
@@ -80,11 +111,15 @@ async function loadIndex(db: D1Database): Promise<Exercise[]> {
 		instructions: row.instructions_zh || row.instructions_en || '',
 		gifUrl: row.gif_url,
 		imageUrl: row.image_url,
+		videoUrl: null,
 		source: 'exercise-dataset',
 		sourceCategory: null,
 		sourceKey: null,
 		catalogs: [],
-		aliases: []
+		aliases: [],
+		enrichmentSources: [],
+		matchConfidence: null,
+		difficulty: null
 	}));
 
 	const garminRows: Exercise[] = (garminResult.results ?? []).map((row) => {
@@ -97,14 +132,24 @@ async function loadIndex(db: D1Database): Promise<Exercise[]> {
 			equipment: equipment.map(humanizeGarmin).join(', '),
 			target: primaryMuscles.map(humanizeGarmin).join(', ') || humanizeGarmin(row.category),
 			secondaryMuscles: parseJsonArray(row.secondary_muscles).map(humanizeGarmin),
-			instructions: row.description ?? '',
-			gifUrl: null,
-			imageUrl: row.image_url,
+			instructions:
+				row.instructions_zh ||
+				row.matched_instructions_zh ||
+				row.instructions_en ||
+				row.matched_instructions_en ||
+				row.description ||
+				'',
+			gifUrl: row.gif_url || row.matched_gif_url,
+			imageUrl: row.image_url || row.matched_image_url,
+			videoUrl: row.video_url,
 			source: 'garmin',
 			sourceCategory: row.category,
 			sourceKey: row.exercise_key,
 			catalogs: parseJsonArray(row.catalogs),
-			aliases: [row.category, row.exercise_key, `${row.category}_${row.exercise_key}`]
+			aliases: [row.category, row.exercise_key, `${row.category}_${row.exercise_key}`],
+			enrichmentSources: parseEnrichmentSources(row.enrichment_sources),
+			matchConfidence: row.match_confidence,
+			difficulty: row.difficulty
 		};
 	});
 
@@ -160,4 +205,19 @@ function humanizeGarmin(value: string): string {
 		.filter(Boolean)
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join(' ');
+}
+
+function parseEnrichmentSources(value: string | null): EnrichmentSource[] {
+	if (!value) return [];
+	try {
+		const parsed = JSON.parse(value);
+		return Array.isArray(parsed)
+			? parsed.filter(
+					(item): item is EnrichmentSource =>
+						typeof item?.source === 'string' && typeof item?.id === 'string'
+				)
+			: [];
+	} catch {
+		return [];
+	}
 }
