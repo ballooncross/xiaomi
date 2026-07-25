@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { levenshtein, rankExercises, tokenize, type Searchable } from './exercise-search';
+import {
+	hasUsefulExerciseDetails,
+	levenshtein,
+	rankExercises,
+	tokenize,
+	type Searchable
+} from './exercise-search';
 
 const ex = (name: string, target = 'chest', equipment = 'barbell'): Searchable => ({
 	name,
@@ -67,5 +73,23 @@ describe('exercise fuzzy search', () => {
 	it('returns alphabetical list for empty query', () => {
 		const names = rankExercises('', dataset, 3).map((r) => r.name);
 		expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+	});
+});
+
+describe('exercise detail filtering', () => {
+	const details = {
+		instructions: 'Keep your core braced.',
+		gifUrl: null,
+		imageUrl: null,
+		videoUrl: null
+	};
+
+	it('requires instructions and at least one media asset', () => {
+		expect(hasUsefulExerciseDetails({ ...details, videoUrl: 'movement.mp4' })).toBe(true);
+		expect(hasUsefulExerciseDetails({ ...details, imageUrl: 'movement.jpg' })).toBe(true);
+		expect(hasUsefulExerciseDetails(details)).toBe(false);
+		expect(
+			hasUsefulExerciseDetails({ ...details, instructions: '', videoUrl: 'movement.mp4' })
+		).toBe(false);
 	});
 });

@@ -12,3 +12,7 @@ coverage
 scripts/.agent-state.json
 scripts/seed-exercises.sql
 scripts/seed-garmin-exercises.sql
+scripts/seed-garmin-enrichment.sql
+scripts/exercise-enrichment-report.json
+scripts/exercise-review-queue.json
+scripts/.exercise-enrichment-cache/

@@ -10,6 +10,7 @@ The MVP is program-first and AI-assisted:
 - optional AI summaries via Gemini first and DeepSeek fallback
 - rule-based fallback when AI keys are missing, rate-limited, or disabled
 - feedback buttons to learn what is useful over time
+- searchable gym exercises with Garmin identifiers, movement instructions, and media enrichment
 
 ## Stack
 
@@ -44,6 +45,7 @@ npm run build               # production build
 npm run telegram:test        # send a local Telegram test message
 npm run db:migrate:local    # apply D1 migrations locally
 npm run db:seed:local       # seed local D1
+npm run exercises:enrich:garmin # build Garmin exercise enrichment data
 npm run deploy              # deploy Pages app
 npm run deploy:cron         # deploy scheduled worker
 npm run agent -- --once     # run the local AI agent once
@@ -63,3 +65,5 @@ Run `npm run db:migrate:local` after pulling schema changes. The birthday notebo
 - [Telegram setup](docs/telegram-setup.md)
 - [AI configuration](docs/ai.md)
 - [Local AI agent](docs/local-agent.md)
+- [Exercise enrichment](docs/exercise-enrichment.md)
+- [Data scripts](scripts/README.md)
