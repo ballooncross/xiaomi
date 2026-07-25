@@ -1,4 +1,5 @@
 import type { DedupExisting, MergeAction } from './dedup';
+import type { CoeBiddingRound, CoeCategory } from '$lib/coe';
 import { DEFAULT_NOTIFY_PREFS, parseNotifyPrefs, type NotifyPrefs } from '$lib/notify-prefs';
 import { MAX_TREND_AGE_DAYS, scoreItem } from './scoring';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
@@ -132,6 +133,20 @@ type JobRunRow = {
   detail: string;
 };
 
+type CoeResultRow = {
+  round_id: string;
+  month: string;
+  bidding_no: number;
+  round_label: string;
+  category: CoeCategory;
+  category_label: string;
+  quota: number;
+  bids_success: number;
+  bids_received: number;
+  premium: number;
+  source_updated_at: string;
+};
+
 type DevRequestRow = {
   id: string; text: string; status: string; response: string;
   branch: string | null; created_at: string; updated_at: string;
@@ -181,6 +196,7 @@ const memory = {
   notifyPrefsByUser: new Map<string, NotifyPrefs>(),
   feedbackByUser: new Map<string, Array<{ id: string; itemId: string; action: FeedbackAction; reason?: string; createdAt: string }>>(),
   jobs: [] as JobRun[],
+  coeRounds: [] as CoeBiddingRound[],
   agentFeeds: [] as AgentFeedItem[],
   preferenceSignalsByUser: new Map<string, PreferenceSignal[]>(),
   aiContextByUser: new Map<string, (AiContextDocument & { id: string })[]>(),
@@ -273,6 +289,12 @@ export abstract class RadarDb {
   abstract notificationExists(type: string, itemId?: string): Promise<boolean>;
   abstract logJob(input: { jobName: string; status: string; detail: string }): Promise<void>;
   abstract listJobRuns(jobName: string, limit?: number): Promise<JobRun[]>;
+  abstract listCoeRounds(): Promise<CoeBiddingRound[]>;
+  abstract upsertCoeRounds(
+    rounds: CoeBiddingRound[],
+    sourceUpdatedAt?: string,
+    updateExisting?: boolean
+  ): Promise<void>;
 
   // User / allowlist methods
   abstract listAllowedEmails(): Promise<string[]>;
@@ -515,6 +537,32 @@ class MemoryRadarDb extends RadarDb {
 
   async listJobRuns(jobName: string, limit = 5): Promise<JobRun[]> {
     return memory.jobs.filter((job) => job.jobName === jobName).slice(0, limit);
+  }
+
+  async listCoeRounds(): Promise<CoeBiddingRound[]> {
+    return memory.coeRounds.map((round) => ({
+      ...round,
+      categories: round.categories.map((category) => ({ ...category }))
+    }));
+  }
+
+  async upsertCoeRounds(
+    rounds: CoeBiddingRound[],
+    sourceUpdatedAt = new Date().toISOString(),
+    updateExisting = false
+  ): Promise<void> {
+    const byId = new Map(memory.coeRounds.map((round) => [round.id, round]));
+    for (const round of rounds) {
+      if (!updateExisting && byId.has(round.id)) continue;
+      byId.set(round.id, {
+        ...round,
+        sourceUpdatedAt,
+        categories: round.categories.map((category) => ({ ...category }))
+      });
+    }
+    memory.coeRounds = [...byId.values()].sort(
+      (a, b) => b.month.localeCompare(a.month) || b.biddingNo - a.biddingNo
+    );
   }
 
   async listAllowedEmails(): Promise<string[]> {
@@ -1270,6 +1318,83 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async listCoeRounds(): Promise<CoeBiddingRound[]> {
+    try {
+      const { results } = await this.db
+        .prepare(
+          `SELECT round_id, month, bidding_no, round_label, category, category_label,
+           quota, bids_success, bids_received, premium, source_updated_at
+           FROM coe_results
+           ORDER BY month DESC, bidding_no DESC, category ASC`
+        )
+        .all<CoeResultRow>();
+      return coeRoundsFromRows(results);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async upsertCoeRounds(
+    rounds: CoeBiddingRound[],
+    sourceUpdatedAt = new Date().toISOString(),
+    updateExisting = false
+  ): Promise<void> {
+    const conflictClause = updateExisting
+      ? `ON CONFLICT(round_id, category) DO UPDATE SET
+         month = excluded.month,
+         bidding_no = excluded.bidding_no,
+         round_label = excluded.round_label,
+         category_label = excluded.category_label,
+         quota = excluded.quota,
+         bids_success = excluded.bids_success,
+         bids_received = excluded.bids_received,
+         premium = excluded.premium,
+         source_updated_at = excluded.source_updated_at,
+         updated_at = CURRENT_TIMESTAMP`
+      : 'ON CONFLICT(round_id, category) DO NOTHING';
+    const statements = rounds.flatMap((round) =>
+      round.categories.map((category) =>
+        this.db
+          .prepare(
+            `INSERT INTO coe_results (
+             round_id, month, bidding_no, round_label, category, category_label,
+             quota, bids_success, bids_received, premium, source_updated_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+             ${conflictClause}`
+          )
+          .bind(
+            round.id,
+            round.month,
+            round.biddingNo,
+            round.label,
+            category.category,
+            category.label,
+            category.quota,
+            category.bidsSuccess,
+            category.bidsReceived,
+            category.premium,
+            sourceUpdatedAt
+          )
+      )
+    );
+
+    try {
+      for (let offset = 0; offset < statements.length; offset += 100) {
+        await this.db.batch(statements.slice(offset, offset + 100));
+      }
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return new MemoryRadarDb(this.userId).upsertCoeRounds(
+          rounds,
+          sourceUpdatedAt,
+          updateExisting
+        );
+      }
+      throw error;
+    }
+  }
+
   async listAllowedEmails(): Promise<string[]> {
     try {
       const { results } = await this.db
@@ -2018,6 +2143,36 @@ class D1RadarDb extends RadarDb {
       throw error;
     }
   }
+}
+
+function coeRoundsFromRows(rows: CoeResultRow[]): CoeBiddingRound[] {
+  const byId = new Map<string, CoeBiddingRound>();
+  for (const row of rows) {
+    let round = byId.get(row.round_id);
+    if (!round) {
+      round = {
+        id: row.round_id,
+        month: row.month,
+        biddingNo: row.bidding_no,
+        label: row.round_label,
+        categories: [],
+        sourceUpdatedAt: row.source_updated_at
+      };
+      byId.set(row.round_id, round);
+    }
+    if (!round.sourceUpdatedAt || row.source_updated_at > round.sourceUpdatedAt) {
+      round.sourceUpdatedAt = row.source_updated_at;
+    }
+    round.categories.push({
+      category: row.category,
+      label: row.category_label,
+      quota: row.quota,
+      bidsSuccess: row.bids_success,
+      bidsReceived: row.bids_received,
+      premium: row.premium
+    });
+  }
+  return [...byId.values()];
 }
 
 function applyFeedbackState(state: MemoryUserItemState | undefined, action: FeedbackAction): MemoryUserItemState {

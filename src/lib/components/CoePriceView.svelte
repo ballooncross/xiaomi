@@ -78,7 +78,7 @@
         {:else}
           LTA · data.gov.sg
         {/if}
-        · 打开页面时拉取；后台每 6 小时检查，周三/四约 18:00 SGT 再查一次
+        · 历史结果保存在数据库；打开页面只刷新最新一轮
       </p>
     </div>
     {#if onRefresh}
@@ -104,6 +104,10 @@
       </button>
     {/if}
   </header>
+
+  {#if data?.stale}
+    <p class="quiet-copy">最新一轮暂时无法刷新，当前显示数据库中的最近结果。</p>
+  {/if}
 
   {#if notifyEnabled}
     <section class="card coe-subscribe" aria-label="COE 通知订阅">

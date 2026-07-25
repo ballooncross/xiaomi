@@ -193,7 +193,7 @@
     coeLoading = true;
     coeError = '';
     try {
-      const response = await fetch('/api/coe');
+      const response = await fetch(force ? '/api/coe?refresh=1' : '/api/coe');
       const payload = (await response.json()) as CoePayload & { error?: string };
       if (!response.ok) {
         coeError = payload.error || '加载失败';
