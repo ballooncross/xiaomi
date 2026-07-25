@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   chooseAutomaticMatch,
+  hasCompatibleEquipment,
+  hasExactNameMatch,
   normalizeName,
   rankCandidates,
   scoreCandidate
@@ -40,6 +42,8 @@ describe('exercise enrichment matching', () => {
   it('normalizes Garmin separators, plurals, and equipment abbreviations', () => {
     expect(normalizeName('DB Push-Ups')).toBe('dumbbell push up');
     expect(normalizeName('NINETY_NINETY_HIP_SWITCH')).toBe('90 90 hip switch');
+    expect(normalizeName('BW Romanian Deadlift')).toBe('body weight romanian deadlift');
+    expect(normalizeName('Single-Leg RDL')).toBe('single leg romanian deadlift');
   });
 
   it('matches an exact source alias', () => {
@@ -59,6 +63,35 @@ describe('exercise enrichment matching', () => {
     const ranked = rankCandidates(target, candidates);
     expect(ranked[0].candidate.id).toBe('source:2');
     expect(chooseAutomaticMatch(ranked)?.method).toBe('exact');
+  });
+
+  it('requires exact names or aliases for movement media', () => {
+    const target = exercise('garmin:SQUAT:BACK_SQUATS', 'Back Squats');
+    expect(
+      hasExactNameMatch(
+        target,
+        exercise('source:back-squat', 'Classic Barbell Squat', { aliases: ['Back Squat'] })
+      )
+    ).toBe(true);
+    expect(
+      hasExactNameMatch(target, exercise('source:front-squat', 'Barbell Front Squat'))
+    ).toBe(false);
+  });
+
+  it('requires compatible equipment for movement media', () => {
+    const genericRaise = exercise('garmin:raise', 'Lateral Raise');
+    const dumbbellRaise = exercise('source:raise', 'Lateral Raise', {
+      equipment: ['dumbbell']
+    });
+    expect(hasCompatibleEquipment(genericRaise, dumbbellRaise)).toBe(false);
+
+    const namedRaise = exercise('garmin:db-raise', 'Dumbbell Lateral Raise');
+    expect(hasCompatibleEquipment(namedRaise, dumbbellRaise)).toBe(true);
+
+    const bodyWeightPlank = exercise('source:plank', 'Plank', {
+      equipment: ['body weight']
+    });
+    expect(hasCompatibleEquipment(exercise('garmin:plank', 'Plank'), bodyWeightPlank)).toBe(true);
   });
 
   it('uses muscle and equipment agreement to separate identical names', () => {

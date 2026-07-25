@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { collectGarminExercises } from './import-garmin-exercises.mjs';
 import {
   chooseAutomaticMatch,
+  hasCompatibleEquipment,
+  hasExactNameMatch,
   nameTokens,
   rankCandidates
 } from './lib/exercise-matching.mjs';
@@ -35,6 +37,10 @@ const FREE_EXERCISE_DB_URL =
   'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
 const FREE_EXERCISE_MEDIA_BASE =
   'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
+const FREE_EXERCISE_VIDEO_DB_URL =
+  'https://exercise-database.zenithfits.com/api/v1/exercises?limit=500';
+const OPEN_EXERCISE_DB_URL =
+  'https://raw.githubusercontent.com/Glowupp-app/open-exercisedb/main/exercises.json';
 const WGER_URL = 'https://wger.de/api/v2/exerciseinfo/?limit=1000';
 const GARMIN_DETAIL_BASE = 'https://connect.garmin.com/web-data/exercises/en-US';
 const GARMIN_DETAIL_CATALOGS = new Set([
@@ -44,6 +50,10 @@ const GARMIN_DETAIL_CATALOGS = new Set([
   'yoga',
   'pilates',
   'mobility'
+]);
+const GENERIC_EXERCISE_NAMES = new Set(['cardio', 'warm up', 'strength']);
+const MEDIA_MATCH_DENYLIST = new Set([
+  'garmin:CURL:ONE_ARM_PREACHER_CURL|free-exercise-video-db:1673'
 ]);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,15 +66,19 @@ async function main() {
   const garminRecords = args.limit ? allGarmin.slice(0, args.limit) : allGarmin;
   console.log(`Enriching ${garminRecords.length} Garmin exercises...`);
 
-  const [existing, freeExerciseDb, wger] = await Promise.all([
+  const [existing, freeExerciseVideoDb, freeExerciseDb, wger, openExerciseDb] = await Promise.all([
     loadExistingDataset(),
+    loadFreeExerciseVideoDb(),
     loadFreeExerciseDb(),
-    loadWger()
+    loadWger(),
+    loadOpenExerciseDb()
   ]);
   const sources = [
     buildSource('exercise-dataset', existing),
+    buildSource('free-exercise-video-db', freeExerciseVideoDb),
+    buildSource('wger', wger),
     buildSource('free-exercise-db', freeExerciseDb),
-    buildSource('wger', wger)
+    buildSource('open-exercise-db', openExerciseDb)
   ];
   const candidateById = new Map(
     sources.flatMap((source) => source.candidates.map((candidate) => [candidate.id, candidate]))
@@ -97,6 +111,18 @@ async function main() {
     if (!selected && override?.status !== 'rejected') {
       for (const group of rankedBySource) {
         const automatic = chooseAutomaticMatch(group.ranked);
+        if (
+          group.source === 'free-exercise-video-db' &&
+          automatic &&
+          (
+            !hasExactNameMatch(target, automatic.candidate) ||
+            !hasCompatibleEquipment(target, automatic.candidate) ||
+            GENERIC_EXERCISE_NAMES.has(target.name.toLowerCase()) ||
+            MEDIA_MATCH_DENYLIST.has(`${target.id}|${automatic.candidate.id}`)
+          )
+        ) {
+          continue;
+        }
         if (automatic) {
           selected = automatic;
           method = automatic.method;
@@ -216,6 +242,57 @@ async function loadFreeExerciseDb() {
   }));
 }
 
+async function loadFreeExerciseVideoDb() {
+  const payload = await fetchJsonCached(FREE_EXERCISE_VIDEO_DB_URL, { ttlMs: DAY_MS });
+  return (payload?.data ?? []).map((exercise) => ({
+    id: `free-exercise-video-db:${exercise.id}`,
+    source: 'free-exercise-video-db',
+    sourceId: exercise.id,
+    linkedExerciseId: null,
+    name: exercise.name,
+    aliases: exercise.aliases ?? [],
+    primaryMuscles: [exercise.target, exercise.muscleGroup].filter(Boolean),
+    secondaryMuscles: exercise.secondaryMuscles ?? [],
+    equipment: [exercise.equipment].filter(Boolean),
+    bodyPart: exercise.bodyPart ?? '',
+    description: exercise.shortDescription || exercise.instructions || '',
+    instructionsEn:
+      exercise.steps?.length
+        ? exercise.steps.join('\n')
+        : exercise.instructions || exercise.shortDescription || '',
+    instructionsZh: '',
+    gifUrl: null,
+    imageUrl: exercise.thumbnails?.male ?? exercise.thumbnails?.female ?? null,
+    videoUrl: exercise.videos?.male ?? exercise.videos?.female ?? null,
+    difficulty: exercise.difficulty ?? null
+  }));
+}
+
+async function loadOpenExerciseDb() {
+  const data = await fetchJsonCached(OPEN_EXERCISE_DB_URL, { ttlMs: DAY_MS });
+  return (data ?? []).map((exercise) => ({
+    id: `open-exercise-db:${exercise.id}`,
+    source: 'open-exercise-db',
+    sourceId: exercise.id,
+    linkedExerciseId: null,
+    name: exercise.name.replaceAll('_', ' '),
+    aliases: [exercise.id],
+    primaryMuscles: [exercise.primary_muscle].filter(Boolean),
+    secondaryMuscles: exercise.secondary_muscles ?? [],
+    equipment: exercise.equipment ?? [],
+    bodyPart: '',
+    description: exercise.description ?? '',
+    instructionsEn: (exercise.execution_tips ?? []).join('\n'),
+    instructionsZh: '',
+    gifUrl: null,
+    imageUrl: null,
+    videoUrl: null,
+    difficulty: Number.isFinite(exercise.difficulty)
+      ? `Level ${exercise.difficulty}/10`
+      : null
+  }));
+}
+
 async function loadWger() {
   const payload = await fetchJsonCached(WGER_URL, { ttlMs: DAY_MS });
   return (payload?.results ?? []).flatMap((exercise) => {
@@ -328,7 +405,7 @@ function mergeEnrichment(target, selected, method) {
     gifUrl: candidate?.gifUrl || null,
     imageUrl: detail.imageUrl || candidate?.imageUrl || null,
     videoUrl: detail.videoUrl || candidate?.videoUrl || null,
-    difficulty: detail.difficulty || null
+    difficulty: detail.difficulty || candidate?.difficulty || null
   };
 }
 
