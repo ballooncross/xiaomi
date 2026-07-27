@@ -1,0 +1,2627 @@
+{
+  "garmin:LUNGE:ALTERNATING_BARBELL_FORWARD_LUNGE": {
+    "status": "accepted",
+    "summary": "Alternate forward lunges while supporting a barbell across your upper back.",
+    "steps": [
+      "Stand tall with the barbell securely across your upper back and feet hip-width apart.",
+      "Step one foot forward and plant it firmly.",
+      "Lower until both knees are bent, keeping your torso upright.",
+      "Drive through the front foot to return to standing.",
+      "Repeat with the opposite leg and continue alternating."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and maintain a braced, neutral spine.",
+    "confidence": 0.9,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.881Z"
+  },
+  "garmin:LUNGE:ALTERNATING_DUMBBELL_LUNGE_WITH_REACH": {
+    "status": "accepted",
+    "summary": "Alternate forward lunges while reaching the dumbbell forward to challenge the legs, shoulders, and core.",
+    "steps": [
+      "Stand tall holding a dumbbell securely with both hands near your chest.",
+      "Step one foot forward into a lunge.",
+      "Lower with control while extending the dumbbell forward at shoulder height.",
+      "Bring the dumbbell back toward your chest and push through the front foot to stand.",
+      "Repeat on the opposite side and continue alternating."
+    ],
+    "safetyNote": "Use a manageable load and avoid rounding your back during the reach.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:PLYO:ALTERNATING_JUMP_LUNGE": {
+    "status": "accepted",
+    "summary": "Explosively jump between alternating split-lunge positions using only body weight.",
+    "steps": [
+      "Begin in a split stance and lower into a controlled lunge.",
+      "Drive through both feet and jump vertically.",
+      "Switch your legs while airborne.",
+      "Land softly in the opposite split stance with both knees bent.",
+      "Immediately stabilize or continue alternating for the prescribed repetitions."
+    ],
+    "safetyNote": "Land quietly with your knees tracking over your toes, and stop if control deteriorates.",
+    "confidence": 0.9,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:WARM_UP:ANKLE_LUNGES": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.25,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": false,
+        "confidence": 0.2,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:RUCK_BACK_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.28,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A backward (reverse) lunge performed while wearing a weighted ruck pack.",
+        "steps": [
+          "Wear a loaded ruck on your back and stand tall with feet hip-width apart.",
+          "Step one foot backward and lower until both knees reach about 90 degrees.",
+          "Push through the front heel to return to standing.",
+          "Repeat, alternating or completing reps per side as programmed."
+        ],
+        "safetyNote": "Keep the torso upright and core braced to manage the added load on the spine."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BACK_FOOT_ELEVATED_DUMBBELL_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "Perform a dumbbell split squat with the rear foot elevated behind you.",
+    "steps": [
+      "Stand in a split stance holding the dumbbells at your sides and place the top of your rear foot on a stable elevation.",
+      "Position the front foot far enough forward to descend comfortably.",
+      "Bend both knees and lower your hips while keeping most of your weight over the front leg.",
+      "Pause before the rear knee reaches the floor.",
+      "Drive through the front foot to return to the starting position, then complete the other side."
+    ],
+    "safetyNote": "Ensure the rear-foot support is stable and keep the front knee aligned with the foot.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:BANDED_EXERCISES:LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.35,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A lunge performed against resistance from an elastic band.",
+        "steps": [
+          "Anchor a band and hold it or stand on it to create tension.",
+          "Stand tall with feet hip-width apart.",
+          "Step into a lunge, lowering until both knees are near 90 degrees.",
+          "Push through the front heel to return against the band's resistance.",
+          "Repeat for the prescribed reps and legs."
+        ],
+        "safetyNote": "Keep the band securely anchored so it does not slip and cause a loss of balance."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BARBELL_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.83,
+        "summary": "Perform a forward lunge onto a box while supporting a barbell across your upper back.",
+        "steps": [
+          "Stand facing a stable box with the barbell securely across your upper back.",
+          "Step one foot forward onto the box and plant the entire foot.",
+          "Bend the front knee and lower into a lunge while keeping your torso upright.",
+          "Drive through the elevated foot to return to the floor.",
+          "Complete the repetitions on each side as prescribed."
+        ],
+        "safetyNote": "Use a box height and barbell load that let you keep the whole lead foot planted securely."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A lunge with a barbell on the back where the front foot steps onto or the rear leg drops from a box.",
+        "steps": [
+          "Rest a barbell across your upper back and stand facing or beside a box.",
+          "Step so one foot is on the box, lowering into a lunge.",
+          "Keep the torso upright as the rear knee lowers.",
+          "Push through the elevated foot to return to standing.",
+          "Repeat for reps, then switch legs."
+        ],
+        "safetyNote": "Ensure the box is stable and step securely to avoid slipping off the edge."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BARBELL_BULGARIAN_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "Perform a rear-foot-elevated split squat with a barbell across your upper back.",
+    "steps": [
+      "Place the barbell securely across your upper back and stand in front of a stable elevation.",
+      "Extend one leg behind you and rest the top of that foot on the elevation.",
+      "Bend both knees to lower your hips while keeping your torso controlled.",
+      "Descend until the front thigh approaches parallel or your comfortable range ends.",
+      "Drive through the front foot to stand, then complete the other side."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and use a stable rear-foot support.",
+    "confidence": 0.9,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BARBELL_CROSSOVER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.94,
+        "summary": "Lunge one leg diagonally behind and across the other while supporting a barbell across your upper back.",
+        "steps": [
+          "Stand tall with the barbell securely across your upper back.",
+          "Step one foot diagonally behind and across your standing leg.",
+          "Bend both knees and lower your hips under control.",
+          "Press through the front foot to return to standing.",
+          "Complete the repetitions on each side as prescribed."
+        ],
+        "safetyNote": "Keep the front knee tracking with the toes and use only a crossover distance you can control."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A curtsy-style lunge with a barbell where one leg crosses behind the other.",
+        "steps": [
+          "Rest a barbell across your upper back and stand with feet hip-width apart.",
+          "Step one foot diagonally behind and across the other leg.",
+          "Lower until both knees are bent and the rear knee nears the floor.",
+          "Push through the front heel to return to standing.",
+          "Repeat for reps, then switch sides."
+        ],
+        "safetyNote": "Move under control to keep balance as the legs cross behind."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BARBELL_FRONT_SPLIT_SQUAT": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.42,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A split squat performed with a barbell held in the front-rack position.",
+        "steps": [
+          "Hold a barbell in the front-rack position across the front of your shoulders.",
+          "Set one foot forward and one back in a staggered stance.",
+          "Lower straight down until the front thigh is about parallel to the floor.",
+          "Drive through the front heel to return to the start.",
+          "Complete all reps, then switch legs."
+        ],
+        "safetyNote": "Keep the elbows high and torso upright so the bar stays secure on the shoulders."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BARBELL_SIDE_LUNGE": {
+    "status": "accepted",
+    "summary": "Step laterally into a lunge while supporting a barbell across your upper back.",
+    "steps": [
+      "Stand tall with the barbell securely across your upper back and feet together or hip-width apart.",
+      "Take a wide step directly to one side.",
+      "Bend the stepping knee and push your hips back while keeping the other leg straight.",
+      "Drive through the stepping foot to return to standing.",
+      "Complete the repetitions on each side as prescribed."
+    ],
+    "safetyNote": "Keep the bending knee aligned with its toes and maintain a braced, neutral spine.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:BARBELL_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "Lower and raise your body from a stationary split stance with a barbell across your upper back.",
+    "steps": [
+      "Place the barbell securely across your upper back and take a comfortable split stance.",
+      "Keep both feet planted and your torso upright.",
+      "Bend both knees to lower the rear knee toward the floor.",
+      "Drive through the front foot to return to the starting height.",
+      "Complete the repetitions before switching legs."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and maintain stable foot contact.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:BATTLE_ROPE:ALTERNATING_LUNGE_WAVE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.91,
+        "summary": "Create alternating battle-rope waves while moving between lunges.",
+        "steps": [
+          "Stand facing the rope anchor with one end in each hand and enough slack to form waves.",
+          "Begin making alternating up-and-down arm waves.",
+          "Step one foot into a lunge while maintaining the alternating waves.",
+          "Drive back to standing without stopping the rope motion.",
+          "Lunge with the opposite leg and continue alternating."
+        ],
+        "safetyNote": "Keep your torso braced and choose a pace that preserves knee alignment and steady rope control."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A conditioning move combining alternating battle-rope waves with alternating lunges.",
+        "steps": [
+          "Hold one battle rope end in each hand and stand facing the anchor.",
+          "Begin making alternating waves with the ropes.",
+          "Step into a lunge with one leg while continuing the waves.",
+          "Return to standing and lunge with the opposite leg.",
+          "Continue alternating lunges and waves for the set duration."
+        ],
+        "safetyNote": "Keep the core braced and back neutral to manage the combined arm and leg effort."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:CORE_CONTROL_REAR_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.3,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "A reverse (rear) lunge emphasizing controlled core and torso stability.",
+        "steps": [
+          "Stand tall with feet hip-width apart and core braced.",
+          "Step one foot backward, lowering until both knees are near 90 degrees.",
+          "Maintain an upright, stable torso throughout the descent.",
+          "Push through the front heel to return to standing.",
+          "Repeat, alternating or per side as programmed."
+        ],
+        "safetyNote": "Move slowly and keep the core engaged to maintain balance and protect the spine."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:DIAGONAL_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.85,
+        "summary": "Step forward and outward on a diagonal into a body-weight lunge.",
+        "steps": [
+          "Stand tall with your feet hip-width apart.",
+          "Step one foot forward and outward at roughly a 45-degree angle.",
+          "Bend the stepping knee and lower your hips while keeping the trailing foot planted.",
+          "Drive through the stepping foot to return to standing.",
+          "Repeat on the other side as prescribed."
+        ],
+        "safetyNote": "Keep the stepping knee aligned with the direction of the foot."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A bodyweight lunge stepping out on a diagonal angle rather than straight forward.",
+        "steps": [
+          "Stand tall with feet hip-width apart.",
+          "Step one foot forward and out at roughly a 45-degree angle.",
+          "Lower until both knees are bent near 90 degrees.",
+          "Push through the front heel to return to standing.",
+          "Repeat for reps, then switch legs."
+        ],
+        "safetyNote": "Keep the front knee tracking over the foot as you step at the angle."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:DUMBBELL_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.4,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A lunge holding dumbbells where the front foot steps onto or the rear leg drops from a box.",
+        "steps": [
+          "Hold a dumbbell in each hand and stand near a box.",
+          "Step so one foot is on the box, lowering into a lunge.",
+          "Keep the torso upright as the rear knee lowers.",
+          "Push through the elevated foot to return to standing.",
+          "Repeat for reps, then switch legs."
+        ],
+        "safetyNote": "Ensure the box is stable and step securely to avoid slipping off the edge."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:DUMBBELL_CROSSOVER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.95,
+        "summary": "Lunge one leg diagonally behind and across the other while holding dumbbells.",
+        "steps": [
+          "Stand tall holding the dumbbells at your sides.",
+          "Step one foot diagonally behind and across your standing leg.",
+          "Bend both knees and lower your hips under control.",
+          "Press through the front foot to return to standing.",
+          "Complete the repetitions on each side as prescribed."
+        ],
+        "safetyNote": "Keep the front knee tracking with the toes and avoid twisting your planted foot."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A curtsy-style lunge with dumbbells where one leg crosses behind the other.",
+        "steps": [
+          "Hold a dumbbell in each hand and stand with feet hip-width apart.",
+          "Step one foot diagonally behind and across the other leg.",
+          "Lower until both knees bend and the rear knee nears the floor.",
+          "Push through the front heel to return to standing.",
+          "Repeat for reps, then switch sides."
+        ],
+        "safetyNote": "Move under control to maintain balance as the legs cross behind."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:DUMBBELL_DIAGONAL_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.87,
+        "summary": "Step forward and outward on a diagonal into a lunge while holding dumbbells.",
+        "steps": [
+          "Stand tall holding the dumbbells at your sides.",
+          "Step one foot forward and outward at roughly a 45-degree angle.",
+          "Bend the stepping knee and lower your hips with control.",
+          "Drive through the stepping foot to return to standing.",
+          "Repeat on the other side as prescribed."
+        ],
+        "safetyNote": "Keep the stepping knee aligned with the foot and prevent the dumbbells from swinging."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A lunge with dumbbells stepping out on a diagonal angle.",
+        "steps": [
+          "Hold a dumbbell in each hand and stand with feet hip-width apart.",
+          "Step one foot forward and out at roughly a 45-degree angle.",
+          "Lower until both knees are bent near 90 degrees.",
+          "Push through the front heel to return to standing.",
+          "Repeat for reps, then switch legs."
+        ],
+        "safetyNote": "Keep the front knee tracking over the foot as you step at the angle."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:SHOULDER_PRESS:DUMBBELL_HAMMER_CURL_TO_LUNGE_TO_PRESS": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.9,
+        "summary": "Combine a neutral-grip dumbbell curl, lunge, and overhead press into one controlled sequence.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand with your palms facing inward.",
+          "Curl the dumbbells toward your shoulders without swinging.",
+          "Step into a lunge and lower under control while keeping the dumbbells at shoulder level.",
+          "Drive through the front foot to stand and press both dumbbells overhead.",
+          "Lower the dumbbells with control, return your arms to your sides, and alternate the lunging leg."
+        ],
+        "safetyNote": "Use a load that allows a neutral spine and controlled overhead press throughout the sequence."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A combination move linking a dumbbell hammer curl, a lunge, and an overhead press.",
+        "steps": [
+          "Hold a dumbbell in each hand at your sides with a neutral grip.",
+          "Perform a hammer curl, bringing the dumbbells to shoulder height.",
+          "Step into a lunge, lowering until both knees are near 90 degrees.",
+          "As you rise from the lunge, press the dumbbells overhead.",
+          "Lower the weights and repeat the sequence for reps."
+        ],
+        "safetyNote": "Keep the core braced and press without overarching the lower back."
+      }
+    },
+    "updatedAt": "2026-07-27T02:11:01.882Z"
+  },
+  "garmin:LUNGE:DUMBBELL_LUNGE_AND_ROTATION": {
+    "status": "accepted",
+    "summary": "A dumbbell lunge combined with torso rotation trains the legs, glutes, and obliques.",
+    "steps": [
+      "Stand upright holding a dumbbell securely in front of your torso.",
+      "Step forward into a lunge and lower both knees under control.",
+      "Keeping your hips stable, rotate your torso toward the forward leg.",
+      "Rotate back to center and push through the front foot to stand.",
+      "Repeat on the opposite side."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and rotate through the upper torso without forcing the lower back.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:DUMBBELL_OVERHEAD_BULGARIAN_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "This rear-foot-elevated split squat is performed while holding a dumbbell overhead.",
+    "steps": [
+      "Stand in a split stance with the rear foot supported on a stable raised surface.",
+      "Press the dumbbell overhead and keep the arm steady.",
+      "Bend both knees to lower your hips while keeping most of your weight over the front leg.",
+      "Pause when you reach a controlled depth.",
+      "Drive through the front foot to return to standing, then complete the other side."
+    ],
+    "safetyNote": "Use a manageable load and stop if you cannot keep the dumbbell stable overhead.",
+    "confidence": 0.82,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:DUMBBELL_OVERHEAD_WALKING_LUNGE": {
+    "status": "accepted",
+    "summary": "A walking lunge performed with a dumbbell held overhead challenges the legs, shoulders, and balance.",
+    "steps": [
+      "Stand tall and press a dumbbell overhead with a stable arm.",
+      "Step forward and lower into a lunge until both knees are comfortably bent.",
+      "Push through the front foot and bring the rear leg forward.",
+      "Continue directly into the next lunge with the opposite leg.",
+      "Alternate legs while keeping the dumbbell overhead."
+    ],
+    "safetyNote": "Keep the ribs controlled and the weight vertically above the shoulder rather than drifting forward.",
+    "confidence": 0.82,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:DUMBBELL_REVERSE_LUNGE_TO_HIGH_KNEE_AND_PRESS": {
+    "status": "accepted",
+    "summary": "This combination links a dumbbell reverse lunge with a forward high-knee drive and overhead press.",
+    "steps": [
+      "Stand upright holding the dumbbell at shoulder height.",
+      "Step one leg backward and lower into a reverse lunge.",
+      "Push through the front foot as you bring the rear leg forward into a high-knee position.",
+      "Press the dumbbell overhead while balancing on the standing leg.",
+      "Lower the dumbbell with control and repeat before changing sides."
+    ],
+    "safetyNote": "Choose a light load and regain stable balance before completing the overhead press.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:WARM_UP:ELBOW_TO_FOOT_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.9,
+        "summary": "A deep forward lunge with the elbow reaching toward the inside of the front foot mobilizes the hips and upper back.",
+        "steps": [
+          "Stand tall, then take a long step forward.",
+          "Lower into a deep lunge and place the opposite hand beside the front foot for support.",
+          "Reach the elbow on the same side as the front leg toward the inside of that foot.",
+          "Pause briefly while keeping the rear leg extended comfortably.",
+          "Return to standing and repeat on the other side."
+        ],
+        "safetyNote": "Work only within a pain-free range and do not force the elbow toward the floor."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A bodyweight mobility lunge in which the front-side elbow drops toward the instep of the lead foot.",
+        "steps": [
+          "Step forward into a deep lunge with the front foot flat.",
+          "Place both hands on the floor inside the front foot.",
+          "Lower the same-side elbow toward the instep of the front foot and hold briefly.",
+          "Return the hand to the floor and press back up to standing.",
+          "Repeat on the other side."
+        ],
+        "safetyNote": "Ease into the stretch gradually and avoid forcing the elbow down."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:ELEVATED_FRONT_FOOT_BARBELL_SPLIT_SQUAT": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.96,
+        "summary": "A barbell split squat with the front foot elevated increases the available range of motion at the hip and knee.",
+        "steps": [
+          "Place the front foot securely on a low box and take a split stance with the barbell supported across the upper back.",
+          "Brace your torso and keep both feet planted.",
+          "Bend both knees and lower the rear knee toward the floor.",
+          "Descend only as far as you can maintain control and front-foot contact.",
+          "Drive through the elevated front foot to rise, then complete the other side."
+        ],
+        "safetyNote": "Use a stable box and keep the front knee tracking in line with the toes."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.78,
+        "summary": "A split squat with the front foot raised on a box, loaded with a barbell across the upper back.",
+        "steps": [
+          "Rest a barbell across your upper back and place your front foot on a low box.",
+          "Set the rear foot back into a staggered split stance.",
+          "Lower by bending the front knee, letting the hips drop below the box level.",
+          "Drive through the front foot to return to the start.",
+          "Complete the set, then switch legs."
+        ],
+        "safetyNote": "Keep the torso upright and the front knee stable; use a rack or spotter for the barbell if needed."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:CARRY:FARMERS_CARRY_WALK_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.98,
+        "summary": "A farmer's carry walking lunge combines alternating forward lunges with dumbbells held at the sides.",
+        "steps": [
+          "Stand tall holding a dumbbell at each side with a firm neutral grip.",
+          "Step forward and lower into a controlled lunge.",
+          "Push through the front foot and bring the rear leg forward.",
+          "Continue into the next lunge with the opposite leg.",
+          "Alternate sides while keeping the dumbbells steady and your torso upright."
+        ],
+        "safetyNote": "Avoid letting the weights swing or pull your shoulders and torso out of alignment."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "Walking lunges performed while carrying a dumbbell in each hand at the sides.",
+        "steps": [
+          "Hold a dumbbell in each hand at arm's length by your sides with shoulders back.",
+          "Step forward into a lunge, lowering both knees toward 90 degrees.",
+          "Drive through the front foot to stand and bring the rear leg forward.",
+          "Step immediately into the next lunge with the opposite leg.",
+          "Continue for the prescribed distance, keeping the weights steady."
+        ],
+        "safetyNote": "Keep the spine tall and grip firm; do not let the shoulders round forward under load."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:GUNSLINGER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.28,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "The proprietary name does not identify the dumbbell and arm sequence unambiguously."
+      },
+      "claude": {
+        "supported": false,
+        "confidence": 0.3,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:POSE:HIGH_LUNGE": {
+    "status": "accepted",
+    "summary": "High Lunge Pose is a standing yoga posture with the front knee bent, rear leg extended, and torso lifted.",
+    "steps": [
+      "From standing, step one foot far back and keep the rear heel lifted.",
+      "Bend the front knee over the ankle while extending the rear leg.",
+      "Square the hips toward the front as comfortably as possible.",
+      "Lift the torso and reach both arms overhead.",
+      "Hold with steady breathing, then repeat with the other leg forward."
+    ],
+    "safetyNote": "Shorten the stance or lower the arms if balance or back comfort is limited.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LAWNMOWER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.35,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "The name does not specify the lunge direction or dumbbell pulling pattern clearly enough."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.62,
+        "summary": "A lunge combined with a single-arm dumbbell row mimicking a lawnmower pull.",
+        "steps": [
+          "Hold a dumbbell in one hand and step forward into a lunge, hinging slightly at the hips.",
+          "Let the dumbbell hang toward the floor near the front foot.",
+          "Row the dumbbell up toward the hip, driving the elbow back.",
+          "Lower the dumbbell and press back to standing.",
+          "Repeat for reps, then switch sides."
+        ],
+        "safetyNote": "Keep the spine neutral during the hinge and row rather than rounding the back."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:POSE:LOW_LUNGE": {
+    "status": "accepted",
+    "summary": "Low Lunge Pose is a deep lunge posture that lengthens the rear hip while the front knee remains bent.",
+    "steps": [
+      "From standing or a forward fold, step one foot far back.",
+      "Bend the front knee over the ankle and extend the rear leg behind you.",
+      "Place the hands beside the front foot for support.",
+      "Lengthen the chest forward while allowing the hips to settle comfortably.",
+      "Hold with steady breathing, then change sides."
+    ],
+    "safetyNote": "Keep the front knee aligned with the foot and reduce the depth if the hips or knee feel strained.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:POSE:LOW_LUNGE_TWIST": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.25,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "The metadata states that yoga schools use this name for different postures, so the exact twist cannot be determined."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A low lunge with the back knee down and a spinal twist toward the front leg.",
+        "steps": [
+          "From a low lunge with the back knee on the floor, place one hand on the floor inside the front foot.",
+          "Root down through the front foot and lengthen the spine.",
+          "Rotate the torso toward the front leg, reaching the opposite arm toward the ceiling.",
+          "Gaze up past the raised hand and hold.",
+          "Return to center, then switch sides."
+        ],
+        "safetyNote": "Twist from the mid-back and stop if you feel pinching in the spine."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LOW_LUNGE_WITH_ISOMETRIC_ADDUCTION": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.82,
+        "summary": "A low lunge with inward muscular tension adds an isometric inner-thigh contraction to the hip-opening position.",
+        "steps": [
+          "Take a long split stance and lower into a comfortable low lunge.",
+          "Keep the front foot planted and the front knee aligned over the foot.",
+          "Without moving the feet, gently draw them toward each other against the floor.",
+          "Maintain the inward tension while holding the lunge and breathing normally.",
+          "Release the tension, rise carefully, and repeat on the other side."
+        ],
+        "safetyNote": "Apply only moderate inward tension and stop if you feel pain in the groin or knees."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "A held low lunge with an isometric squeeze of the inner thighs to engage the adductors.",
+        "steps": [
+          "Step into a low lunge with the front knee bent over the ankle.",
+          "Set both feet firmly and keep the torso upright.",
+          "Isometrically squeeze the legs toward the midline as if drawing the feet together.",
+          "Hold the contraction for the prescribed time while breathing steadily.",
+          "Release and switch sides."
+        ],
+        "safetyNote": "Keep the contraction gradual and avoid straining the groin."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:POSE:LOW_LUNGE_WITH_KNEE_DOWN": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.98,
+        "summary": "This low lunge yoga pose places the rear knee down while the torso and arms rise.",
+        "steps": [
+          "Step one foot forward into a lunge and lower the rear knee to the floor.",
+          "Position the front knee above the ankle and point the rear leg comfortably behind you.",
+          "Let the hips move forward gently while lifting the torso.",
+          "Reach both arms overhead without compressing the lower back.",
+          "Hold with steady breathing, then change sides."
+        ],
+        "safetyNote": "Cushion the rear knee as needed and avoid pushing the hips beyond a comfortable stretch."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A crescent low-lunge yoga pose with the back knee resting on the floor and arms raised.",
+        "steps": [
+          "From a lunge, lower the back knee to the floor with the toes untucked.",
+          "Bend the front knee to stack it over the ankle.",
+          "Press the hips gently forward to open the front of the back hip.",
+          "Sweep both arms overhead and lift the chest.",
+          "Hold, breathing evenly, then switch sides."
+        ],
+        "safetyNote": "Pad the down knee and avoid overarching the lower back when reaching up."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LOW_SIDE_TO_SIDE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.97,
+        "summary": "A low side-to-side lunge shifts the body laterally between bent legs while maintaining a low stance.",
+        "steps": [
+          "Stand with the feet wide and toes pointing comfortably forward or slightly outward.",
+          "Bend one knee and shift the hips toward that side while keeping the opposite leg longer.",
+          "Stay low as you move through the center.",
+          "Shift onto the other leg and bend that knee.",
+          "Continue alternating sides with controlled movement."
+        ],
+        "safetyNote": "Keep each bent knee tracking with its toes and do not force the straight leg into an excessive stretch."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A bodyweight lateral lunge shifting the hips low from one side to the other.",
+        "steps": [
+          "Stand with feet wider than shoulder width, toes forward.",
+          "Shift your weight to one side, bending that knee into a deep side lunge while the other leg stays straight.",
+          "Keep the hips low and chest up.",
+          "Shift smoothly across to lunge onto the opposite leg.",
+          "Continue alternating side to side for reps."
+        ],
+        "safetyNote": "Keep the bent knee tracking over the toes and stay low rather than bouncing."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LUNGE_MATRIX": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.3,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "A lunge matrix can use several different direction sequences, and this record does not define which one."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.5,
+        "summary": "A multi-directional lunge sequence stepping forward, laterally, and rotationally to train the hips in several planes.",
+        "steps": [
+          "Stand tall with feet hip-width apart.",
+          "Lunge forward with one leg, then return to center.",
+          "Lunge laterally to the side with the same leg, then return.",
+          "Lunge backward and rotationally, returning to center after each.",
+          "Complete the sequence, then repeat leading with the other leg."
+        ],
+        "safetyNote": "Control each direction and keep the working knee aligned over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:MOVE:LUNGE_SQUAT": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.25,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "The name does not clarify whether this is a split squat, an alternating lunge-to-squat sequence, or another combination."
+      },
+      "claude": {
+        "supported": false,
+        "confidence": 0.3,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LUNGE_WITH_ARM_REACH": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.35,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "The record conflicts on whether a dumbbell is used and does not specify the direction or timing of the arm reach."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.55,
+        "summary": "A lunge combined with an overhead arm reach to extend hip and torso mobility, optionally holding a dumbbell.",
+        "steps": [
+          "Hold a dumbbell (or use bodyweight) and step forward into a lunge.",
+          "Lower until both knees approach 90 degrees.",
+          "Reach both arms overhead, lengthening the torso tall.",
+          "Lower the arms and drive through the front foot to stand.",
+          "Repeat, alternating legs."
+        ],
+        "safetyNote": "Avoid arching the lower back as you reach overhead."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LUNGE_WITH_DIAGONAL_REACH": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.78,
+        "summary": "This bodyweight lunge adds a diagonal arm reach to mobilize the hips, shoulders, and torso.",
+        "steps": [
+          "Stand tall with the arms relaxed.",
+          "Step forward into a lunge and lower under control.",
+          "Reach both arms diagonally across and beyond the forward leg while allowing a controlled torso rotation.",
+          "Return the arms and torso to center.",
+          "Push through the front foot to stand, then repeat on the other side."
+        ],
+        "safetyNote": "Keep the front knee aligned with the toes and make the diagonal reach without twisting the knee."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A bodyweight lunge with both arms reaching diagonally overhead across the body.",
+        "steps": [
+          "Step forward into a lunge, lowering both knees toward 90 degrees.",
+          "Reach both arms up and across on a diagonal, away from the front leg.",
+          "Feel the stretch through the trunk and hip.",
+          "Return the arms to center and press back to standing.",
+          "Repeat, alternating legs and reach direction."
+        ],
+        "safetyNote": "Keep the front knee stable and reach from the torso rather than twisting the knee."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:LUNGE:LUNGE_WITH_SIDE_BEND": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.38,
+        "summary": "",
+        "steps": [],
+        "safetyNote": "The name and metadata do not specify how the dumbbell is held or which direction the torso bends."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "A lunge combined with a lateral torso bend, holding a dumbbell to load the obliques.",
+        "steps": [
+          "Hold a dumbbell in one hand and step forward into a lunge.",
+          "Lower until both knees approach 90 degrees.",
+          "Bend the torso laterally away from the dumbbell to stretch the side.",
+          "Return upright and drive through the front foot to stand.",
+          "Repeat, then switch sides."
+        ],
+        "safetyNote": "Bend directly to the side without twisting or over-flexing the spine."
+      }
+    },
+    "updatedAt": "2026-07-27T02:12:10.001Z"
+  },
+  "garmin:WARM_UP:STRETCH_LUNGE_WITH_SPINAL_TWIST": {
+    "status": "accepted",
+    "summary": "Stretch the hips, thighs, and spine by combining a forward lunge with a controlled torso rotation.",
+    "steps": [
+      "Stand tall and step one foot forward into a long stance.",
+      "Bend the front knee and lower into a lunge while keeping the back leg extended.",
+      "Place the hand opposite the front foot beside that foot.",
+      "Rotate your torso toward the front leg and reach the other arm upward.",
+      "Pause, return carefully, and repeat on the opposite side."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and rotate only within a comfortable range.",
+    "confidence": 0.9,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:MOVE:LUNGES_WITH_KNEE_LIFT": {
+    "status": "accepted",
+    "summary": "Perform a forward lunge followed by a balanced knee drive as you return to standing.",
+    "steps": [
+      "Stand tall with your feet about hip-width apart.",
+      "Step forward and lower until both knees are comfortably bent.",
+      "Push through the front foot to rise.",
+      "Bring the rear leg forward and lift its knee toward your chest.",
+      "Regain balance, then repeat on the other side."
+    ],
+    "safetyNote": "Keep the supporting knee aligned over the foot and use a smaller knee lift if balance is limited.",
+    "confidence": 0.88,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OFFSET_DUMBBELL_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.42,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.82,
+        "summary": "A forward lunge performed while holding a single dumbbell on one side to add an anti-lateral-flexion core challenge.",
+        "steps": [
+          "Hold one dumbbell at shoulder or at your side on one hand.",
+          "Brace your core and keep your torso squared to resist leaning.",
+          "Step forward and lower until both knees bend near 90 degrees.",
+          "Push through the front heel to return to standing.",
+          "Complete the set, then switch the dumbbell to the other side."
+        ],
+        "safetyNote": "Resist tipping toward the loaded side by keeping your shoulders and hips level."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OFFSET_DUMBBELL_REVERSE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.42,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.82,
+        "summary": "A reverse (backward-stepping) lunge holding a single dumbbell on one side for an offset core challenge.",
+        "steps": [
+          "Hold one dumbbell on one hand at shoulder or at your side.",
+          "Brace your core and keep your torso squared and level.",
+          "Step one foot backward and lower until both knees bend near 90 degrees.",
+          "Drive through the front heel to return to standing.",
+          "Finish the set, then switch the dumbbell to the other side."
+        ],
+        "safetyNote": "Control the backward step and resist leaning toward the loaded side."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OVERHEAD_BULGARIAN_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "Perform a rear-foot-elevated split squat while holding a barbell securely overhead.",
+    "steps": [
+      "Place one foot behind you on a bench and set the other foot far enough forward for a stable stance.",
+      "Press the barbell overhead with straight, stable arms.",
+      "Brace your trunk and lower your hips by bending the front knee.",
+      "Descend under control while keeping the front knee aligned with the foot.",
+      "Drive through the front foot to stand, then complete the set before switching legs."
+    ],
+    "safetyNote": "Use a light load and stop if you cannot keep the bar stable overhead or the front knee aligned.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OVERHEAD_DUMBBELL_LUNGE": {
+    "status": "accepted",
+    "summary": "Perform a forward lunge while maintaining one or more dumbbells in a stable overhead position.",
+    "steps": [
+      "Stand tall and press the dumbbell or dumbbells overhead with your arms extended.",
+      "Brace your trunk and step one foot forward.",
+      "Lower into a lunge while keeping the weight directly above your shoulders.",
+      "Push through the front foot to return to standing.",
+      "Repeat with the opposite leg."
+    ],
+    "safetyNote": "Choose a load you can control without arching your lower back or losing overhead stability.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OVERHEAD_DUMBBELL_REVERSE_LUNGE": {
+    "status": "accepted",
+    "summary": "Step backward into a lunge while holding one or more dumbbells steadily overhead.",
+    "steps": [
+      "Stand tall and press the dumbbell or dumbbells overhead.",
+      "Brace your trunk and step one foot backward.",
+      "Lower until both knees are comfortably bent while keeping the weight above your shoulders.",
+      "Push through the front foot and bring the rear foot forward to stand.",
+      "Repeat on the opposite side."
+    ],
+    "safetyNote": "Keep your ribs controlled and reduce the load if the dumbbell drifts or your back arches.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OVERHEAD_DUMBBELL_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "Lower and rise in a stationary split stance while holding one or more dumbbells overhead.",
+    "steps": [
+      "Take a stable split stance with both feet pointing generally forward.",
+      "Press the dumbbell or dumbbells overhead and brace your trunk.",
+      "Bend both knees to lower your hips straight down.",
+      "Pause at a comfortable depth while keeping the front knee aligned with the foot.",
+      "Drive through both feet to rise, then switch legs after completing the set."
+    ],
+    "safetyNote": "Use a manageable load and avoid arching your lower back to hold the weight overhead.",
+    "confidence": 0.83,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OVERHEAD_LUNGE": {
+    "status": "accepted",
+    "summary": "Perform a forward lunge while stabilizing a barbell overhead.",
+    "steps": [
+      "Stand tall and secure the barbell overhead with straight, stable arms.",
+      "Brace your trunk and step one foot forward.",
+      "Lower into a lunge while keeping the bar above your shoulders.",
+      "Push through the front foot to return to standing.",
+      "Repeat with the opposite leg."
+    ],
+    "safetyNote": "Use a light load and stop if shoulder mobility or balance prevents a stable overhead position.",
+    "confidence": 0.83,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:HYPEREXTENSION:OVERHEAD_LUNGE_WITH_MEDICINE_BALL": {
+    "status": "accepted",
+    "summary": "Perform a forward lunge while holding a medicine ball overhead.",
+    "steps": [
+      "Stand tall and hold the medicine ball overhead with both hands.",
+      "Brace your trunk and step one foot forward.",
+      "Lower into a lunge while keeping the ball above your shoulders.",
+      "Push through the front foot to return to standing.",
+      "Repeat with the opposite leg."
+    ],
+    "safetyNote": "Keep the ball controlled and avoid leaning backward or letting the front knee collapse inward.",
+    "confidence": 0.83,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:OVERHEAD_LUNGE_WITH_ROTATION": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.88,
+        "summary": "Perform a barbell overhead lunge with a controlled torso rotation toward the forward leg.",
+        "steps": [
+          "Stabilize the barbell overhead with straight arms and stand tall.",
+          "Step one foot forward and lower into a lunge.",
+          "Keeping your hips controlled, rotate your upper torso toward the forward leg.",
+          "Return your torso to center while maintaining the bar overhead.",
+          "Push back to standing and repeat on the opposite side."
+        ],
+        "safetyNote": "Use a very light load and keep the rotation small enough to maintain knee and overhead control."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A forward lunge holding a barbell overhead while adding a torso rotation toward the front leg to engage the obliques.",
+        "steps": [
+          "Press and hold a barbell overhead with arms locked out.",
+          "Step forward and lower into a lunge with both knees near 90 degrees.",
+          "Rotate your torso toward the front leg while keeping the bar overhead.",
+          "Rotate back to center.",
+          "Push through the front heel to stand, then alternate legs."
+        ],
+        "safetyNote": "Rotate slowly and only as far as you can keep the bar stable overhead."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:RUCK_OVERHEAD_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.28,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.55,
+        "summary": "A forward lunge performed while pressing a loaded ruck (weighted backpack) overhead for lower-body and overhead stability work.",
+        "steps": [
+          "Grip a loaded ruck and press it overhead with arms locked out.",
+          "Brace your core and keep the ruck stacked over your shoulders.",
+          "Step forward and lower until both knees bend near 90 degrees.",
+          "Push through the front heel to return to standing.",
+          "Alternate legs for the prescribed repetitions."
+        ],
+        "safetyNote": "Keep the ruck balanced overhead and lower it under control if your shoulders fatigue."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:MOVE:PSOAS_LUNGE_STRETCH": {
+    "status": "accepted",
+    "summary": "Stretch the hip flexors by gently shifting the pelvis forward from a lunge position.",
+    "steps": [
+      "Begin in a half-kneeling lunge with one knee down and the opposite foot forward.",
+      "Stand through your torso and lightly tuck your pelvis.",
+      "Shift your hips forward until you feel a stretch at the front of the kneeling-side hip.",
+      "Hold the position without arching your lower back.",
+      "Ease out and repeat on the opposite side."
+    ],
+    "safetyNote": "Use padding under the rear knee if needed and stop before you feel pinching in the hip or back.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_BARBELL_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.46,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.68,
+        "summary": "A backward-stepping lunge onto a box while holding a barbell across the back.",
+        "steps": [
+          "Set a barbell across your upper back and stand in front of a box.",
+          "Step one foot backward onto the box behind you.",
+          "Lower until the front thigh is near parallel to the floor.",
+          "Drive through the front heel to return to standing.",
+          "Complete the reps, then switch legs."
+        ],
+        "safetyNote": "Make sure the box is stable and place the rear foot securely before descending."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.44,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A bodyweight backward-stepping lunge that places the rear foot onto a box behind you.",
+        "steps": [
+          "Stand in front of a box.",
+          "Step one foot backward onto the box behind you.",
+          "Lower until the front thigh is near parallel to the floor.",
+          "Push through the front heel to return to standing.",
+          "Complete the reps, then switch legs."
+        ],
+        "safetyNote": "Confirm the box is stable and set the rear foot securely before lowering."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_DUMBBELL_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.46,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A backward-stepping lunge onto a box while holding a dumbbell in each hand.",
+        "steps": [
+          "Hold a dumbbell in each hand at your sides and stand in front of a box.",
+          "Step one foot backward onto the box behind you.",
+          "Lower until the front thigh is near parallel to the floor.",
+          "Drive through the front heel to return to standing.",
+          "Complete the reps, then switch legs."
+        ],
+        "safetyNote": "Ensure the box is stable and keep the weights controlled at your sides."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_DUMBBELL_CROSSOVER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.93,
+        "summary": "Hold dumbbells while stepping one leg backward and across the body into a curtsy-style lunge.",
+        "steps": [
+          "Stand tall with a dumbbell in each hand at your sides.",
+          "Step one foot backward and diagonally behind the standing leg.",
+          "Bend both knees and lower under control while keeping your torso upright.",
+          "Push through the front foot to return to standing.",
+          "Repeat on the opposite side."
+        ],
+        "safetyNote": "Keep the front knee tracking with the foot and limit the crossover if it causes knee or hip discomfort."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A curtsy-style reverse lunge holding dumbbells, stepping the rear leg back and across the body's midline.",
+        "steps": [
+          "Hold a dumbbell in each hand at your sides.",
+          "Step one foot backward and diagonally across behind your standing leg.",
+          "Lower until the front thigh is near parallel, keeping the front knee tracking forward.",
+          "Drive through the front heel to return to standing.",
+          "Alternate sides for the prescribed repetitions."
+        ],
+        "safetyNote": "Keep the front knee aligned over the foot and avoid letting it collapse inward."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_DUMBBELL_DIAGONAL_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.89,
+        "summary": "Hold dumbbells while stepping backward on a diagonal into a controlled lunge.",
+        "steps": [
+          "Stand tall with a dumbbell in each hand at your sides.",
+          "Step one foot backward and outward on a diagonal.",
+          "Bend both knees to lower into the angled lunge.",
+          "Push through the front foot to return to the starting position.",
+          "Repeat on the opposite side."
+        ],
+        "safetyNote": "Keep each knee aligned with its foot and shorten the diagonal step if you lose balance."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.68,
+        "summary": "A reverse lunge holding dumbbells where the rear foot steps backward on a diagonal to target the glutes at an angle.",
+        "steps": [
+          "Hold a dumbbell in each hand at your sides.",
+          "Step one foot backward and out to a diagonal behind you.",
+          "Lower until the front thigh is near parallel to the floor.",
+          "Push through the front heel to return to standing.",
+          "Alternate legs for the prescribed repetitions."
+        ],
+        "safetyNote": "Keep the front knee tracking over the foot as you angle backward."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_LUNGE_WITH_REACH_BACK": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.91,
+        "summary": "Combine a backward lunge with an overhead reach toward the rear to open the front of the body.",
+        "steps": [
+          "Stand tall with your arms relaxed.",
+          "Step one foot backward and lower into a reverse lunge.",
+          "Raise your arms and reach upward and slightly back without collapsing your lower back.",
+          "Bring your arms and torso back to neutral.",
+          "Push through the front foot to stand, then repeat on the opposite side."
+        ],
+        "safetyNote": "Keep the backward reach gentle and stop if it causes discomfort in your lower back or shoulders."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A bodyweight backward-stepping lunge combined with an overhead arm reach back to add a shoulder and thoracic stretch.",
+        "steps": [
+          "Stand tall with feet hip-width apart.",
+          "Step one foot backward and lower into a reverse lunge.",
+          "At the bottom, reach both arms overhead and slightly back.",
+          "Return the arms and drive through the front heel to stand.",
+          "Alternate legs for the prescribed repetitions."
+        ],
+        "safetyNote": "Reach back only as far as you can control without overarching your lower back."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_LUNGE_WITH_TWIST_AND_OVERHEAD_REACH": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.91,
+        "summary": "Combine a reverse lunge with a controlled torso twist and overhead reach.",
+        "steps": [
+          "Stand tall and step one foot backward into a reverse lunge.",
+          "Raise your arms overhead while keeping your trunk braced.",
+          "Rotate your torso toward the forward leg within a comfortable range.",
+          "Return your torso and arms to center.",
+          "Push through the front foot to stand, then repeat on the opposite side."
+        ],
+        "safetyNote": "Keep the front knee aligned with the foot and avoid forcing the twist or arching your lower back."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.68,
+        "summary": "A bodyweight reverse lunge that combines a torso twist toward the front leg with an overhead reach to engage the obliques and shoulders.",
+        "steps": [
+          "Step one foot backward and lower into a reverse lunge.",
+          "Rotate your torso toward the front leg.",
+          "Reach both arms overhead as you unwind, extending tall.",
+          "Return to center and drive through the front heel to stand.",
+          "Alternate legs for the prescribed repetitions."
+        ],
+        "safetyNote": "Move through the twist and reach smoothly, keeping the front knee stable over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:13:18.409Z"
+  },
+  "garmin:LUNGE:REVERSE_SLIDING_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.28,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A reverse lunge in which the rear foot slides back off a box on a gliding disc to increase range and control.",
+        "steps": [
+          "Stand tall with one foot on a box and the other foot behind it resting on a sliding disc.",
+          "Brace your core and keep the front foot planted flat on the box.",
+          "Slide the rear foot backward along the floor as you lower into a lunge, bending the front knee.",
+          "Descend until the front thigh is near parallel and the rear knee lowers toward the floor.",
+          "Drive through the front heel and slide the rear foot back up to the start."
+        ],
+        "safetyNote": "Keep the front knee tracking over the toes and control the slide so you don't overshoot the split."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:REVERSE_SLIDING_LUNGE": {
+    "status": "accepted",
+    "summary": "A reverse lunge performed by sliding one foot backward on a sliding disc while the front leg controls the movement.",
+    "steps": [
+      "Stand tall with one foot centered on the sliding disc.",
+      "Brace your torso and slide that foot straight backward.",
+      "Bend the front knee and lower your hips until reaching a comfortable lunge depth.",
+      "Press through the front foot while sliding the rear foot forward to stand.",
+      "Complete the repetitions, then switch sides."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and control the disc throughout.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:POSE:RUNNERS_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.3,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.8,
+        "summary": "A yoga lunge pose with one foot forward and the back leg extended to open the hips and stretch the hamstrings.",
+        "steps": [
+          "From a low lunge, place the front foot flat and extend the back leg straight behind you.",
+          "Keep the hands framing or resting beside the front foot.",
+          "Lengthen the spine and press the chest forward over the front thigh.",
+          "Shift the hips back slightly toward the rear leg to deepen the hamstring stretch.",
+          "Hold, breathing steadily, then switch sides."
+        ],
+        "safetyNote": "Ease into the stretch gradually and avoid forcing the hips past a comfortable range."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:RUNNERS_LUNGE_TO_BALANCE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.91,
+        "summary": "This movement transitions from a deep runner's lunge into a single-leg standing balance.",
+        "steps": [
+          "Begin in a runner's lunge with one foot forward, the opposite leg extended back, and your torso long.",
+          "Shift your weight into the front foot and begin rising.",
+          "Drive the rear knee forward and upward as you straighten the standing leg.",
+          "Pause upright while balancing on the standing leg.",
+          "Step back into the runner's lunge and repeat before switching sides."
+        ],
+        "safetyNote": "Use a controlled transition and keep the standing knee aligned over the foot."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A dynamic lunge that transitions into a single-leg balance by driving the rear knee up.",
+        "steps": [
+          "Start in a lunge with one foot forward, weight in the front leg.",
+          "Brace your core and press through the front foot.",
+          "Drive the rear knee up and forward as you rise onto the standing front leg.",
+          "Balance on the standing leg with the opposite knee lifted to hip height.",
+          "Lower the lifted leg back into the lunge and repeat, then switch sides."
+        ],
+        "safetyNote": "Fix your gaze on a point ahead to steady the balance and avoid wobbling the knee."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:SANDBAG:LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.86,
+        "summary": "A sandbag lunge strengthens the legs while the upper body stabilizes the securely held load.",
+        "steps": [
+          "Stand tall while holding the sandbag securely close to your body.",
+          "Step one foot forward and plant it firmly.",
+          "Bend both knees to lower into a lunge while keeping your torso upright.",
+          "Press through the front foot to return to standing.",
+          "Alternate legs or complete the repetitions before switching sides."
+        ],
+        "safetyNote": "Keep the sandbag secure and avoid letting the front knee collapse inward."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.78,
+        "summary": "A forward lunge performed while holding a sandbag to load the lower body.",
+        "steps": [
+          "Hold a sandbag against the chest or across the shoulders and stand tall.",
+          "Brace your core and step one foot forward.",
+          "Bend both knees to lower until the front thigh is near parallel and the rear knee nears the floor.",
+          "Drive through the front heel to return to standing.",
+          "Repeat, alternating or completing reps per side."
+        ],
+        "safetyNote": "Keep the torso upright and the front knee tracking over the toes."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:SANDBAG:ROTATIONAL_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.78,
+        "summary": "A sandbag rotational lunge combines a lunging step with controlled trunk and sandbag rotation toward the working side.",
+        "steps": [
+          "Stand holding the sandbag securely in front of your torso.",
+          "Step into a lunge and lower under control.",
+          "Rotate your torso and move the sandbag toward the side of the forward leg.",
+          "Return the sandbag and torso to center.",
+          "Press through the forward foot to stand, then repeat on the other side."
+        ],
+        "safetyNote": "Rotate through the upper torso without twisting or collapsing the planted knee."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.68,
+        "summary": "A lunge holding a sandbag while rotating the torso over the front leg to engage the obliques.",
+        "steps": [
+          "Hold a sandbag at chest height and stand tall with feet hip-width.",
+          "Step one foot forward and bend both knees into a lunge.",
+          "At the bottom, rotate your torso toward the front leg, keeping the sandbag in front of you.",
+          "Rotate back to center.",
+          "Push through the front heel to stand, then repeat and switch sides."
+        ],
+        "safetyNote": "Rotate from the trunk in a controlled manner and keep the front knee stable."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:SANDBAG:SIDE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.96,
+        "summary": "A sandbag side lunge loads the hips and legs as you step laterally while holding a sandbag.",
+        "steps": [
+          "Stand tall while holding the sandbag securely close to your body.",
+          "Take a wide step to one side with both feet pointing generally forward.",
+          "Push your hips back and bend the stepping knee while keeping the opposite leg long.",
+          "Press through the stepping foot to return to standing.",
+          "Complete the repetitions, then switch sides."
+        ],
+        "safetyNote": "Keep the bent knee tracking with the toes and maintain control of the sandbag."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.78,
+        "summary": "A lateral lunge performed while holding a sandbag to load the hips and inner thighs.",
+        "steps": [
+          "Hold a sandbag at the chest and stand with feet together.",
+          "Step one foot out wide to the side, keeping both feet pointing forward.",
+          "Bend the stepping-side knee and push the hips back, keeping the other leg straight.",
+          "Lower until the bent thigh is near parallel while the trailing leg stays extended.",
+          "Push off the bent leg to return to standing, then repeat on the other side."
+        ],
+        "safetyNote": "Keep the trailing leg straight and the working knee aligned over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SCISSOR_POWER_SWITCH": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.38,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": false,
+        "confidence": 0.35,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SHIFTING_SIDE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.9,
+        "summary": "A shifting side lunge transfers the hips between bent-knee positions on alternating sides without fully standing between them.",
+        "steps": [
+          "Take a wide stance with your feet pointing generally forward.",
+          "Push your hips back and bend one knee, keeping the opposite leg long.",
+          "Stay low as you shift your hips through the center.",
+          "Bend the opposite knee while straightening the first leg.",
+          "Continue shifting smoothly from side to side."
+        ],
+        "safetyNote": "Keep each bent knee aligned with its toes and move only through a comfortable range."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "A lateral lunge in which weight shifts side to side between legs without fully returning to center.",
+        "steps": [
+          "Stand with feet wide, toes pointing forward.",
+          "Shift your weight to one side, bending that knee and pushing the hips back into a side lunge.",
+          "Keep the opposite leg extended and its foot flat.",
+          "Shift your weight across to the other side, straightening the first leg and bending the other.",
+          "Continue alternating side to side in a smooth shifting motion."
+        ],
+        "safetyNote": "Keep both feet flat and knees tracking over the toes as you shift weight."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_AND_CROSSOVER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.82,
+        "summary": "This combination alternates a lateral lunge with a crossover lunge to challenge the hips and legs in different directions.",
+        "steps": [
+          "Stand tall with your feet under your hips.",
+          "Step one foot sideways and lower into a side lunge.",
+          "Press through that foot to return to standing.",
+          "Move the same leg across the other leg and lower into a controlled crossover lunge.",
+          "Return to standing and repeat before switching sides."
+        ],
+        "safetyNote": "Keep each planted knee tracking with the toes and avoid forcing the crossover depth."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A combination lunge alternating a lateral lunge with a crossover (curtsy) lunge on the same leg.",
+        "steps": [
+          "Stand tall with feet hip-width.",
+          "Step one foot out to the side into a lateral lunge, bending that knee and keeping the other leg straight.",
+          "Push back to center.",
+          "Step the same leg behind and across the body into a crossover lunge, bending both knees.",
+          "Return to center and repeat the sequence, then switch sides."
+        ],
+        "safetyNote": "Control the crossover step to keep the knees stable and avoid twisting them."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_LUNGE": {
+    "status": "accepted",
+    "summary": "A side lunge strengthens the hips and legs by shifting the body over one bent leg while the other remains long.",
+    "steps": [
+      "Stand tall with your feet under your hips.",
+      "Take a wide step to one side with both feet pointing generally forward.",
+      "Push your hips back and bend the stepping knee while keeping the opposite leg long.",
+      "Press through the stepping foot to return to standing.",
+      "Repeat on the same side or alternate sides."
+    ],
+    "safetyNote": "Keep the bent knee aligned with the toes and the stepping foot fully grounded.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_LUNGE_AND_PRESS": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.36,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A lateral lunge combined with an overhead press performed as you rise.",
+        "steps": [
+          "Stand tall holding your load at shoulder height and feet together.",
+          "Step one foot out to the side and bend that knee into a lateral lunge.",
+          "Keep the opposite leg straight and torso upright.",
+          "Drive through the bent leg to return to standing while pressing the load overhead.",
+          "Lower the load back to the shoulders and repeat, then switch sides."
+        ],
+        "safetyNote": "Brace the core during the press and keep the working knee tracking over the toes."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_LUNGE_JUMP_OFF": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.88,
+        "summary": "An explosive side lunge that finishes by driving off the lunging leg into a lateral or upward jump.",
+        "steps": [
+          "Stand tall with your feet under your hips.",
+          "Step to one side and lower into a side lunge.",
+          "Drive forcefully through the bent leg to leave the floor.",
+          "Land softly with the knee slightly bent and regain control.",
+          "Repeat as programmed, then switch sides."
+        ],
+        "safetyNote": "Land quietly with the knee aligned over the foot and stop if control deteriorates."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "An explosive lateral lunge that finishes by jumping off the working leg.",
+        "steps": [
+          "Stand tall with feet hip-width.",
+          "Step one foot out wide and lower into a lateral lunge.",
+          "Load the bent leg by pushing the hips back.",
+          "Explosively drive off the bent leg to jump up and toward center.",
+          "Land softly and repeat, alternating sides."
+        ],
+        "safetyNote": "Land with soft, bent knees to absorb impact and keep the knee aligned over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:WARM_UP:STRETCH_SIDE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.96,
+        "summary": "A side lunge stretch lengthens the inner thigh by shifting the hips over one bent leg while the other leg stays straight.",
+        "steps": [
+          "Stand with your feet wider than shoulder width and toes pointing generally forward.",
+          "Shift your hips toward one side and bend that knee.",
+          "Keep the opposite leg straight and both feet grounded.",
+          "Hold briefly while breathing normally.",
+          "Return through the center and repeat on the other side."
+        ],
+        "safetyNote": "Use a comfortable depth and do not force the straight leg or groin."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.75,
+        "summary": "A static lateral lunge stretch to open the hips and adductors as a warm-up.",
+        "steps": [
+          "Stand with feet wider than shoulder-width, toes forward.",
+          "Shift your weight to one side, bending that knee and pushing the hips back.",
+          "Keep the opposite leg straight to feel a stretch along the inner thigh.",
+          "Hold the position, keeping both feet flat.",
+          "Return to center and repeat on the other side."
+        ],
+        "safetyNote": "Ease into the stretch gently and keep the bent knee behind the toes."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_LUNGE_SWEEP": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.34,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.55,
+        "summary": "A lateral lunge that transitions into sweeping the trailing leg through as you rise.",
+        "steps": [
+          "Stand tall with feet hip-width.",
+          "Step one foot out to the side into a lateral lunge, bending that knee.",
+          "Push off the bent leg to return toward standing.",
+          "As you rise, sweep the working leg up and across in front of the body.",
+          "Lower the leg and repeat, then switch sides."
+        ],
+        "safetyNote": "Control the sweep to maintain balance and avoid straining the standing knee."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_LUNGE_TO_CROSSOVER_TAP": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.88,
+        "summary": "This movement links a side lunge with a controlled crossover toe tap for lateral strength and balance.",
+        "steps": [
+          "Stand tall with your feet under your hips.",
+          "Step one foot sideways and lower into a side lunge.",
+          "Press through the lunging foot to rise.",
+          "Bring that foot across the standing leg and lightly tap the floor.",
+          "Move directly into the next repetition, then switch sides."
+        ],
+        "safetyNote": "Keep the standing knee aligned with the foot and make the crossover tap light and controlled."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A lateral lunge followed by tapping the working foot behind and across the body.",
+        "steps": [
+          "Stand tall with feet hip-width.",
+          "Step one foot out to the side into a lateral lunge.",
+          "Push off to return toward standing.",
+          "Bring the same foot behind and across the body to tap the floor in a crossover position.",
+          "Return to standing and repeat, then switch sides."
+        ],
+        "safetyNote": "Keep the standing knee stable as you reach across for the tap."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIDE_TO_SIDE_LUNGE_CHOPS": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.84,
+        "summary": "Side-to-side lunge chops combine alternating lateral lunges with a diagonal chopping motion of the arms.",
+        "steps": [
+          "Take a wide stance and extend your arms together in front of you.",
+          "Shift into a side lunge while sweeping your arms diagonally toward that side.",
+          "Stay braced as you pass through the center.",
+          "Shift into the opposite side lunge and chop your arms toward the other side.",
+          "Continue alternating with controlled rhythm."
+        ],
+        "safetyNote": "Turn through the torso without twisting the knees, and keep each bent knee aligned with its toes."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A side-to-side lateral lunge combined with a chopping arm motion to engage the core.",
+        "steps": [
+          "Stand with feet wide, hands clasped or holding a load in front.",
+          "Shift into a lateral lunge on one side, bending that knee.",
+          "Chop the arms down toward the bent leg as you lunge.",
+          "Push back and shift into a lateral lunge on the other side, chopping toward that leg.",
+          "Continue alternating side to side."
+        ],
+        "safetyNote": "Rotate through the trunk under control and keep the lunging knee over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SIFF_JUMP_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.85,
+        "summary": "A Siff jump lunge is an alternating jump lunge performed while staying high on the balls of the feet to emphasize the calves.",
+        "steps": [
+          "Take a split stance and rise onto the balls of both feet.",
+          "Lower into a shallow lunge without allowing the heels to settle.",
+          "Jump upward and switch the legs in the air.",
+          "Land softly on the balls of the feet in the opposite split stance.",
+          "Immediately lower under control and continue alternating."
+        ],
+        "safetyNote": "Maintain ankle control and use a smaller range if you cannot land softly without the heels collapsing."
+      },
+      "claude": {
+        "supported": false,
+        "confidence": 0.35,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SINGLE_ARM_REVERSE_LUNGE_AND_PRESS": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.94,
+        "summary": "This exercise combines a dumbbell reverse lunge with a one-arm overhead press.",
+        "steps": [
+          "Stand tall holding one dumbbell at shoulder height in one hand.",
+          "Step the opposite foot backward and lower into a reverse lunge.",
+          "Press through the front foot to rise as you press the dumbbell overhead.",
+          "Lower the dumbbell to shoulder height with control.",
+          "Repeat the repetitions, then switch the working arm and leg arrangement."
+        ],
+        "safetyNote": "Keep your torso braced, the front knee aligned with the toes, and the dumbbell under control overhead."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.68,
+        "summary": "A reverse lunge holding a dumbbell in one hand, pressing it overhead as you stand.",
+        "steps": [
+          "Hold a dumbbell in one hand at shoulder height and stand tall.",
+          "Step the opposite foot back into a reverse lunge, lowering the rear knee toward the floor.",
+          "Drive through the front heel to stand while pressing the dumbbell overhead.",
+          "Lower the dumbbell back to the shoulder as you set up the next rep.",
+          "Complete reps, then switch the dumbbell and legs."
+        ],
+        "safetyNote": "Brace the core to keep the torso upright during the single-arm press."
+      }
+    },
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:LUNGE:SLIDING_LATERAL_LUNGE": {
+    "status": "accepted",
+    "summary": "A sliding lateral lunge keeps one foot on a sliding disc as it glides sideways while the supporting leg bends.",
+    "steps": [
+      "Stand tall with one foot centered on the sliding disc.",
+      "Shift your weight onto the stationary leg and slide the other foot sideways.",
+      "Push your hips back and bend the stationary knee while keeping the sliding leg long.",
+      "Press through the stationary foot and draw the disc back inward to stand.",
+      "Complete the repetitions, then switch sides."
+    ],
+    "safetyNote": "Control the disc, keep the supporting knee aligned with the toes, and avoid sliding beyond a stable range.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:14:26.552Z"
+  },
+  "garmin:SUSPENSION:LUNGE": {
+    "status": "accepted",
+    "summary": "Perform a supported forward lunge while holding the suspension handles.",
+    "steps": [
+      "Stand facing the anchor and hold one handle in each hand with light strap tension.",
+      "Step one foot forward while keeping your torso upright.",
+      "Bend both knees to lower into a lunge.",
+      "Push through the front foot to return to standing.",
+      "Repeat on the other side."
+    ],
+    "safetyNote": "Keep the front knee aligned with the toes and maintain controlled strap tension.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:15.054Z"
+  },
+  "garmin:SUSPENSION:SIDE_LUNGE": {
+    "status": "accepted",
+    "summary": "Use suspension handles for support while lunging laterally into one hip.",
+    "steps": [
+      "Face the anchor, hold both handles, and stand with your feet together.",
+      "Step one foot widely to the side.",
+      "Bend the stepping knee and push that hip back while keeping the other leg straight.",
+      "Push through the bent leg to return to standing.",
+      "Repeat on the other side."
+    ],
+    "safetyNote": "Keep the bent knee tracking over the foot and both feet planted.",
+    "confidence": 0.82,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:PLYO:WEIGHTED_ALTERNATING_JUMP_LUNGE": {
+    "status": "accepted",
+    "summary": "Alternate lunge positions with an explosive jump while holding dumbbells.",
+    "steps": [
+      "Stand in a split stance with a dumbbell in each hand.",
+      "Lower into a lunge with both knees bent.",
+      "Jump vertically and switch your legs in the air.",
+      "Land softly in the opposite split stance.",
+      "Immediately lower under control and continue alternating."
+    ],
+    "safetyNote": "Use manageable weights and stop if you cannot land softly with stable knees.",
+    "confidence": 0.83,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_CURTSY_LUNGE": {
+    "status": "accepted",
+    "summary": "Hold dumbbells while stepping one leg diagonally behind the other into a curtsy lunge.",
+    "steps": [
+      "Stand tall holding the dumbbells at your sides.",
+      "Step one foot diagonally behind and across the standing leg.",
+      "Bend both knees and lower your hips while keeping your torso upright.",
+      "Press through the front foot to return to standing.",
+      "Repeat on the opposite side."
+    ],
+    "safetyNote": "Keep the front knee aligned with its toes and avoid forcing an excessive crossover.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.28,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.85,
+        "summary": "A standard forward lunge performed while wearing a weighted vest for added load.",
+        "steps": [
+          "Wear a weighted vest and stand tall with feet hip-width apart.",
+          "Step forward with one leg, keeping the torso upright.",
+          "Lower until the front thigh is near parallel and the back knee drops toward the floor.",
+          "Push through the front heel to return to standing.",
+          "Repeat, alternating or completing reps per leg."
+        ],
+        "safetyNote": "Keep the front knee tracking over the toes and maintain a neutral spine."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_LUNGE_MATRIX": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.25,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A sequence of lunges performed in multiple directions (forward, lateral, and reverse) while holding dumbbells.",
+        "steps": [
+          "Hold a dumbbell in each hand, standing tall with feet hip-width apart.",
+          "Lunge forward with one leg, then return to center.",
+          "Lunge laterally to the same side, then return to center.",
+          "Lunge diagonally back or in reverse, then return to center.",
+          "Complete the sequence, then repeat on the other leg."
+        ],
+        "safetyNote": "Keep each working knee aligned over the foot and control the return between directions."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_REVERSE_LUNGE_WITH_REACH_BACK": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.78,
+        "summary": "Step backward into a dumbbell-loaded reverse lunge while reaching the weight backward.",
+        "steps": [
+          "Stand tall holding a dumbbell securely with both hands.",
+          "Step one foot backward and begin bending both knees.",
+          "Lower into the reverse lunge while extending the dumbbell backward within a comfortable shoulder range.",
+          "Bring the dumbbell back toward your body as you press through the front foot.",
+          "Return to standing and alternate legs."
+        ],
+        "safetyNote": "Keep your trunk controlled and do not reach farther than your shoulders comfortably allow."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A reverse lunge combined with an overhead reach back while holding dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand at your sides.",
+          "Step one leg back into a reverse lunge, lowering the back knee toward the floor.",
+          "As you descend, reach the dumbbells back and overhead to extend the reach.",
+          "Bring the arms down and drive through the front heel to return to standing.",
+          "Repeat, then switch legs."
+        ],
+        "safetyNote": "Keep the core braced and avoid overarching the lower back during the reach."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_REVERSE_LUNGE_WITH_TWIST_AND_OVERHEAD_REACH": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.8,
+        "summary": "Combine a dumbbell-loaded reverse lunge with a controlled torso twist and overhead reach.",
+        "steps": [
+          "Stand tall and hold a dumbbell securely with both hands.",
+          "Step one foot backward and lower into a reverse lunge.",
+          "Rotate your torso toward the front leg while reaching the dumbbell overhead.",
+          "Return the dumbbell to center and unwind your torso.",
+          "Push through the front foot to stand, then repeat on the other side."
+        ],
+        "safetyNote": "Use a light load and keep the movement pain-free through the back and shoulders."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A reverse lunge combined with a torso twist and overhead reach using dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand.",
+          "Step one leg back into a reverse lunge.",
+          "At the bottom, rotate the torso toward the front leg.",
+          "Reach the dumbbells overhead as you untwist and rise.",
+          "Return to standing and repeat, then switch legs."
+        ],
+        "safetyNote": "Rotate from the trunk under control and keep the front knee stable over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_REVERSE_SLIDING_BOX_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.18,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.6,
+        "summary": "A reverse lunge with the back foot on a sliding disc that steps down off a box, while holding dumbbells.",
+        "steps": [
+          "Stand on a box holding a dumbbell in each hand, with one foot on a sliding disc.",
+          "Slide the disc foot back and off the box to descend into a reverse lunge.",
+          "Lower until the front thigh is near parallel, keeping the torso upright.",
+          "Drive through the front leg and slide the foot back onto the box to stand.",
+          "Repeat, then switch legs."
+        ],
+        "safetyNote": "Control the slide and step carefully on and off the box to avoid slipping."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_REVERSE_SLIDING_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.96,
+        "summary": "Hold dumbbells while sliding one foot backward into a reverse lunge.",
+        "steps": [
+          "Stand with dumbbells at your sides and place one foot on a sliding disc.",
+          "Slide that foot backward as you bend the supporting knee.",
+          "Lower until you reach a controlled reverse-lunge position.",
+          "Press through the stationary foot and slide the rear foot forward.",
+          "Complete the repetitions, then switch sides."
+        ],
+        "safetyNote": "Keep most of your weight over the stationary foot and prevent the disc from moving too quickly."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A reverse lunge with the back foot gliding on a sliding disc while holding dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand with one foot on a sliding disc.",
+          "Slide the disc foot straight back while bending the front knee.",
+          "Lower into a lunge until the front thigh is near parallel.",
+          "Pull the disc foot back in, driving through the front leg to stand.",
+          "Repeat, then switch legs."
+        ],
+        "safetyNote": "Keep the front knee over the foot and control the slide throughout the range."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_RUNNERS_LUNGE_TO_BALANCE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.94,
+        "summary": "Move from a dumbbell-loaded runner's lunge into a single-leg balance.",
+        "steps": [
+          "Stand holding the dumbbells at your sides.",
+          "Step one foot backward and lower into a runner's lunge.",
+          "Drive through the front foot as you bring the rear leg forward.",
+          "Finish standing on the front leg with the opposite knee lifted.",
+          "Pause with control, then step back into the next repetition."
+        ],
+        "safetyNote": "Keep the standing knee softly bent and use a lighter load if balance is unstable."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A lunge that transitions into a single-leg balance with a driving knee, holding dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand.",
+          "Step one leg back into a lunge, lowering into a runner's position.",
+          "Drive powerfully through the front leg to stand.",
+          "Bring the rear knee up and forward into a balanced single-leg stance.",
+          "Hold briefly, lower the leg back, and repeat, then switch sides."
+        ],
+        "safetyNote": "Establish balance before adding speed and keep the standing knee slightly bent."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SHIFTING_SIDE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.91,
+        "summary": "Hold dumbbells while shifting between right and left side-lunge positions from a wide stance.",
+        "steps": [
+          "Take a wide stance and hold the dumbbells securely.",
+          "Bend one knee and shift your hips toward that side while keeping the opposite leg straight.",
+          "Press through the bent leg and move through the center.",
+          "Shift your hips to the other side and bend the opposite knee.",
+          "Continue alternating with both feet planted."
+        ],
+        "safetyNote": "Keep each bent knee tracking over its foot and shift only through a comfortable range."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.7,
+        "summary": "A lateral lunge where weight shifts from side to side over a wide stance while holding dumbbells.",
+        "steps": [
+          "Stand in a wide stance holding a dumbbell in each hand.",
+          "Shift your weight over one leg, bending that knee into a side lunge.",
+          "Keep the opposite leg straight and torso upright.",
+          "Shift your weight across to the other leg into a side lunge on that side.",
+          "Continue shifting side to side for the prescribed reps."
+        ],
+        "safetyNote": "Keep the bent knee tracking over the foot and avoid letting it cave inward."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_AND_CROSSOVER_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.86,
+        "summary": "Alternate a dumbbell-loaded side lunge with a crossover lunge.",
+        "steps": [
+          "Stand tall with the dumbbells held securely.",
+          "Step one foot to the side and lower into a side lunge.",
+          "Push through that foot to return to standing.",
+          "Move the same foot diagonally across the other leg and lower into a crossover lunge.",
+          "Return to standing, complete the repetitions, and switch sides."
+        ],
+        "safetyNote": "Keep the supporting knee aligned with its toes during both lunge directions."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.68,
+        "summary": "A combination of a lateral lunge followed by a crossover (curtsy) lunge on the same leg, with dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand.",
+          "Step one leg out to the side into a lateral lunge, then return to center.",
+          "Step the same leg diagonally behind into a crossover lunge.",
+          "Return to center to complete one rep.",
+          "Repeat the sequence, then switch legs."
+        ],
+        "safetyNote": "Control the transition between directions and keep knees aligned over the feet."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_LUNGE": {
+    "status": "accepted",
+    "summary": "Hold dumbbells while stepping laterally into a side lunge.",
+    "steps": [
+      "Stand tall holding the dumbbells at your sides.",
+      "Step one foot widely to the side.",
+      "Bend the stepping knee and push your hips back while keeping the other leg straight.",
+      "Press through the bent leg to return to standing.",
+      "Repeat on the opposite side."
+    ],
+    "safetyNote": "Keep the bent knee aligned with the toes and both feet flat.",
+    "confidence": 0.85,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_LUNGE_AND_PRESS": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.92,
+        "summary": "Combine a dumbbell-loaded side lunge with an overhead press.",
+        "steps": [
+          "Stand holding the dumbbells at shoulder height.",
+          "Step one foot laterally and lower into a side lunge.",
+          "Push through the bent leg to return toward standing.",
+          "Press the dumbbells overhead as you stand tall.",
+          "Lower the dumbbells to shoulder height and repeat on the other side."
+        ],
+        "safetyNote": "Avoid arching your lower back during the press and keep the lunging knee aligned."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A lateral lunge combined with an overhead dumbbell press.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand at shoulder height.",
+          "Step to one side into a lateral lunge, bending that knee.",
+          "As you push back to center, press the dumbbells overhead.",
+          "Lower the dumbbells back to the shoulders.",
+          "Repeat, then perform on the other side."
+        ],
+        "safetyNote": "Press with a braced core and avoid overarching the back at lockout."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_LUNGE_JUMP_OFF": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.32,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "A lateral lunge with an explosive jump off the working leg, holding dumbbells.",
+        "steps": [
+          "Stand holding a dumbbell in each hand, feet together.",
+          "Step to one side into a lateral lunge, loading the bent leg.",
+          "Push explosively off that leg to jump upward or laterally.",
+          "Land softly and absorb into the next lunge.",
+          "Repeat, then perform on the other side."
+        ],
+        "safetyNote": "Land softly with a bent knee and keep it aligned over the foot on impact."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_LUNGE_SWEEP": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": false,
+        "confidence": 0.22,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.62,
+        "summary": "A lateral lunge that transitions into a sweeping leg motion across the body, with dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand.",
+          "Step to one side into a lateral lunge.",
+          "Push back through the bent leg to return to center.",
+          "Sweep the working leg across or in front of the body.",
+          "Return the foot down and repeat, then switch sides."
+        ],
+        "safetyNote": "Maintain balance during the sweep and keep the standing knee slightly bent."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_LUNGE_TO_CROSSOVER_TAP": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.89,
+        "summary": "Move from a dumbbell-loaded side lunge into a controlled crossover toe tap.",
+        "steps": [
+          "Stand holding the dumbbells securely.",
+          "Step one foot to the side and lower into a side lunge.",
+          "Push through the bent leg and rise onto the opposite supporting leg.",
+          "Move the lunging foot across the supporting leg and lightly tap the floor.",
+          "Return to the starting position, then switch sides."
+        ],
+        "safetyNote": "Keep the supporting knee stable and make the crossover tap light and controlled."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "A lateral lunge that transitions into a crossover foot tap behind the standing leg, with dumbbells.",
+        "steps": [
+          "Stand tall holding a dumbbell in each hand.",
+          "Step to one side into a lateral lunge.",
+          "Push back to center through the bent leg.",
+          "Bring the working leg across and tap the foot behind the standing leg.",
+          "Return and repeat, then switch sides."
+        ],
+        "safetyNote": "Keep the standing knee stable and control the crossover to maintain balance."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIDE_TO_SIDE_LUNGE_CHOPS": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.85,
+        "summary": "Shift between weighted side lunges while moving a dumbbell diagonally across the body in a chopping pattern.",
+        "steps": [
+          "Take a wide stance and hold one dumbbell with both hands.",
+          "Shift into a side lunge while moving the dumbbell diagonally toward that side.",
+          "Press through the bent leg and guide the dumbbell back across the body.",
+          "Shift into a side lunge on the opposite side and complete the next chop.",
+          "Continue alternating with controlled torso rotation."
+        ],
+        "safetyNote": "Rotate through a comfortable range and keep both knees aligned with their toes."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.65,
+        "summary": "Alternating lateral lunges combined with a diagonal chopping motion of the dumbbells.",
+        "steps": [
+          "Stand in a wide stance holding a dumbbell (or both) with both hands.",
+          "Lunge laterally to one side while chopping the weight down toward that leg.",
+          "Push back and shift into a lateral lunge on the other side.",
+          "Chop the weight down toward the opposite leg.",
+          "Continue alternating side to side for the prescribed reps."
+        ],
+        "safetyNote": "Rotate through the trunk under control and keep each bent knee over the foot."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SIFF_JUMP_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.76,
+        "summary": "Perform dumbbell jump lunges while staying elevated on the balls of the feet to emphasize the calves.",
+        "steps": [
+          "Hold the dumbbells at your sides and take a split stance.",
+          "Rise onto the balls of both feet and lower into a shallow lunge.",
+          "Jump vertically and switch your legs in the air.",
+          "Land softly on the balls of your feet in the opposite split stance.",
+          "Maintain heel elevation as you continue alternating."
+        ],
+        "safetyNote": "Use light weights and avoid this movement if you cannot maintain stable, soft landings."
+      },
+      "claude": {
+        "supported": false,
+        "confidence": 0.4,
+        "summary": "",
+        "steps": [],
+        "safetyNote": ""
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:15.055Z"
+  },
+  "garmin:LUNGE:WEIGHTED_SLIDING_LATERAL_LUNGE": {
+    "status": "accepted",
+    "summary": "A dumbbell-loaded lateral lunge in which one foot slides outward while the standing leg bends.",
+    "steps": [
+      "Stand tall holding a dumbbell securely, with your feet together and core braced.",
+      "Shift your weight onto one leg and slowly slide the opposite foot out to the side.",
+      "Bend the supporting knee and push your hips back while keeping the sliding leg straight.",
+      "Pause when you reach a controlled depth with your chest lifted.",
+      "Drive through the supporting foot and slide the other foot inward to return to standing.",
+      "Complete the repetitions, then switch sides."
+    ],
+    "safetyNote": "Keep the supporting knee aligned with the toes and use a controlled sliding range.",
+    "confidence": 0.82,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:35.734Z"
+  },
+  "garmin:LUNGE:WEIGHTED_WALKING_LUNGE": {
+    "status": "accepted",
+    "summary": "A traveling lunge performed while holding dumbbells for added resistance.",
+    "steps": [
+      "Stand tall holding a dumbbell in each hand with your core braced.",
+      "Step forward and plant the entire lead foot.",
+      "Lower your hips until both knees are bent comfortably, keeping your torso upright.",
+      "Push through the lead foot and bring the rear leg forward.",
+      "Continue by lunging forward with the opposite leg."
+    ],
+    "safetyNote": "Keep each front knee aligned with its toes and maintain control between steps.",
+    "confidence": 0.9,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:35.734Z"
+  },
+  "garmin:POSE:WIDE_SIDE_LUNGE": {
+    "status": "needs-manual",
+    "reviews": {
+      "codex": {
+        "supported": true,
+        "confidence": 0.96,
+        "summary": "A wide side-lunge yoga pose with one knee deeply bent, the opposite leg extended, and the arms reaching away from the floor.",
+        "steps": [
+          "Begin standing with your feet set wide apart.",
+          "Turn toward one side, bend that knee deeply, and lower your hips while keeping the opposite leg straight.",
+          "Keep the bent knee aligned with its toes and ground the bent-leg foot.",
+          "Lengthen your spine and lift your torso away from the floor.",
+          "Extend your arms outward as far as is comfortable and hold the pose.",
+          "Rise with control and repeat on the opposite side."
+        ],
+        "safetyNote": "Do not force the depth, and reduce the bend if you feel knee or groin pain."
+      },
+      "claude": {
+        "supported": true,
+        "confidence": 0.72,
+        "summary": "A wide-stance side lunge yoga pose (Skandasana) that stretches one leg straight while deeply bending the other, with no equipment.",
+        "steps": [
+          "Stand with feet in a wide stance, toes pointing forward or slightly out.",
+          "Shift your weight to one side, bending that knee deeply while the opposite leg extends straight.",
+          "Keep the extended foot flat and the bent-knee heel grounded, sitting the hips back and down.",
+          "Lengthen through the spine and reach the arms forward or overhead for balance.",
+          "Press through the bent leg to shift back to center, then repeat to the other side."
+        ],
+        "safetyNote": "Ease into the depth gradually to avoid overstretching the groin and inner thigh."
+      }
+    },
+    "updatedAt": "2026-07-27T02:18:35.734Z"
+  },
+  "garmin:LUNGE:WIDE_GRIP_OVERHEAD_BARBELL_SPLIT_SQUAT": {
+    "status": "accepted",
+    "summary": "A stationary split squat performed while holding a barbell overhead with a wide grip.",
+    "steps": [
+      "Take a wide grip on the barbell and press it overhead with your arms extended.",
+      "Step into a stable split stance and brace your core with your torso upright.",
+      "Bend both knees to lower straight down while keeping the barbell balanced overhead.",
+      "Stop at a controlled depth with the front knee aligned over the foot.",
+      "Drive through the front foot to return to the starting height.",
+      "Complete the repetitions, then switch which leg is forward."
+    ],
+    "safetyNote": "Use a manageable load and stop if you cannot keep the barbell stable overhead.",
+    "confidence": 0.8,
+    "modelVersion": "codex-claude-v1",
+    "generatedBy": "codex-cli",
+    "reviewedBy": "claude-cli",
+    "updatedAt": "2026-07-27T02:18:35.734Z"
+  }
+}

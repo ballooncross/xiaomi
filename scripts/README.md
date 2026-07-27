@@ -17,6 +17,9 @@ Fetch source data, match records, and create the enrichment seed:
 
 ```bash
 npm run exercises:enrich:garmin
+npm run exercises:describe:garmin -- --dry-run
+npm run exercises:describe:garmin
+npm run exercises:enrich:garmin
 npm run exercises:seed:enrichment:local
 ```
 
@@ -38,6 +41,7 @@ The importer creates these ignored files:
 - `scripts/.exercise-enrichment-cache/`
 
 Accepted and rejected match decisions are stored in the tracked file `data/exercise-enrichment/match-overrides.json`.
+Exact specialist guides that are not available from bulk sources are stored in `data/exercise-enrichment/curated-guides.json`. Each record must include its published source URL.
 
 ## Codex and Claude review
 
@@ -66,9 +70,23 @@ EXERCISE_CLAUDE_COMMAND="claude -p" \
 npm run exercises:review:garmin
 ```
 
-Both services must return the same candidate with at least 0.90 confidence. Disagreements are saved as `needs-manual` so later runs skip the completed batch.
+Both services must return the same candidate with at least 0.75 confidence. Confirmed unmatched decisions require at least 0.90 confidence. Disagreements are saved as `needs-manual` and can be reviewed again after source or matching changes.
 
 After new decisions are saved, run the enrichment importer again so the generated SQL includes them.
+
+## AI fallback descriptions
+
+Generate labeled descriptions for familiar exercises that still have no published match:
+
+```bash
+npm run exercises:describe:garmin -- --dry-run
+npm run exercises:describe:garmin -- --filter lunge --max-batches 2
+npm run exercises:describe:garmin
+```
+
+Codex writes the fallback text. Claude independently confirms that the Garmin name and metadata identify an unambiguous movement, but does not edit the Codex wording. Both CLIs run with the same sandbox restrictions as match review. Accepted results are committed in `data/exercise-enrichment/generated-descriptions.json`.
+
+Run `npm run exercises:enrich:garmin` again after description generation. The generated seed then includes the fallback text and an `ai-generated` source marker for the UI.
 
 ## Production commands
 

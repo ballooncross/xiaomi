@@ -64,6 +64,28 @@ export function nameTokens(value) {
   return new Set(normalizeName(value).split(' ').filter(Boolean));
 }
 
+/** @param {string} value */
+export function exerciseAliases(value) {
+  const normalized = normalizeName(value);
+  if (!normalized) return [];
+
+  const aliases = new Set();
+  /** @type {Array<[RegExp, string]>} */
+  const substitutions = [
+    [/\bside\b/g, 'lateral'],
+    [/\blateral\b/g, 'side'],
+    [/\brear\b/g, 'reverse'],
+    [/\breverse\b/g, 'rear'],
+    [/\bdrop\b/g, 'curtsy'],
+    [/\bcurtsy\b/g, 'drop']
+  ];
+  for (const [pattern, replacement] of substitutions) {
+    const alias = normalized.replace(pattern, replacement);
+    if (alias !== normalized) aliases.add(alias);
+  }
+  return [...aliases];
+}
+
 /**
  * @param {ExerciseRecord} target
  * @param {ExerciseRecord} candidate

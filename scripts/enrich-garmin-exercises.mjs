@@ -7,9 +7,11 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from 'cheerio';
 import { collectGarminExercises } from './import-garmin-exercises.mjs';
 import {
   chooseAutomaticMatch,
+  exerciseAliases,
   hasCompatibleEquipment,
   hasExactNameMatch,
   nameTokens,
@@ -21,6 +23,20 @@ const CACHE_DIR = join(SCRIPT_DIR, '.exercise-enrichment-cache');
 const OUTPUT_SQL = join(SCRIPT_DIR, 'seed-garmin-enrichment.sql');
 const REPORT_FILE = join(SCRIPT_DIR, 'exercise-enrichment-report.json');
 const REVIEW_QUEUE_FILE = join(SCRIPT_DIR, 'exercise-review-queue.json');
+const GENERATED_DESCRIPTIONS_FILE = join(
+  SCRIPT_DIR,
+  '..',
+  'data',
+  'exercise-enrichment',
+  'generated-descriptions.json'
+);
+const CURATED_GUIDES_FILE = join(
+  SCRIPT_DIR,
+  '..',
+  'data',
+  'exercise-enrichment',
+  'curated-guides.json'
+);
 const OVERRIDES_FILE = join(
   SCRIPT_DIR,
   '..',
@@ -42,6 +58,35 @@ const FREE_EXERCISE_VIDEO_DB_URL =
 const OPEN_EXERCISE_DB_URL =
   'https://raw.githubusercontent.com/Glowupp-app/open-exercisedb/main/exercises.json';
 const WGER_URL = 'https://wger.de/api/v2/exerciseinfo/?limit=1000';
+const MUSCLE_AND_STRENGTH_BASE = 'https://www.muscleandstrength.com';
+const MUSCLE_AND_STRENGTH_INDEXES = [
+  'abs',
+  'abductors.html',
+  'adductors.html',
+  'biceps',
+  'calves',
+  'chest',
+  'forearms',
+  'glutes',
+  'hamstrings',
+  'hip-flexors',
+  'it-band',
+  'lats',
+  'lower-back',
+  'middle-back',
+  'neck.html',
+  'obliques',
+  'quads',
+  'shoulders',
+  'traps',
+  'triceps',
+  'bodyweight',
+  'barbell',
+  'dumbbell',
+  'cable',
+  'machine',
+  'exercise-ball'
+];
 const GARMIN_DETAIL_BASE = 'https://connect.garmin.com/web-data/exercises/en-US';
 const GARMIN_DETAIL_CATALOGS = new Set([
   'strength',
@@ -52,6 +97,11 @@ const GARMIN_DETAIL_CATALOGS = new Set([
   'mobility'
 ]);
 const GENERIC_EXERCISE_NAMES = new Set(['cardio', 'warm up', 'strength']);
+const MEDIA_MATCH_SOURCES = new Set([
+  'free-exercise-video-db',
+  'curated-web-guide',
+  'muscle-and-strength'
+]);
 const MEDIA_MATCH_DENYLIST = new Set([
   'garmin:CURL:ONE_ARM_PREACHER_CURL|free-exercise-video-db:1673'
 ]);
@@ -66,9 +116,19 @@ async function main() {
   const garminRecords = args.limit ? allGarmin.slice(0, args.limit) : allGarmin;
   console.log(`Enriching ${garminRecords.length} Garmin exercises...`);
 
-  const [existing, freeExerciseVideoDb, freeExerciseDb, wger, openExerciseDb] = await Promise.all([
+  const [
+    existing,
+    freeExerciseVideoDb,
+    curatedGuides,
+    muscleAndStrength,
+    freeExerciseDb,
+    wger,
+    openExerciseDb
+  ] = await Promise.all([
     loadExistingDataset(),
     loadFreeExerciseVideoDb(),
+    loadCuratedGuides(),
+    loadMuscleAndStrength(),
     loadFreeExerciseDb(),
     loadWger(),
     loadOpenExerciseDb()
@@ -76,6 +136,8 @@ async function main() {
   const sources = [
     buildSource('exercise-dataset', existing),
     buildSource('free-exercise-video-db', freeExerciseVideoDb),
+    buildSource('curated-web-guide', curatedGuides),
+    buildSource('muscle-and-strength', muscleAndStrength),
     buildSource('wger', wger),
     buildSource('free-exercise-db', freeExerciseDb),
     buildSource('open-exercise-db', openExerciseDb)
@@ -84,6 +146,7 @@ async function main() {
     sources.flatMap((source) => source.candidates.map((candidate) => [candidate.id, candidate]))
   );
   const overrides = readJsonFile(OVERRIDES_FILE, {});
+  const generatedDescriptions = readJsonFile(GENERATED_DESCRIPTIONS_FILE, {});
   const details = args.skipGarminDetails
     ? new Map()
     : await loadGarminDetails(garminRecords);
@@ -108,21 +171,11 @@ async function main() {
       }
     }
 
-    if (!selected && override?.status !== 'rejected') {
+    if (!selected) {
       for (const group of rankedBySource) {
-        const automatic = chooseAutomaticMatch(group.ranked);
-        if (
-          group.source === 'free-exercise-video-db' &&
-          automatic &&
-          (
-            !hasExactNameMatch(target, automatic.candidate) ||
-            !hasCompatibleEquipment(target, automatic.candidate) ||
-            GENERIC_EXERCISE_NAMES.has(target.name.toLowerCase()) ||
-            MEDIA_MATCH_DENYLIST.has(`${target.id}|${automatic.candidate.id}`)
-          )
-        ) {
-          continue;
-        }
+        const automatic = MEDIA_MATCH_SOURCES.has(group.source)
+          ? chooseExactMediaMatch(target, group.ranked)
+          : chooseAutomaticMatch(group.ranked);
         if (automatic) {
           selected = automatic;
           method = automatic.method;
@@ -132,6 +185,7 @@ async function main() {
     }
 
     const result = mergeEnrichment(target, selected, method);
+    applyGeneratedDescription(result, generatedDescriptions[garmin.id]);
     enriched.push(result);
 
     if (!selected && override?.status !== 'rejected') {
@@ -268,6 +322,122 @@ async function loadFreeExerciseVideoDb() {
   }));
 }
 
+async function loadCuratedGuides() {
+  const guides = readJsonFile(CURATED_GUIDES_FILE, []);
+  return guides.map((guide) => ({
+    id: `curated-web-guide:${guide.id}`,
+    source: 'curated-web-guide',
+    sourceId: guide.id,
+    sourceUrl: guide.sourceUrl,
+    linkedExerciseId: null,
+    name: guide.name,
+    aliases: [...(guide.aliases ?? []), ...exerciseAliases(guide.name)],
+    primaryMuscles: guide.primaryMuscles ?? [],
+    secondaryMuscles: guide.secondaryMuscles ?? [],
+    equipment: guide.equipment ?? [],
+    bodyPart: guide.bodyPart ?? '',
+    description: guide.description ?? '',
+    instructionsEn: guide.instructionsEn ?? guide.description ?? '',
+    instructionsZh: '',
+    gifUrl: null,
+    imageUrl: guide.imageUrl ?? null,
+    videoUrl: guide.videoUrl ?? null,
+    difficulty: null
+  }));
+}
+
+async function loadMuscleAndStrength() {
+  const limiter = createRateLimiter(3);
+  const indexPages = await Promise.all(
+    MUSCLE_AND_STRENGTH_INDEXES.map((slug) =>
+      fetchTextCached(`${MUSCLE_AND_STRENGTH_BASE}/exercises/${slug}`, {
+        limiter,
+        ttlMs: 30 * DAY_MS
+      })
+    )
+  );
+  const guideUrls = new Set();
+  for (const html of indexPages.filter(Boolean)) {
+    const $ = load(html);
+    $('a[href^="/exercises/"]').each((_, element) => {
+      const path = $(element).attr('href');
+      if (path && !MUSCLE_AND_STRENGTH_INDEXES.some((slug) => path === `/exercises/${slug}`)) {
+        guideUrls.add(new URL(path, MUSCLE_AND_STRENGTH_BASE).toString());
+      }
+    });
+  }
+
+  const guides = [];
+  let completed = 0;
+  await mapLimit([...guideUrls], 5, async (url) => {
+    try {
+      const html = await fetchTextCached(url, { limiter, ttlMs: 30 * DAY_MS });
+      const guide = html ? parseMuscleAndStrengthGuide(html, url) : null;
+      if (guide) guides.push(guide);
+    } catch (error) {
+      console.warn(`Muscle & Strength guide skipped for ${url}: ${String(error)}`);
+    }
+    completed += 1;
+    if (completed % 100 === 0 || completed === guideUrls.size) {
+      console.log(`Muscle & Strength guides: ${completed}/${guideUrls.size}`);
+    }
+  });
+  return guides;
+}
+
+function parseMuscleAndStrengthGuide(html, url) {
+  const $ = load(html);
+  const heading = cleanText($('h1').first().text());
+  const name = heading.replace(/\s*:?\s*Video Exercise Guide.*$/i, '').trim();
+  const instructions = $('.field-name-body li')
+    .map((_, element) => cleanText($(element).text()))
+    .get()
+    .filter(Boolean);
+  if (!name || !instructions.length) return null;
+
+  const overview = cleanText(
+    $('.field-name-field-exercise-overview .field-item').first().text()
+  );
+  const akaAliases = [...name.matchAll(/\(\s*(?:AKA|also known as)\s+([^)]+)\)/gi)]
+    .map((match) => cleanText(match[1]))
+    .filter(Boolean);
+  const baseName = name.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  const equipment = equipmentFromName(baseName);
+  const unprefixedName = baseName.replace(
+    /^(?:bodyweight|barbell|dumbbell|kettlebell|cable|machine|banded|resistance band)\s+/i,
+    ''
+  );
+  const videoUrl = $('iframe[src*="youtube.com/embed/"]').first().attr('src') ?? null;
+  const imageUrl = $('meta[property="og:image"]').attr('content') ?? null;
+
+  return {
+    id: `muscle-and-strength:${new URL(url).pathname}`,
+    source: 'muscle-and-strength',
+    sourceId: url,
+    sourceUrl: url,
+    linkedExerciseId: null,
+    name: baseName || name,
+    aliases: [
+      name,
+      ...akaAliases,
+      ...(unprefixedName !== baseName ? [unprefixedName] : []),
+      ...exerciseAliases(baseName || name),
+      new URL(url).pathname.split('/').at(-1)?.replace(/\.html$/i, '').replaceAll('-', ' ')
+    ].filter(Boolean),
+    primaryMuscles: [],
+    secondaryMuscles: [],
+    equipment,
+    bodyPart: '',
+    description: overview || instructions.join('\n'),
+    instructionsEn: instructions.join('\n'),
+    instructionsZh: '',
+    gifUrl: null,
+    imageUrl: absoluteUrl(MUSCLE_AND_STRENGTH_BASE, imageUrl),
+    videoUrl: absoluteUrl(MUSCLE_AND_STRENGTH_BASE, videoUrl),
+    difficulty: null
+  };
+}
+
 async function loadOpenExerciseDb() {
   const data = await fetchJsonCached(OPEN_EXERCISE_DB_URL, { ttlMs: DAY_MS });
   return (data ?? []).map((exercise) => ({
@@ -342,6 +512,23 @@ function buildSource(name, candidates) {
   return { name, candidates, tokenIndex };
 }
 
+function chooseExactMediaMatch(target, ranked) {
+  if (GENERIC_EXERCISE_NAMES.has(target.name.toLowerCase())) return null;
+  const compatible = ranked.filter(
+    ({ candidate }) =>
+      hasExactNameMatch(target, candidate) &&
+      hasCompatibleEquipment(target, candidate) &&
+      !MEDIA_MATCH_DENYLIST.has(`${target.id}|${candidate.id}`)
+  );
+  if (compatible.length !== 1) return null;
+  return {
+    ...compatible[0],
+    score: Math.max(0.95, compatible[0].score),
+    margin: compatible[0].score,
+    method: 'exact-source'
+  };
+}
+
 function candidatePool(target, source) {
   const matches = new Map();
   for (const value of [target.name, ...(target.aliases ?? [])]) {
@@ -360,7 +547,8 @@ function toTarget(garmin, detail) {
     name: garmin.name,
     aliases: [
       garmin.exerciseKey,
-      `${garmin.category}_${garmin.exerciseKey}`
+      `${garmin.category}_${garmin.exerciseKey}`,
+      ...exerciseAliases(garmin.name)
     ],
     primaryMuscles: garmin.primaryMuscles,
     secondaryMuscles: garmin.secondaryMuscles,
@@ -391,7 +579,13 @@ function mergeEnrichment(target, selected, method) {
   const candidate = selected?.candidate;
   const sources = [];
   if (target.detail) sources.push({ source: 'garmin-detail', id: target.id });
-  if (candidate) sources.push({ source: candidate.source, id: candidate.sourceId });
+  if (candidate) {
+    sources.push({
+      source: candidate.source,
+      id: candidate.sourceId,
+      ...(candidate.sourceUrl ? { url: candidate.sourceUrl } : {})
+    });
+  }
 
   return {
     id: target.id,
@@ -407,6 +601,40 @@ function mergeEnrichment(target, selected, method) {
     videoUrl: detail.videoUrl || candidate?.videoUrl || null,
     difficulty: detail.difficulty || candidate?.difficulty || null
   };
+}
+
+function applyGeneratedDescription(result, generated) {
+  if (
+    !generated ||
+    generated.status !== 'accepted' ||
+    !generated.summary ||
+    !Array.isArray(generated.steps) ||
+    !generated.steps.length
+  ) {
+    return;
+  }
+
+  let used = false;
+  if (!result.description) {
+    result.description = generated.summary;
+    used = true;
+  }
+  if (!result.instructionsEn) {
+    result.instructionsEn = [
+      ...generated.steps,
+      generated.safetyNote ? `Safety: ${generated.safetyNote}` : null
+    ]
+      .filter(Boolean)
+      .join('\n');
+    used = true;
+  }
+  if (used && !result.enrichmentSources.some((item) => item.source === 'ai-generated')) {
+    result.enrichmentSources.push({
+      source: 'ai-generated',
+      id: generated.modelVersion ?? 'codex-claude-v1',
+      kind: 'ai-generated'
+    });
+  }
 }
 
 function compactRecord(record) {
@@ -520,6 +748,59 @@ async function fetchJsonCached(
   throw lastError;
 }
 
+async function fetchTextCached(
+  url,
+  {
+    limiter = null,
+    ttlMs = 14 * DAY_MS,
+    negativeTtlMs = 30 * DAY_MS
+  } = {}
+) {
+  const cacheFile = join(
+    CACHE_DIR,
+    `${createHash('sha256').update(`text:${url}`).digest('hex')}.json`
+  );
+  const cached = readJsonFile(cacheFile, null);
+  const cacheAge = cached ? Date.now() - Date.parse(cached.fetchedAt) : Number.POSITIVE_INFINITY;
+  const cacheTtl = cached?.status === 404 ? negativeTtlMs : ttlMs;
+  if (cached && cacheAge < cacheTtl) return cached.status === 200 ? cached.data : null;
+  if (args.offline) return cached?.status === 200 ? cached.data : null;
+
+  const host = new URL(url).host;
+  if (blockedHosts.has(host)) return null;
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      if (limiter) await limiter();
+      const response = await fetch(url, {
+        headers: { Accept: 'text/html', 'user-agent': 'personal-radar exercise enrichment' },
+        signal: AbortSignal.timeout(30_000)
+      });
+      if (response.status === 404) {
+        writeJsonFile(cacheFile, { status: 404, fetchedAt: new Date().toISOString() });
+        return null;
+      }
+      if (response.status === 403 || response.status === 429) {
+        const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
+        if (attempt === 3) {
+          blockedHosts.add(host);
+          throw new Error(`host paused after HTTP ${response.status}`);
+        }
+        await sleep(retryAfter ?? attempt * 5_000);
+        continue;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.text();
+      writeJsonFile(cacheFile, { status: 200, fetchedAt: new Date().toISOString(), data });
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) await sleep(attempt * 1_000 + Math.floor(Math.random() * 500));
+    }
+  }
+  throw lastError;
+}
+
 function createRateLimiter(requestsPerSecond) {
   const interval = Math.ceil(1000 / requestsPerSecond);
   let nextStart = 0;
@@ -582,6 +863,27 @@ function stripHtml(value) {
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function cleanText(value) {
+  return String(value).replace(/\s+/g, ' ').trim();
+}
+
+function equipmentFromName(value) {
+  const normalized = value.toLowerCase();
+  const equipment = [
+    ['bodyweight', 'body weight'],
+    ['barbell', 'barbell'],
+    ['dumbbell', 'dumbbell'],
+    ['kettlebell', 'kettlebell'],
+    ['cable', 'cable'],
+    ['machine', 'machine'],
+    ['banded', 'band'],
+    ['resistance band', 'band']
+  ];
+  return equipment
+    .filter(([keyword]) => normalized.includes(keyword))
+    .map(([, name]) => name);
 }
 
 function truncate(value, maxLength) {

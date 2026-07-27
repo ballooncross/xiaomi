@@ -1,0 +1,58 @@
+[
+  {
+    "id": "lunge-matrix",
+    "name": "Lunge Matrix",
+    "aliases": ["3-Lunge Matrix"],
+    "primaryMuscles": ["glutes", "quadriceps"],
+    "secondaryMuscles": ["hamstrings", "adductors"],
+    "equipment": [],
+    "bodyPart": "upper legs",
+    "description": "A multi-directional warm-up sequence combining anterior, lateral, and drop-step lunges.",
+    "instructionsEn": "Stand tall and step forward into an anterior lunge, then push back to center.\nStep the same leg to the side, bend that hip and knee, and return to center.\nStep the same leg back and away at a 45-degree angle for a drop-step lunge, then return.\nComplete the sequence on the other side.",
+    "imageUrl": "https://static1.squarespace.com/static/67bbe2d9d2050c22ab9b061c/t/689fc53df9a8904ec6b3c59c/1755301181613/lunge.jpg?format=1500w",
+    "videoUrl": null,
+    "sourceUrl": "https://www.pt2austin.com/movement-library/lunge-matrix"
+  },
+  {
+    "id": "diagonal-lunge",
+    "name": "Diagonal Lunge",
+    "aliases": [],
+    "primaryMuscles": ["glutes", "quadriceps"],
+    "secondaryMuscles": ["hamstrings"],
+    "equipment": [],
+    "bodyPart": "upper legs",
+    "description": "A dynamic warm-up lunge performed by stepping outward at a 45-degree angle.",
+    "instructionsEn": "Stand tall with the feet hip-width apart.\nStep one leg out at a 45-degree angle while keeping the shoulders square.\nDrop the hips toward the floor with the front foot flat and chest up.\nPush off the front leg to return to standing, then repeat on the other side.",
+    "imageUrl": "https://d1ldvf68ux039x.cloudfront.net/thumbs/frames/video/1709/551373/1000w_q95.jpg",
+    "videoUrl": "https://d34w7g4gy10iej.cloudfront.net/video/1709/DOD_104840754/DOD_104840754-1024x576-1769k.mp4",
+    "sourceUrl": "https://www.dvidshub.net/video/551373/diagonal-lunge"
+  },
+  {
+    "id": "weighted-vest-lunge",
+    "name": "Weighted Lunge",
+    "aliases": ["Weight Vest Lunge", "Weighted Vest Lunge"],
+    "primaryMuscles": ["glutes", "quadriceps"],
+    "secondaryMuscles": ["hamstrings"],
+    "equipment": ["weighted vest"],
+    "bodyPart": "upper legs",
+    "description": "A forward lunge performed while wearing a securely fastened weighted vest.",
+    "instructionsEn": "Fasten the weighted vest securely and stand with the feet shoulder-width apart.\nStep one foot forward and lower into a lunge while keeping the back straight.\nKeep the front knee aligned with the direction of the foot.\nPush through the front leg to return to standing, then repeat with the other leg.",
+    "imageUrl": null,
+    "videoUrl": "https://media.physitrack.com/exercises/ec98034d-2cc1-4aec-bcf8-e5ea18a44c9a/en/video_1280x720.mp4",
+    "sourceUrl": "https://ca.physitrack.com/home-exercise-video/lunge-with-weight-vest-%252845-degree%2529"
+  },
+  {
+    "id": "sandbag-lunge",
+    "name": "Sandbag Lunge",
+    "aliases": ["Sandbag Lunges"],
+    "primaryMuscles": ["quadriceps", "glutes"],
+    "secondaryMuscles": ["hamstrings", "core"],
+    "equipment": ["sandbag"],
+    "bodyPart": "upper legs",
+    "description": "A loaded lunge performed with a sandbag secured across the upper back or shoulders.",
+    "instructionsEn": "Place the sandbag securely across your shoulders and stand with the feet hip-width apart.\nStep one foot forward and lower with an upright torso until the back knee approaches the floor.\nKeep the front knee aligned with the foot.\nPush through the front heel to return to standing, then repeat with the other leg.",
+    "imageUrl": "https://grabgains.com/dist/exercises/thumbnails/99401201.webp",
+    "videoUrl": "https://grabgains.com/dist/exercises/videos/99401201.mp4",
+    "sourceUrl": "https://grabgains.com/exercises/sandbag-lunges"
+  }
+]

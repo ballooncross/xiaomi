@@ -84,12 +84,13 @@ describe('exercise detail filtering', () => {
 		videoUrl: null
 	};
 
-	it('requires instructions and at least one media asset', () => {
+	it('accepts either instructions or a media asset', () => {
 		expect(hasUsefulExerciseDetails({ ...details, videoUrl: 'movement.mp4' })).toBe(true);
 		expect(hasUsefulExerciseDetails({ ...details, imageUrl: 'movement.jpg' })).toBe(true);
-		expect(hasUsefulExerciseDetails(details)).toBe(false);
+		expect(hasUsefulExerciseDetails(details)).toBe(true);
 		expect(
 			hasUsefulExerciseDetails({ ...details, instructions: '', videoUrl: 'movement.mp4' })
-		).toBe(false);
+		).toBe(true);
+		expect(hasUsefulExerciseDetails({ ...details, instructions: '' })).toBe(false);
 	});
 });
