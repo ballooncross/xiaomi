@@ -35,7 +35,7 @@ const WORD_RE = /[a-z0-9]+/g;
 
 export function hasUsefulExerciseDetails(exercise: ExerciseDetails): boolean {
 	return (
-		Boolean(exercise.instructions.trim()) &&
+		Boolean(exercise.instructions.trim()) ||
 		Boolean(exercise.gifUrl || exercise.imageUrl || exercise.videoUrl)
 	);
 }

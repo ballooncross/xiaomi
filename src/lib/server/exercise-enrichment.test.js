@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chooseAutomaticMatch,
+  exerciseAliases,
   hasCompatibleEquipment,
   hasExactNameMatch,
   normalizeName,
@@ -44,6 +45,12 @@ describe('exercise enrichment matching', () => {
     expect(normalizeName('NINETY_NINETY_HIP_SWITCH')).toBe('90 90 hip switch');
     expect(normalizeName('BW Romanian Deadlift')).toBe('body weight romanian deadlift');
     expect(normalizeName('Single-Leg RDL')).toBe('single leg romanian deadlift');
+  });
+
+  it('adds common movement synonyms without dropping exercise modifiers', () => {
+    expect(exerciseAliases('Weighted Side Lunge')).toContain('weighted lateral lunge');
+    expect(exerciseAliases('Drop Lunge')).toContain('curtsy lunge');
+    expect(exerciseAliases('Rear Lunge')).toContain('reverse lunge');
   });
 
   it('matches an exact source alias', () => {

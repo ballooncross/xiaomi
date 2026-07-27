@@ -8,6 +8,7 @@ import {
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { parseFirstJsonObject } from './lib/cli-json.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const QUEUE_FILE = join(SCRIPT_DIR, 'exercise-review-queue.json');
@@ -26,7 +27,8 @@ const CLAUDE_COMMAND =
   process.env.EXERCISE_CLAUDE_COMMAND ??
   'claude -p --tools "" --no-session-persistence --safe-mode --disable-slash-commands';
 const BATCH_SIZE = 25;
-const MINIMUM_CONFIDENCE = 0.9;
+const MINIMUM_MATCH_CONFIDENCE = 0.75;
+const MINIMUM_REJECTION_CONFIDENCE = 0.9;
 const COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
 
 const args = parseArgs(process.argv.slice(2));
@@ -35,7 +37,9 @@ mkdirSync(REVIEW_WORK_DIR, { recursive: true });
 async function main() {
   const queue = readJson(QUEUE_FILE, []);
   const overrides = readJson(OVERRIDES_FILE, {});
-  const pending = queue.filter((item) => !overrides[item.garmin.id]);
+  const pending = queue.filter((item) =>
+    !['accepted', 'rejected'].includes(overrides[item.garmin.id]?.status)
+  );
   const batches = chunk(pending, BATCH_SIZE).slice(0, args.maxBatches ?? undefined);
 
   console.log(
@@ -73,7 +77,7 @@ async function main() {
         Number(claudeDecision?.confidence) || 0
       );
 
-      if (agreedCandidate && confidence >= MINIMUM_CONFIDENCE) {
+      if (agreedCandidate && confidence >= MINIMUM_MATCH_CONFIDENCE) {
         overrides[garminId] = {
           status: 'accepted',
           candidateId: codexDecision.candidateId,
@@ -89,7 +93,7 @@ async function main() {
       const agreedUnmatched =
         codexDecision?.candidateId == null &&
         claudeDecision?.candidateId == null &&
-        confidence >= MINIMUM_CONFIDENCE;
+        confidence >= MINIMUM_REJECTION_CONFIDENCE;
       if (agreedUnmatched) {
         overrides[garminId] = {
           status: 'rejected',
@@ -175,10 +179,7 @@ async function runCli(command, prompt) {
 }
 
 function extractJson(output) {
-  const start = output.indexOf('{');
-  const end = output.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('CLI output did not contain a JSON object');
-  const parsed = JSON.parse(output.slice(start, end + 1));
+  const parsed = parseFirstJsonObject(output);
   if (!Array.isArray(parsed.decisions)) throw new Error('CLI JSON is missing decisions');
   return parsed.decisions;
 }

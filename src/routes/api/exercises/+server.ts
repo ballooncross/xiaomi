@@ -47,6 +47,8 @@ type GarminExerciseRow = {
 type EnrichmentSource = {
 	source: string;
 	id: string;
+	url?: string;
+	kind?: 'published' | 'ai-generated';
 };
 
 type Exercise = {
@@ -219,7 +221,14 @@ function parseEnrichmentSources(value: string | null): EnrichmentSource[] {
 			? parsed.filter(
 					(item): item is EnrichmentSource =>
 						typeof item?.source === 'string' && typeof item?.id === 'string'
-				)
+				).map((item) => ({
+					source: item.source,
+					id: item.id,
+					...(typeof item.url === 'string' ? { url: item.url } : {}),
+					...(item.kind === 'published' || item.kind === 'ai-generated'
+						? { kind: item.kind }
+						: {})
+				}))
 			: [];
 	} catch {
 		return [];

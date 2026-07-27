@@ -131,10 +131,35 @@
     sourceCategory: string | null;
     sourceKey: string | null;
     catalogs: string[];
-    enrichmentSources: Array<{ source: string; id: string }>;
+    enrichmentSources: Array<{
+      source: string;
+      id: string;
+      url?: string;
+      kind?: 'published' | 'ai-generated';
+    }>;
     matchConfidence: number | null;
     difficulty: string | null;
   };
+  const exerciseSourceLabels: Record<string, string> = {
+    'garmin-detail': 'Garmin',
+    'exercise-dataset': '动作库',
+    'free-exercise-video-db': 'Free Exercise Video DB',
+    'free-exercise-db': 'Free Exercise DB',
+    'open-exercise-db': 'Open Exercise DB',
+    'curated-web-guide': '在线动作指南',
+    'muscle-and-strength': 'Muscle & Strength',
+    wger: 'wger',
+    'ai-generated': 'AI 生成说明'
+  };
+
+  function exerciseSourceLabel(source: string) {
+    return exerciseSourceLabels[source] ?? source;
+  }
+
+  function isEmbeddedExerciseVideo(url: string | null) {
+    return Boolean(url && /(?:youtube\.com\/embed\/|player\.vimeo\.com\/video\/)/i.test(url));
+  }
+
   const gymBodyParts: Array<{ id: string; label: string }> = [
     { id: 'back', label: '背部' },
     { id: 'chest', label: '胸部' },
@@ -3307,7 +3332,16 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
         </button>
       </div>
-      {#if gymDetail.videoUrl}
+      {#if isEmbeddedExerciseVideo(gymDetail.videoUrl)}
+        <iframe
+          class="gym-modal-gif gym-modal-embed"
+          src={gymDetail.videoUrl ?? ''}
+          title={`${gymDetail.name} 动作示范`}
+          loading="lazy"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+      {:else if gymDetail.videoUrl}
         <video
           class="gym-modal-gif"
           src={gymDetail.videoUrl}
@@ -3342,11 +3376,16 @@
       {/if}
       {#if gymDetail.enrichmentSources.length}
         <p class="gym-source-key">
-          详情来源：{gymDetail.enrichmentSources.map((item) => item.source).join('、')}
+          详情来源：{gymDetail.enrichmentSources
+            .map((item) => exerciseSourceLabel(item.source))
+            .join('、')}
           {#if gymDetail.matchConfidence != null}
             · 匹配度 {Math.round(gymDetail.matchConfidence * 100)}%
           {/if}
         </p>
+      {/if}
+      {#if gymDetail.enrichmentSources.some((item) => item.kind === 'ai-generated')}
+        <p class="gym-ai-note">动作说明由 AI 根据 Garmin 名称和训练元数据生成。两个模型均确认动作定义明确，但训练前仍请核对。</p>
       {/if}
       {#if gymDetail.secondaryMuscles.length}
         <p class="gym-modal-secondary">协同肌群：{gymDetail.secondaryMuscles.join('、')}</p>
@@ -4188,6 +4227,11 @@
     border-radius: 16px;
   }
 
+  .gym-modal-embed {
+    width: min(560px, 100%);
+    aspect-ratio: 16 / 9;
+  }
+
   .gym-modal-placeholder {
     display: grid;
     place-items: center;
@@ -4208,6 +4252,17 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
     overflow-wrap: anywhere;
+  }
+
+  .gym-ai-note {
+    margin: 10px 0 0;
+    padding: 9px 11px;
+    color: #795c1d;
+    background: #fff7dc;
+    border: 1px solid #ead69c;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.45;
   }
 
   .gym-modal-secondary {

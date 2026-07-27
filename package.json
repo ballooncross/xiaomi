@@ -18,6 +18,7 @@
     "exercises:import:garmin": "node scripts/import-garmin-exercises.mjs",
     "exercises:enrich:garmin": "node scripts/enrich-garmin-exercises.mjs",
     "exercises:review:garmin": "node scripts/review-exercise-matches.mjs",
+    "exercises:describe:garmin": "node scripts/generate-exercise-descriptions.mjs",
     "exercises:seed:garmin:local": "wrangler d1 execute personal-radar --local --yes --file ./scripts/seed-garmin-exercises.sql",
     "exercises:seed:garmin:remote": "wrangler d1 execute personal-radar --remote --yes --file ./scripts/seed-garmin-exercises.sql",
     "exercises:seed:enrichment:local": "wrangler d1 execute personal-radar --local --yes --file ./scripts/seed-garmin-enrichment.sql",
@@ -47,6 +48,7 @@
     "cookie": "^0.7.2"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "fast-xml-parser": "^5.8.0",
     "lunar-javascript": "^1.7.7",
     "vanillajs-datepicker": "^1.3.4"
