@@ -172,6 +172,31 @@
     { id: 'cardio', label: '有氧' },
     { id: 'neck', label: '颈部' }
   ];
+  const GYM_RECENT_STORAGE_KEY = 'personal-radar-gym-recent-searches';
+  const GYM_RECENT_LIMIT = 8;
+
+  function readStoredGymRecent(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = window.localStorage.getItem(GYM_RECENT_STORAGE_KEY);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return [];
+      const seen = new Set<string>();
+      return parsed
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => {
+          if (!item || seen.has(item.toLowerCase())) return false;
+          seen.add(item.toLowerCase());
+          return true;
+        })
+        .slice(0, GYM_RECENT_LIMIT);
+    } catch {
+      return [];
+    }
+  }
+
   let gymQuery = $state('');
   let gymBodyPart = $state('');
   let gymUsefulOnly = $state(true);
@@ -179,6 +204,7 @@
   let gymLoading = $state(false);
   let gymLoaded = $state(false);
   let gymDetail = $state<GymExercise | null>(null);
+  let gymRecentSearches = $state<string[]>([]);
   let gymDebounce: ReturnType<typeof setTimeout> | undefined;
   let coeData = $state<CoePayload | null>(null);
   let coeLoading = $state(false);
@@ -211,6 +237,58 @@
   function onGymSearch() {
     clearTimeout(gymDebounce);
     gymDebounce = setTimeout(loadExercises, 300);
+  }
+
+  function persistGymRecent(next: string[]) {
+    gymRecentSearches = next;
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(GYM_RECENT_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* storage blocked or full; the in-memory list still works this session */
+    }
+  }
+
+  /**
+   * Recents are recorded on commit (Enter, or opening a result) rather than on
+   * every keystroke, otherwise every prefix of a query would be stored.
+   */
+  function rememberGymSearch(value: string) {
+    const query = value.trim();
+    if (!query) return;
+    const key = query.toLowerCase();
+    const next = [query, ...gymRecentSearches.filter((item) => item.toLowerCase() !== key)].slice(
+      0,
+      GYM_RECENT_LIMIT
+    );
+    persistGymRecent(next);
+  }
+
+  function applyGymRecent(value: string) {
+    clearTimeout(gymDebounce);
+    gymQuery = value;
+    rememberGymSearch(value);
+    loadExercises();
+  }
+
+  function removeGymRecent(value: string) {
+    persistGymRecent(gymRecentSearches.filter((item) => item !== value));
+  }
+
+  function clearGymRecent() {
+    persistGymRecent([]);
+  }
+
+  function onGymSearchKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    clearTimeout(gymDebounce);
+    rememberGymSearch(gymQuery);
+    loadExercises();
+  }
+
+  function openGymDetail(exercise: GymExercise) {
+    gymDetail = exercise;
+    rememberGymSearch(gymQuery);
   }
 
   function setGymBodyPart(bodyPart: string) {
@@ -383,6 +461,7 @@
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
     applyServerOrLocalNav(data.middleNav);
+    gymRecentSearches = readStoredGymRecent();
     if (data.user?.isAdmin) {
       loadDevRequests();
       loadAllowlist();
@@ -2134,8 +2213,30 @@
               placeholder="搜索动作 / 肌群 / 器械，如 curl、abs、dumbbell、深蹲…"
               bind:value={gymQuery}
               oninput={onGymSearch}
+              onkeydown={onGymSearchKeydown}
             />
           </div>
+          {#if gymRecentSearches.length > 0}
+            <div class="gym-recent">
+              <span class="gym-recent-label">最近搜索</span>
+              {#each gymRecentSearches as recent (recent)}
+                <span class="gym-recent-chip">
+                  <button type="button" class="gym-recent-apply" onclick={() => applyGymRecent(recent)}>
+                    {recent}
+                  </button>
+                  <button
+                    type="button"
+                    class="gym-recent-remove"
+                    aria-label={`删除最近搜索 ${recent}`}
+                    onclick={() => removeGymRecent(recent)}
+                  >
+                    ×
+                  </button>
+                </span>
+              {/each}
+              <button type="button" class="gym-recent-clear" onclick={clearGymRecent}>清空</button>
+            </div>
+          {/if}
           <div class="gym-filters" role="group" aria-label="筛选动作">
             <button
               type="button"
@@ -2160,7 +2261,7 @@
           {:else}
             <div class="gym-grid">
               {#each gymResults as exercise (exercise.id)}
-                <button type="button" class="gym-card" onclick={() => (gymDetail = exercise)}>
+                <button type="button" class="gym-card" onclick={() => openGymDetail(exercise)}>
                   {#if exercise.gifUrl || exercise.imageUrl}
                     <img
                       class="gym-gif"
@@ -4098,6 +4199,64 @@
     border-radius: 999px;
     background: #fffdf7;
     font-size: 14px;
+  }
+
+  .gym-recent {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 0;
+  }
+
+  .gym-recent-label {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .gym-recent-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line);
+    background: #fffdf7;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .gym-recent-apply {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    padding: 5px 4px 5px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .gym-recent-remove {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    padding: 5px 10px 5px 4px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .gym-recent-chip:hover .gym-recent-apply,
+  .gym-recent-remove:hover {
+    color: var(--jade);
+  }
+
+  .gym-recent-clear {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   .gym-filters {
