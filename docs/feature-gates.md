@@ -21,6 +21,7 @@ Admin UI: **我的 → 功能开关**
 | `coe_page` | on | member | — |
 | `coe_notify` | on | member | `coe-check` (recipients = per-user subscribe) |
 | `gym_page` | on | member | — |
+| `package_tracking` | on | member | `package-tracking` |
 | `telegram_digest` | on | member | `daily-digest` |
 | `admin_ops` | on | admin | — |
 | `dev_requests` | on | admin | — |

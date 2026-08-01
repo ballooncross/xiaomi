@@ -7,6 +7,7 @@ import { getCronJobStatuses } from '$lib/server/job-status';
 import { sortReminders } from '$lib/server/lunar';
 import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
 import type { Env } from '$lib/server/types';
+import { listPackageTrackings } from '$lib/server/package-tracking/repository';
 
 export async function loadRadarPageData(
 	platformEnv: Env | undefined,
@@ -25,7 +26,7 @@ export async function loadRadarPageData(
 	const showAdminOps = features.admin_ops?.allowed ?? false;
 	const showIca = features.ica_check?.allowed ?? false;
 
-	const [items, savedItems, topics, reminders, icaTool, cronJobs, middleNav, telegramChatId, notifyPrefs] =
+	const [items, savedItems, topics, reminders, icaTool, cronJobs, middleNav, telegramChatId, notifyPrefs, packages] =
 		await Promise.all([
 			db.listItems(80),
 			db.listSavedItems(),
@@ -35,7 +36,8 @@ export async function loadRadarPageData(
 			showAdminOps ? getCronJobStatuses(env) : Promise.resolve([]),
 			user?.id ? db.getMiddleNav(user.id) : Promise.resolve(null),
 			user?.id ? db.getUserTelegramChatId(user.id) : Promise.resolve(null),
-			user?.id ? db.getNotifyPrefs(user.id) : Promise.resolve({ ...DEFAULT_NOTIFY_PREFS })
+			user?.id ? db.getNotifyPrefs(user.id) : Promise.resolve({ ...DEFAULT_NOTIFY_PREFS }),
+			user?.id && features.package_tracking?.allowed ? listPackageTrackings(env, user.id) : Promise.resolve([])
 		]);
 
 	const telegramBotConfigured = Boolean(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_BOT_USERNAME);
@@ -52,6 +54,7 @@ export async function loadRadarPageData(
 		telegramBotConfigured,
 		telegramLinked: Boolean(telegramChatId),
 		notifyPrefs,
+		packages,
 		features,
 		user: user
 			? {

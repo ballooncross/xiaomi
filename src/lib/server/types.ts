@@ -8,6 +8,55 @@ export type FeedbackAction = 'save' | 'track' | 'unsave' | 'not_relevant' | 'mor
 export type CalendarType = 'gregorian' | 'lunar';
 export type ReminderRepeat = 'none' | 'annual';
 export type DateCategory = 'birthday' | 'child_birthday' | 'anniversary' | 'memorial' | 'other';
+export type PackageProviderId = 'yxd' | 'dexi' | 'mh56';
+export type PackageTrackingState = 'awaiting_tracking_data' | 'active' | 'needs_attention' | 'archived';
+export type PackageStatus =
+  | 'awaiting_tracking_data'
+  | 'info_received'
+  | 'in_transit'
+  | 'out_for_delivery'
+  | 'delivery_attempted'
+  | 'exception'
+  | 'delivered'
+  | 'returned'
+  | 'unknown';
+
+export type PackageTrackingEvent = {
+  id: string;
+  packageId: string;
+  fingerprint: string;
+  status: PackageStatus;
+  providerStatus: string;
+  message: string;
+  eventAt: string;
+  location?: string;
+  notifiedAt?: string;
+  createdAt?: string;
+};
+
+export type PackageTracking = {
+  id: string;
+  userId: string;
+  trackingNumber: string;
+  label?: string;
+  providerId?: PackageProviderId;
+  state: PackageTrackingState;
+  status: PackageStatus;
+  providerStatus?: string;
+  latestEventAt?: string;
+  latestLocation?: string;
+  estimatedDeliveryAt?: string;
+  sourceUrl?: string;
+  lastCheckedAt?: string;
+  lastSuccessAt?: string;
+  lastError?: string;
+  unresolvedSince: string;
+  deliveredAt?: string;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  events?: PackageTrackingEvent[];
+};
 
 export type WatchTopic = {
   id: string;

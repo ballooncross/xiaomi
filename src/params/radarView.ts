@@ -5,6 +5,7 @@ const views = new Set([
 	'concerts',
 	'trends',
 	'dates',
+	'packages',
 	'gym',
 	'coe',
 	'interests',

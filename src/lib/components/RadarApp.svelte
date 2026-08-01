@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import CoePriceView from '$lib/components/CoePriceView.svelte';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
+  import PackageTrackingView from '$lib/components/PackageTrackingView.svelte';
   import type { CoePayload } from '$lib/coe';
   import type { CronJobStatus, DateCategory, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
@@ -13,8 +14,8 @@
   import type { NotifyPrefs } from '$lib/notify-prefs';
   import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
 
-  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
-  type NavSlotId = 'concerts' | 'trends' | 'dates' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
+  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'packages' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
+  type NavSlotId = 'concerts' | 'trends' | 'dates' | 'packages' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
 
   function featureAllowed(id: FeatureId): boolean {
     return Boolean(data.features?.[id]?.allowed);
@@ -36,6 +37,7 @@
     concerts: '/concerts',
     trends: '/trends',
     dates: '/dates',
+    packages: '/packages',
     gym: '/gym',
     coe: '/coe',
     interests: '/interests',
@@ -49,6 +51,7 @@
     { id: 'concerts', label: '演出' },
     { id: 'trends', label: '趋势' },
     { id: 'dates', label: '日期' },
+    { id: 'packages', label: '包裹' },
     { id: 'gym', label: '健身' },
     { id: 'coe', label: 'COE' },
     { id: 'interests', label: '兴趣' },
@@ -59,6 +62,7 @@
   const MORE_MENU_ITEMS: Array<{ id: View; label: string; hint: string }> = [
     { id: 'me', label: '我的', hint: '资料、工具与收藏' },
     { id: 'concerts', label: '演出', hint: '演出流与时间线' },
+    { id: 'packages', label: '包裹', hint: '物流状态与历史' },
     { id: 'coe', label: 'COE', hint: '新加坡官方报价' },
     { id: 'interests', label: '兴趣', hint: '关注主题与屏蔽' },
     { id: 'settings', label: '设置', hint: '导航与偏好配置' }
@@ -423,12 +427,14 @@
   $effect(() => {
     if (activeView === 'coe' && !featureAllowed('coe_page')) setView('home');
     if (activeView === 'gym' && !featureAllowed('gym_page')) setView('home');
+    if (activeView === 'packages' && !featureAllowed('package_tracking')) setView('home');
   });
 
   const visibleNavOptions = $derived(
     ALL_NAV_OPTIONS.filter((option) => {
       if (option.id === 'coe') return featureAllowed('coe_page');
       if (option.id === 'gym') return featureAllowed('gym_page');
+      if (option.id === 'packages') return featureAllowed('package_tracking');
       return true;
     })
   );
@@ -473,6 +479,7 @@
     const fixedIds = new Set(MORE_MENU_ITEMS.map((item) => item.id));
     const base = MORE_MENU_ITEMS.filter((item) => {
       if (item.id === 'coe') return featureAllowed('coe_page');
+      if (item.id === 'packages') return featureAllowed('package_tracking');
       return true;
     });
     const extras = visibleNavOptions
@@ -498,6 +505,7 @@
   const hideSidePanel = $derived(
     activeView === 'dates' ||
       activeView === 'gym' ||
+      activeView === 'packages' ||
       activeView === 'coe' ||
       activeView === 'interests' ||
       activeView === 'me' ||
@@ -2135,6 +2143,8 @@
             </div>
           </section>
         </section>
+      {:else if activeView === 'packages'}
+        <PackageTrackingView initialPackages={data.packages} />
       {:else if activeView === 'gym'}
         <section class="gym">
           <header class="gym-head">
@@ -2322,14 +2332,14 @@
             </button>
           </div>
 
-          {#if featureAllowed('telegram_digest') || featureAllowed('coe_notify') || featureAllowed('coe_page')}
+          {#if featureAllowed('telegram_digest') || featureAllowed('package_tracking') || featureAllowed('coe_notify') || featureAllowed('coe_page')}
           <section class="job-run-card">
             <div class="job-run-copy">
               <span>通知</span>
               <strong>Telegram</strong>
               <p>
                 {#if telegramLinked}
-                  已连接。趋势摘要与日期提醒分开发送，共享功能可单独订阅。
+                  已连接。摘要、日期提醒和包裹更新会按各自规则发送。
                 {:else if data.telegramBotConfigured}
                   连接后，通知会发到你自己的聊天（不再共用一个群）。
                 {:else}
