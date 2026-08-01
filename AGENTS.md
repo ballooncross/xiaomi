@@ -46,6 +46,10 @@
 - Recent exercise queries are frontend-only and stored in local storage under `personal-radar-gym-recent-searches`.
 - Keep recent-query persistence out of backend APIs and databases.
 
+## Navigation Configuration
+
+- Define configurable navigation items in `src/lib/navigation.ts`. The settings UI, settings API validation, and route matching must share that definition so every displayed option can be persisted and opened.
+
 ## Automated Development Requests
 
 - The coding subprocess may edit and test its isolated worktree, but must not commit, push, merge, or deploy. The development-request wrapper owns those actions.

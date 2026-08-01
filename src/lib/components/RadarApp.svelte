@@ -30,9 +30,15 @@
     GYM_RECENT_SEARCHES_STORAGE_KEY,
     parseGymRecentSearches
   } from '$lib/gym-recent-searches';
+  import {
+    DEFAULT_MIDDLE_NAV,
+    NAV_ITEMS,
+    normalizeMiddleNav,
+    type NavSlotId,
+    type RadarView
+  } from '$lib/navigation';
 
-  type View = 'home' | 'concerts' | 'trends' | 'dates' | 'packages' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
-  type NavSlotId = 'concerts' | 'trends' | 'dates' | 'packages' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
+  type View = RadarView;
 
   function featureAllowed(id: FeatureId): boolean {
     return Boolean(data.features?.[id]?.allowed);
@@ -64,18 +70,7 @@
   };
 
   const NAV_STORAGE_KEY = 'personal-radar-middle-nav';
-  const ALL_NAV_OPTIONS: Array<{ id: NavSlotId; label: string }> = [
-    { id: 'concerts', label: '演出' },
-    { id: 'trends', label: '趋势' },
-    { id: 'dates', label: '日期' },
-    { id: 'packages', label: '包裹' },
-    { id: 'gym', label: '健身' },
-    { id: 'coe', label: 'COE' },
-    { id: 'interests', label: '兴趣' },
-    { id: 'me', label: '我的' },
-    { id: 'settings', label: '设置' }
-  ];
-  const DEFAULT_MIDDLE_NAV: NavSlotId[] = ['concerts', 'dates', 'gym'];
+  const ALL_NAV_OPTIONS = NAV_ITEMS;
   const MORE_MENU_ITEMS: Array<{ id: View; label: string; hint: string }> = [
     { id: 'me', label: '我的', hint: '资料、工具与收藏' },
     { id: 'concerts', label: '演出', hint: '演出流与时间线' },
@@ -84,18 +79,6 @@
     { id: 'interests', label: '兴趣', hint: '关注主题与屏蔽' },
     { id: 'settings', label: '设置', hint: '导航与偏好配置' }
   ];
-
-  function normalizeMiddleNav(value: unknown, options?: { fallbackToDefault?: boolean }): NavSlotId[] {
-    const valid = new Set(ALL_NAV_OPTIONS.map((item) => item.id));
-    const ids = Array.isArray(value)
-      ? value.filter((item): item is NavSlotId => typeof item === 'string' && valid.has(item as NavSlotId))
-      : [];
-    const unique = [...new Set(ids)].slice(0, 3);
-    if (unique.length === 0 && options?.fallbackToDefault !== false) {
-      return [...DEFAULT_MIDDLE_NAV];
-    }
-    return unique;
-  }
 
   function readStoredMiddleNav(): NavSlotId[] {
     if (typeof window === 'undefined') return [...DEFAULT_MIDDLE_NAV];
