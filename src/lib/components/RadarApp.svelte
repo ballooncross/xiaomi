@@ -25,6 +25,11 @@
   import type { FeatureId } from '$lib/server/features';
   import type { NotifyPrefs } from '$lib/notify-prefs';
   import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
+  import {
+    addGymRecentSearch,
+    GYM_RECENT_SEARCHES_STORAGE_KEY,
+    parseGymRecentSearches
+  } from '$lib/gym-recent-searches';
 
   type View = 'home' | 'concerts' | 'trends' | 'dates' | 'packages' | 'gym' | 'coe' | 'interests' | 'me' | 'settings' | 'saved';
   type NavSlotId = 'concerts' | 'trends' | 'dates' | 'packages' | 'gym' | 'coe' | 'interests' | 'me' | 'settings';
@@ -195,6 +200,7 @@
   let gymLoading = $state(false);
   let gymLoaded = $state(false);
   let gymDetail = $state<GymExercise | null>(null);
+  let gymRecentSearches = $state<string[]>([]);
   let gymDebounce: ReturnType<typeof setTimeout> | undefined;
   let coeData = $state<CoePayload | null>(null);
   let coeLoading = $state(false);
@@ -205,12 +211,33 @@
   let moreMenuOpen = $state(false);
   let draftMiddleNav = $state<NavSlotId[]>([...initialMiddleNav]);
 
-  async function loadExercises() {
+  function storeGymRecentSearch(query: string) {
+    const next = addGymRecentSearch(gymRecentSearches, query);
+    if (next === gymRecentSearches || next.length === 0) return;
+    gymRecentSearches = next;
+    try {
+      window.localStorage.setItem(GYM_RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* Exercise search remains usable when local storage is unavailable. */
+    }
+  }
+
+  function clearGymRecentSearches() {
+    gymRecentSearches = [];
+    try {
+      window.localStorage.removeItem(GYM_RECENT_SEARCHES_STORAGE_KEY);
+    } catch {
+      /* The in-memory history is still cleared. */
+    }
+  }
+
+  async function loadExercises(options?: { recordSearch?: boolean }) {
     gymLoading = true;
     gymLoaded = true;
     try {
       const params = new URLSearchParams();
       const query = gymQuery.trim();
+      if (options?.recordSearch && query) storeGymRecentSearch(query);
       if (query) params.set('q', query);
       if (gymBodyPart) params.set('bodyPart', gymBodyPart);
       if (gymUsefulOnly) params.set('hasDetails', 'true');
@@ -226,7 +253,19 @@
 
   function onGymSearch() {
     clearTimeout(gymDebounce);
-    gymDebounce = setTimeout(loadExercises, 300);
+    gymDebounce = setTimeout(() => loadExercises({ recordSearch: true }), 300);
+  }
+
+  function runGymSearch(query: string) {
+    clearTimeout(gymDebounce);
+    gymQuery = query;
+    loadExercises({ recordSearch: true });
+  }
+
+  function onGymSearchKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    runGymSearch(gymQuery);
   }
 
   function setGymBodyPart(bodyPart: string) {
@@ -403,6 +442,13 @@
 
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
+    try {
+      gymRecentSearches = parseGymRecentSearches(
+        window.localStorage.getItem(GYM_RECENT_SEARCHES_STORAGE_KEY)
+      );
+    } catch {
+      gymRecentSearches = [];
+    }
     applyServerOrLocalNav(data.middleNav);
     if (data.user?.isAdmin) {
       loadDevRequests();
@@ -2234,11 +2280,24 @@
           <div class="gym-search">
             <input
               type="search"
+              aria-label="搜索健身动作"
               placeholder="搜索动作 / 肌群 / 器械，如 curl、abs、dumbbell、深蹲…"
               bind:value={gymQuery}
               oninput={onGymSearch}
+              onkeydown={onGymSearchKeydown}
             />
           </div>
+          {#if gymRecentSearches.length > 0}
+            <div class="gym-recent-searches" aria-label="最近搜索">
+              <span>最近搜索</span>
+              <div class="gym-recent-list">
+                {#each gymRecentSearches as query (query.toLocaleLowerCase())}
+                  <button type="button" onclick={() => runGymSearch(query)}>{query}</button>
+                {/each}
+              </div>
+              <button type="button" class="gym-recent-clear" onclick={clearGymRecentSearches}>清空</button>
+            </div>
+          {/if}
           <div class="gym-filters" role="group" aria-label="筛选动作">
             <button
               type="button"
@@ -4232,6 +4291,53 @@
     border-radius: 999px;
     background: #fffdf7;
     font-size: 14px;
+  }
+
+  .gym-recent-searches {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .gym-recent-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .gym-recent-list button,
+  .gym-recent-clear {
+    border: 0;
+    background: transparent;
+    color: var(--jade);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .gym-recent-list button {
+    max-width: 180px;
+    overflow: hidden;
+    padding: 3px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fffdf7;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gym-recent-list button:hover {
+    border-color: var(--jade);
+  }
+
+  .gym-recent-clear {
+    margin-left: auto;
+    padding: 3px 0;
+    color: var(--muted);
+    white-space: nowrap;
   }
 
   .gym-filters {

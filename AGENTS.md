@@ -41,6 +41,11 @@
 - Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
 - YXD requires browser rendering for reliable results. MH56 is server rendered. Validate D-EXI against the first live sample because no working D-EXI number was available during initial implementation.
 
+## Gym Exercise Search
+
+- Recent exercise queries are frontend-only and stored in local storage under `personal-radar-gym-recent-searches`.
+- Keep recent-query persistence out of backend APIs and databases.
+
 ## Automated Development Requests
 
 - The coding subprocess may edit and test its isolated worktree, but must not commit, push, merge, or deploy. The development-request wrapper owns those actions.
