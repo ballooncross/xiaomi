@@ -39,7 +39,7 @@
 - Archive delivered packages only after the delivery update has been handled successfully.
 - Removing a package permanently deletes its event history and stops future checks and notifications.
 - Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
-- YXD requires browser rendering for reliable results. MH56 is server rendered. D-EXI `LX...` lookups require the tracking-field update and result-row selection requests, the Chinese search-button value, day-first timestamps in Singapore time, and a browser-compatible user agent for full details.
+- YXD requires browser rendering for reliable results. MH56 is server rendered. D-EXI `LX...` lookups require the tracking-field update and result-row selection requests, the Chinese search-button value, day-first timestamps in Singapore time, and a browser-compatible user agent for full details. Preserve non-empty cells after a D-EXI status because they contain supplemental values such as the estimated-arrival date.
 
 ## Gym Exercise Search
 

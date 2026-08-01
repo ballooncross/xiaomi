@@ -71,6 +71,22 @@ describe('package provider parsers', () => {
     });
   });
 
+  it('preserves supplemental D-EXI values attached to a tracking event', () => {
+    const html = `<table><tbody>
+      <tr><th>日期</th><th>时间</th><th>站点</th><th>状态</th><th>备注</th></tr>
+      <tr><td></td><td>01/08/2026</td><td>12:00</td><td>新加坡</td>
+        <td>预计航班到达时间</td><td>03/08/2026</td>
+      </tr>
+    </tbody></table>`;
+
+    expect(parseDexiXml(html)[0]).toMatchObject({
+      status: 'in_transit',
+      providerStatus: '预计航班到达时间 · 03/08/2026',
+      message: '预计航班到达时间 · 03/08/2026',
+      eventAt: '2026-08-01T04:00:00.000Z'
+    });
+  });
+
   it('performs the D-EXI field update before loading its result details', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(
@@ -84,7 +100,7 @@ describe('package provider parsers', () => {
       </tbody></table></response></ajax-response>`))
       .mockResolvedValueOnce(new Response('<ajax-response></ajax-response>'))
       .mockResolvedValueOnce(new Response(`<table><tbody>
-        <tr><td></td><td>01/08/2026</td><td>12:00</td><td>Singapore</td><td>Estimated flight arrival</td></tr>
+        <tr><td></td><td>01/08/2026</td><td>12:00</td><td>Singapore</td><td>Estimated flight arrival</td><td>03/08/2026</td></tr>
         <tr><td></td><td>31/07/2026</td><td>18:00</td><td>China</td><td>In transit</td></tr>
         <tr><td></td><td>31/07/2026</td><td>09:00</td><td>China</td><td>At warehouse</td></tr>
       </tbody></table>`));
@@ -101,6 +117,7 @@ describe('package provider parsers', () => {
     expect(String(fetchMock.mock.calls[3]?.[0])).toContain('_event_=rowclicked');
     expect(String(fetchMock.mock.calls[4]?.[0])).toBe('http://www.d-exi.com/querytracksfm');
     expect(result.events).toHaveLength(3);
-    expect(result.estimatedDeliveryAt).toBe('2026-08-01T04:00:00.000Z');
+    expect(result.events[2]?.message).toBe('Estimated flight arrival · 03/08/2026');
+    expect(result.estimatedDeliveryAt).toBe('2026-08-03T04:00:00.000Z');
   });
 });

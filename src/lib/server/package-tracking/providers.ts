@@ -71,9 +71,11 @@ export function parseDexiXml(xml: string, trackingNumber?: string): ProviderEven
       ? parseDexiDateTime(cells[detailDateIndex] ?? '', cells[detailDateIndex + 1] ?? '')
       : undefined;
     if (detailDate && cells[detailDateIndex + 3]) {
-      const message = cells[detailDateIndex + 3];
+      const status = cells[detailDateIndex + 3];
+      const supplementalValues = cells.slice(detailDateIndex + 4).filter(Boolean);
+      const message = [status, ...supplementalValues].join(' · ');
       events.push({
-        status: normalizePackageStatus(message),
+        status: normalizePackageStatus(status),
         providerStatus: message,
         message,
         eventAt: detailDate,
@@ -278,7 +280,26 @@ function parseDexiOnTimestamp(value: string): string | undefined {
 }
 
 function estimatedDeliveryFromDexiEvents(events: ProviderEvent[]): string | undefined {
-  return [...events].reverse().find((event) => /预计航班到达时间|estimated flight arrival/i.test(event.message))?.eventAt;
+  const event = [...events].reverse()
+    .find((candidate) => /预计航班到达时间|estimated flight arrival/i.test(candidate.message));
+  if (!event) return undefined;
+  return parseDexiSupplementalDate(event.message) ?? event.eventAt;
+}
+
+function parseDexiSupplementalDate(value: string): string | undefined {
+  const dayFirst = value.match(/(?:^|\D)(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\D|$)/);
+  if (dayFirst) {
+    return parseDexiDateTime(
+      `${dayFirst[1].padStart(2, '0')}/${dayFirst[2].padStart(2, '0')}/${dayFirst[3]}`,
+      '12:00'
+    );
+  }
+  const yearFirst = value.match(/(?:^|\D)(\d{4})[-年](\d{1,2})[-月](\d{1,2})(?:日|\D|$)/);
+  if (!yearFirst) return undefined;
+  const [, year, month, day] = yearFirst;
+  return new Date(
+    `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T12:00:00+08:00`
+  ).toISOString();
 }
 
 function parseYxdRowsFromHtml(html: string, trackingNumber: string): YxdRow[] {
