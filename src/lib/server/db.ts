@@ -930,6 +930,17 @@ class MemoryRadarDb extends RadarDb {
       }
       recovered += 1;
     }
+    const orphanCutoff = Date.parse(nowIso) - 20 * 60_000;
+    for (const request of memory.devRequests) {
+      if (request.status !== 'in_progress') continue;
+      if (memory.devRequestRuns.some((run) => run.requestId === request.id && run.status === 'running')) continue;
+      const updatedAt = Date.parse(request.updatedAt ?? request.createdAt ?? '');
+      if (!Number.isFinite(updatedAt) || updatedAt >= orphanCutoff) continue;
+      request.status = 'pending';
+      request.response = '旧版 Agent 未留下运行记录，已自动重新排队。';
+      request.updatedAt = nowIso;
+      recovered += 1;
+    }
     return recovered;
   }
 
@@ -2393,7 +2404,21 @@ class D1RadarDb extends RadarDb {
           ).bind('上次运行中断，已自动重新排队。', stale.request_id)
         ]);
       }
-      return results.length;
+      const orphanCutoff = new Date(Date.parse(nowIso) - 20 * 60_000).toISOString();
+      const orphans = await this.db
+        .prepare(
+          `UPDATE dev_requests
+           SET status = 'pending', response = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE status = 'in_progress' AND updated_at < datetime(?)
+             AND NOT EXISTS (
+               SELECT 1 FROM dev_request_runs
+               WHERE dev_request_runs.request_id = dev_requests.id
+                 AND dev_request_runs.status = 'running'
+             )`
+        )
+        .bind('旧版 Agent 未留下运行记录，已自动重新排队。', orphanCutoff)
+        .run();
+      return results.length + (orphans.meta.changes ?? 0);
     } catch (error) {
       if (isMissingTableError(error)) return 0;
       throw error;

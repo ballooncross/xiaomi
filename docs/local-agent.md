@@ -15,8 +15,6 @@ Run:
 ```bash
 npm run agent -- --once      # single tick
 npm run agent:dry            # search but do not submit
-# continuous loop, keeps the Mac awake:
-nohup caffeinate -i npx tsx scripts/agent.ts > /tmp/radar-agent.log 2>&1 &
 ```
 
 Install the production scheduler:
@@ -33,7 +31,10 @@ and refreshed only when `package-lock.json` changes. Single-run mode exits
 after the guarded scan even if a timed-out scan still has unresolved promises,
 so launchd can start the next scheduled cycle.
 
-Monitor: `tail -f /tmp/radar-agent.log` · status `pgrep -fl agent.ts` · stop `kill $(pgrep -f agent.ts)`.
+Do not run a separate continuous `caffeinate` or `nohup` process alongside the
+installed scheduler. Multiple legacy runners can race for requests. Monitor
+with `tail -f ~/Library/Logs/personal-radar-agent.log` and inspect the service
+with `launchctl print gui/$(id -u)/com.personalradar.agent`.
 
 Each tick also reports `running`, `ok`, or `error` to the radar. Admins can see the latest tick time and detail under 我的 > 工具 > 定时任务状态 > 本地 AI Agent. If the process stops reporting, the last timestamp remains visible so a stale agent is easy to spot.
 
@@ -93,6 +94,9 @@ A request is completed only after `npm test`, `npm run check`, and
 `npm run build` pass, the result reaches `main`, the GitHub Deploy workflow
 succeeds, and the public version endpoint shows the expected deployed version. Clarifying questions
 are stored as `needs_input`, and retries preserve earlier attempts and events.
+
+Claims created by an older runner without a durable run record are detected as
+orphans and automatically requeued after twenty minutes.
 
 The Radar admin UI uses the authenticated session for requests. It shows
 runner health, phases, attempt summaries, commit SHAs, and event history. Use

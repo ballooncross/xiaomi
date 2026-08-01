@@ -83,4 +83,19 @@ describe('development request run lifecycle', () => {
     expect(await db.recoverStaleDevRequests(new Date().toISOString())).toBeGreaterThanOrEqual(1);
     expect((await db.listDevRequests({ status: 'pending' })).some((item) => item.id === request.id)).toBe(true);
   });
+
+  it('recovers a legacy in-progress request that has no run record', async () => {
+    const db = getDb();
+    const request: DevRequest = {
+      id: crypto.randomUUID(),
+      text: 'Recover legacy runner claim',
+      status: 'in_progress',
+      response: '',
+      updatedAt: '2000-01-01T00:00:00.000Z'
+    };
+    await db.insertDevRequest(request);
+
+    expect(await db.recoverStaleDevRequests(new Date().toISOString())).toBeGreaterThanOrEqual(1);
+    expect((await db.listDevRequests({ status: 'pending' })).some((item) => item.id === request.id)).toBe(true);
+  });
 });
