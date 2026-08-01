@@ -417,9 +417,9 @@ async function waitForDeployment(
 async function waitForLiveVersion(expectedVersion: string): Promise<string | null> {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     try {
-      const response = await fetch(config.radarUrl, { signal: AbortSignal.timeout(15000) });
-      const html = await response.text();
-      if (response.ok && html.includes(expectedVersion)) return expectedVersion;
+      const response = await fetch(`${config.radarUrl}/api/version`, { signal: AbortSignal.timeout(15000) });
+      const body = (await response.json()) as { version?: string };
+      if (response.ok && body.version === expectedVersion) return expectedVersion;
     } catch { /* retry */ }
     await delay(5000);
   }

@@ -89,7 +89,7 @@ independent dependency install so tests and build caches are writable.
 
 A request is completed only after `npm test`, `npm run check`, and
 `npm run build` pass, the result reaches `main`, the GitHub Deploy workflow
-succeeds, and the live footer shows the expected version. Clarifying questions
+succeeds, and the public version endpoint shows the expected deployed version. Clarifying questions
 are stored as `needs_input`, and retries preserve earlier attempts and events.
 
 The Radar admin UI uses the authenticated session for requests. It shows
