@@ -30,3 +30,13 @@
 
 - The local agent reports every tick to `POST /api/agent/status` with `running`, `ok`, or `error`.
 - Keep the `local-agent` entry in the 定时任务状态 list aligned with that endpoint so stale runs and failures remain visible to admins.
+
+## Package Tracking
+
+- Package tracking data is user scoped. Telegram commands must resolve the linked chat to a Personal Radar user before reading or changing packages.
+- Run package checks at 08:30 Singapore time and notify only when a new provider event is stored.
+- Retry unresolved tracking numbers for seven days, then move them to `needs_attention` and stop automatic checks.
+- Archive delivered packages only after the delivery update has been handled successfully.
+- Removing a package permanently deletes its event history and stops future checks and notifications.
+- Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
+- YXD requires browser rendering for reliable results. MH56 is server rendered. Validate D-EXI against the first live sample because no working D-EXI number was available during initial implementation.

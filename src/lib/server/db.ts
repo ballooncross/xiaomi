@@ -309,6 +309,7 @@ export abstract class RadarDb {
   abstract createUser(user: { id: string; email: string; name: string; picture: string }): Promise<void>;
   abstract updateUserProfile(id: string, name: string, picture: string): Promise<void>;
   abstract getUserTelegramChatId(userId: string): Promise<string | null>;
+  abstract getUserIdByTelegramChatId(chatId: string): Promise<string | null>;
   abstract setUserTelegramChatId(userId: string, chatId: string | null): Promise<void>;
   abstract listUsersWithTelegram(): Promise<TelegramLinkedUser[]>;
   abstract createTelegramLinkToken(userId: string, token: string, expiresAt: string): Promise<void>;
@@ -619,6 +620,10 @@ class MemoryRadarDb extends RadarDb {
 
   async getUserTelegramChatId(userId: string): Promise<string | null> {
     return memory.users.find((u) => u.id === userId)?.telegramChatId ?? null;
+  }
+
+  async getUserIdByTelegramChatId(chatId: string): Promise<string | null> {
+    return memory.users.find((u) => u.telegramChatId === chatId)?.id ?? null;
   }
 
   async setUserTelegramChatId(userId: string, chatId: string | null): Promise<void> {
@@ -1495,6 +1500,19 @@ class D1RadarDb extends RadarDb {
         .bind(userId)
         .first<{ telegram_chat_id: string | null }>();
       return row?.telegram_chat_id ?? null;
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) return null;
+      throw error;
+    }
+  }
+
+  async getUserIdByTelegramChatId(chatId: string): Promise<string | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT id FROM users WHERE telegram_chat_id = ? LIMIT 1')
+        .bind(chatId)
+        .first<{ id: string }>();
+      return row?.id ?? null;
     } catch (error) {
       if (isMissingTableError(error) || isMissingColumnError(error)) return null;
       throw error;

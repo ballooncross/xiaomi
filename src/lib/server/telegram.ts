@@ -140,3 +140,21 @@ export function telegramDeepLink(botUsername: string, token: string): string {
 export function isTelegramBotConfigured(env: Env): boolean {
 	return Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_USERNAME && normalizeTelegramBotUsername(env.TELEGRAM_BOT_USERNAME));
 }
+
+export async function configureTelegramCommands(env: Env): Promise<{ ok: boolean; detail: string }> {
+	if (!env.TELEGRAM_BOT_TOKEN) return { ok: false, detail: 'Telegram bot token is not configured' };
+	const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setMyCommands`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({
+			commands: [
+				{ command: 'track', description: '添加包裹：/track 单号' },
+				{ command: 'untrack', description: '删除包裹：/untrack 单号' },
+				{ command: 'packages', description: '查看正在跟踪的包裹' },
+				{ command: 'help', description: '查看包裹命令帮助' }
+			]
+		})
+	});
+	if (!response.ok) return { ok: false, detail: `Telegram HTTP ${response.status}` };
+	return { ok: true, detail: 'commands configured' };
+}

@@ -37,6 +37,13 @@ const scheduledJobs: CronJobDefinition[] = [
     enabled: (env) => Boolean(env.TELEGRAM_BOT_TOKEN)
   },
   {
+    jobName: 'package-tracking',
+    label: '包裹物流检查',
+    description: '刷新活跃包裹，仅在物流有新进展时发送 Telegram。',
+    schedule: '每天 08:30',
+    enabled: () => true
+  },
+  {
     jobName: 'coe-check',
     label: 'COE 结果检查',
     description: '拉取 LTA 官方报价；发现新一轮时 Telegram 通知 Cat A/B。',

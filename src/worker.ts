@@ -3,12 +3,14 @@ import { runAllFetchJobs, runCoeCheckJob, runDailyDigestJob } from './lib/server
 import { compileContext } from './lib/server/context-compiler';
 import { getDb } from './lib/server/db';
 import type { Env } from './lib/server/types';
+import { refreshPackageLocally, runPackageTrackingJob } from './lib/server/package-tracking/service';
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const hourMinute = new Date(event.scheduledTime).toISOString().slice(11, 16);
     if (hourMinute === '00:30') {
       ctx.waitUntil(runDailyDigestJob(env));
+      ctx.waitUntil(runPackageTrackingJob(env));
       // Recompile AI context daily after digest
       ctx.waitUntil(compileContext(getDb(env)).catch(() => {}));
       return;
@@ -28,6 +30,23 @@ export default {
         return new Response('Unauthorized', { status: 401 });
       }
       return Response.json(await runIcaAppointmentCheckJob(env));
+    }
+
+    if (url.pathname === '/package-refresh' && request.method === 'POST') {
+      if (!env.ADMIN_TOKEN || request.headers.get('x-admin-token') !== env.ADMIN_TOKEN) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      try {
+        const payload = await request.json<{ userId?: string; packageId?: string }>();
+        if (!payload.userId || !payload.packageId) {
+          return Response.json({ error: 'userId and packageId are required' }, { status: 400 });
+        }
+        return Response.json({ item: await refreshPackageLocally(env, payload.userId, payload.packageId) });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Package refresh failed';
+        console.error(JSON.stringify({ message: 'package refresh failed', error: message }));
+        return Response.json({ error: message }, { status: 500 });
+      }
     }
 
     return new Response('Personal Radar cron worker');

@@ -8,6 +8,7 @@ export type FeatureId =
 	| 'coe_page'
 	| 'coe_notify'
 	| 'gym_page'
+	| 'package_tracking'
 	| 'telegram_digest'
 	| 'admin_ops'
 	| 'dev_requests';
@@ -55,6 +56,14 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
 		description: '健身搜索页。',
 		defaultEnabled: true,
 		defaultMinRole: 'member'
+	},
+	{
+		id: 'package_tracking',
+		label: '包裹跟踪',
+		description: '包裹页面、Telegram 命令与每日物流检查。',
+		defaultEnabled: true,
+		defaultMinRole: 'member',
+		cronJobName: 'package-tracking'
 	},
 	{
 		id: 'telegram_digest',

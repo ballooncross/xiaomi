@@ -11,6 +11,7 @@ The MVP is program-first and AI-assisted:
 - rule-based fallback when AI keys are missing, rate-limited, or disabled
 - feedback buttons to learn what is useful over time
 - searchable gym exercises with Garmin identifiers, movement instructions, and media enrichment
+- package tracking through the web app and linked Telegram bot
 
 ## Stack
 
@@ -66,4 +67,5 @@ Run `npm run db:migrate:local` after pulling schema changes. The birthday notebo
 - [AI configuration](docs/ai.md)
 - [Local AI agent](docs/local-agent.md)
 - [Exercise enrichment](docs/exercise-enrichment.md)
+- [Package tracking](docs/package-tracking.md)
 - [Data scripts](scripts/README.md)
