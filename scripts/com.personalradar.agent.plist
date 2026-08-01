@@ -5,24 +5,25 @@
   <key>Label</key>
   <string>com.personalradar.agent</string>
 
-  <!-- Login shell so PATH includes homebrew (codex) + nvm (node/npx). -->
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>exec /Users/stevebai/workspace/xiaomi/scripts/run-agent.sh</string>
+    <string>exec '/Users/stevebai/Library/Application Support/Personal Radar/run-agent.sh'</string>
   </array>
 
-  <key>WorkingDirectory</key>
-  <string>/Users/stevebai/workspace/xiaomi</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>RADAR_SOURCE_ROOT</key>
+    <string>/Users/stevebai/workspace/xiaomi</string>
+    <key>RADAR_AGENT_RUNTIME</key>
+    <string>/Users/stevebai/Library/Application Support/Personal Radar/agent-runtime</string>
+  </dict>
 
-  <!-- Start at login and restart if it ever exits (crash, sleep, etc.). -->
   <key>RunAtLoad</key>
   <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>ThrottleInterval</key>
-  <integer>30</integer>
+  <key>StartInterval</key>
+  <integer>600</integer>
 
   <key>StandardOutPath</key>
   <string>/Users/stevebai/Library/Logs/personal-radar-agent.log</string>

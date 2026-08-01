@@ -19,6 +19,18 @@ npm run agent:dry            # search but do not submit
 nohup caffeinate -i npx tsx scripts/agent.ts > /tmp/radar-agent.log 2>&1 &
 ```
 
+Install the production scheduler:
+
+```bash
+scripts/install-agent.sh
+```
+
+The installed launch agent runs one cycle every ten minutes from a dedicated
+detached worktree tracking `origin/main`. Each cycle reloads the current code
+and `scripts/.env`, so changing the configured AI backend does not require a
+long-lived Node process restart. Dependencies are installed inside the runtime
+and refreshed only when `package-lock.json` changes.
+
 Monitor: `tail -f /tmp/radar-agent.log` · status `pgrep -fl agent.ts` · stop `kill $(pgrep -f agent.ts)`.
 
 Each tick also reports `running`, `ok`, or `error` to the radar. Admins can see the latest tick time and detail under 我的 > 工具 > 定时任务状态 > 本地 AI Agent. If the process stops reporting, the last timestamp remains visible so a stale agent is easy to spot.
@@ -65,6 +77,24 @@ All under `/api/agent/`, authenticated with the `x-admin-token` header:
 - `POST /api/agent/context/compile` — force Layer 1 (raw signals) -> Layer 2 (structured context) recompile; also runs after every 5+ new signals and daily at 00:30 UTC
 - `GET /api/agent/feed/outcomes` — how agent submissions performed (save/dismiss rates by topic and source)
 - `POST /api/agent/status`: record the local process tick as `running`, `ok`, or `error` for the admin status card
+
+## Development requests
+
+Development requests use durable attempts and append-only events in D1. The
+coding model may edit and test an isolated worktree, but it must not commit,
+push, merge, or deploy. The local wrapper owns publication and compares the
+final tree to the captured base SHA, so a model-created commit is still
+detected rather than mislabeled as no change. Each coding worktree receives an
+independent dependency install so tests and build caches are writable.
+
+A request is completed only after `npm test`, `npm run check`, and
+`npm run build` pass, the result reaches `main`, the GitHub Deploy workflow
+succeeds, and the live footer shows the expected version. Clarifying questions
+are stored as `needs_input`, and retries preserve earlier attempts and events.
+
+The Radar admin UI uses the authenticated session for requests. It shows
+runner health, phases, attempt summaries, commit SHAs, and event history. Use
+补充信息 to create a linked follow-up whose prompt includes the parent request.
 
 ## Track vs save
 

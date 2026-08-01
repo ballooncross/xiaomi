@@ -10,6 +10,9 @@ import type {
   AiContextDocument,
   DateReminder,
   DevRequest,
+  DevRequestEvent,
+  DevRequestRun,
+  DevRequestRunner,
   Env,
   FeedbackAction,
   JobRun,
@@ -152,7 +155,24 @@ type CoeResultRow = {
 
 type DevRequestRow = {
   id: string; text: string; status: string; response: string;
-  branch: string | null; created_at: string; updated_at: string;
+  branch: string | null; parent_request_id?: string | null; created_at: string; updated_at: string;
+};
+
+type DevRequestRunRow = {
+  id: string; request_id: string; attempt: number; status: string; phase: string;
+  runner_id: string; runner_version: string; backend: string; base_sha: string;
+  result_sha: string; branch: string; summary: string; error_category: string;
+  lease_expires_at: string; started_at: string; finished_at: string | null; updated_at: string;
+};
+
+type DevRequestEventRow = {
+  id: string; request_id: string; run_id: string; sequence: number; phase: string;
+  level: string; event_type: string; message: string; payload_json: string; created_at: string;
+};
+
+type DevRequestRunnerRow = {
+  id: string; status: string; version: string; backend: string; git_sha: string;
+  detail: string; last_seen_at: string;
 };
 
 type UserRow = {
@@ -206,7 +226,10 @@ const memory = {
   agentOutcomes: [] as Array<{ id: string; agentFeedId: string; outcome: string; createdAt: string }>,
   impressionsByUser: new Map<string, Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>>(),
   notifications: [] as Array<{ id: string; itemId?: string; channel: string; type: string; status: string; message: string; createdAt: string }>,
-  devRequests: [] as DevRequest[]
+  devRequests: [] as DevRequest[],
+  devRequestRuns: [] as DevRequestRun[],
+  devRequestEvents: [] as DevRequestEvent[],
+  devRequestRunners: [] as DevRequestRunner[]
 };
 
 function getUserTopics(userId: string): WatchTopic[] {
@@ -368,6 +391,15 @@ export abstract class RadarDb {
   abstract insertDevRequest(request: DevRequest): Promise<void>;
   abstract listDevRequests(options?: { status?: string; limit?: number }): Promise<DevRequest[]>;
   abstract updateDevRequest(id: string, updates: { status?: string; response?: string; branch?: string }): Promise<void>;
+  abstract claimDevRequest(requestId: string, run: DevRequestRun): Promise<boolean>;
+  abstract listDevRequestRuns(requestIds?: string[]): Promise<DevRequestRun[]>;
+  abstract insertDevRequestEvent(event: DevRequestEvent): Promise<void>;
+  abstract listDevRequestEvents(requestId: string, limit?: number): Promise<DevRequestEvent[]>;
+  abstract finishDevRequestRun(runId: string, updates: Partial<Pick<DevRequestRun, 'status' | 'phase' | 'resultSha' | 'branch' | 'summary' | 'errorCategory' | 'leaseExpiresAt'>>): Promise<void>;
+  abstract retryDevRequest(id: string): Promise<boolean>;
+  abstract recoverStaleDevRequests(nowIso: string): Promise<number>;
+  abstract upsertDevRequestRunner(runner: DevRequestRunner): Promise<void>;
+  abstract getDevRequestRunner(): Promise<DevRequestRunner | null>;
 
   // User-initiated dedup
   abstract getItemById(itemId: string): Promise<RadarItem | null>;
@@ -835,6 +867,80 @@ class MemoryRadarDb extends RadarDb {
       if (updates.branch !== undefined) request.branch = updates.branch ?? undefined;
       request.updatedAt = new Date().toISOString();
     }
+  }
+
+  async claimDevRequest(requestId: string, run: DevRequestRun): Promise<boolean> {
+    const request = memory.devRequests.find((item) => item.id === requestId);
+    if (!request || request.status !== 'pending') return false;
+    request.status = 'in_progress';
+    request.response = 'Agent 已领取请求，正在分析。';
+    request.updatedAt = new Date().toISOString();
+    memory.devRequestRuns.push(run);
+    return true;
+  }
+
+  async listDevRequestRuns(requestIds?: string[]): Promise<DevRequestRun[]> {
+    const allowed = requestIds ? new Set(requestIds) : null;
+    return memory.devRequestRuns
+      .filter((run) => !allowed || allowed.has(run.requestId))
+      .sort((a, b) => b.attempt - a.attempt);
+  }
+
+  async insertDevRequestEvent(event: DevRequestEvent): Promise<void> {
+    memory.devRequestEvents.push(event);
+  }
+
+  async listDevRequestEvents(requestId: string, limit = 100): Promise<DevRequestEvent[]> {
+    return memory.devRequestEvents.filter((event) => event.requestId === requestId).slice(-limit);
+  }
+
+  async finishDevRequestRun(
+    runId: string,
+    updates: Partial<Pick<DevRequestRun, 'status' | 'phase' | 'resultSha' | 'branch' | 'summary' | 'errorCategory' | 'leaseExpiresAt'>>
+  ): Promise<void> {
+    const run = memory.devRequestRuns.find((item) => item.id === runId);
+    if (!run) return;
+    Object.assign(run, updates, { updatedAt: new Date().toISOString() });
+    if (updates.status && updates.status !== 'running') run.finishedAt = new Date().toISOString();
+  }
+
+  async retryDevRequest(id: string): Promise<boolean> {
+    const request = memory.devRequests.find((item) => item.id === id);
+    if (!request || request.status === 'pending' || request.status === 'in_progress') return false;
+    request.status = 'pending';
+    request.response = '';
+    request.branch = undefined;
+    request.updatedAt = new Date().toISOString();
+    return true;
+  }
+
+  async recoverStaleDevRequests(nowIso: string): Promise<number> {
+    let recovered = 0;
+    for (const run of memory.devRequestRuns) {
+      if (run.status !== 'running' || run.leaseExpiresAt >= nowIso) continue;
+      run.status = 'failed';
+      run.phase = 'failed';
+      run.errorCategory = 'runner_lost';
+      run.summary = 'Runner lease expired before the attempt completed.';
+      run.finishedAt = nowIso;
+      const request = memory.devRequests.find((item) => item.id === run.requestId);
+      if (request?.status === 'in_progress') {
+        request.status = 'pending';
+        request.response = '上次运行中断，已自动重新排队。';
+      }
+      recovered += 1;
+    }
+    return recovered;
+  }
+
+  async upsertDevRequestRunner(runner: DevRequestRunner): Promise<void> {
+    const index = memory.devRequestRunners.findIndex((item) => item.id === runner.id);
+    if (index >= 0) memory.devRequestRunners[index] = runner;
+    else memory.devRequestRunners.push(runner);
+  }
+
+  async getDevRequestRunner(): Promise<DevRequestRunner | null> {
+    return [...memory.devRequestRunners].sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''))[0] ?? null;
   }
 
   async getItemById(itemId: string): Promise<RadarItem | null> {
@@ -2083,8 +2189,8 @@ class D1RadarDb extends RadarDb {
   async insertDevRequest(request: DevRequest): Promise<void> {
     try {
       await this.db
-        .prepare('INSERT INTO dev_requests (id, text, status, response, branch) VALUES (?, ?, ?, ?, ?)')
-        .bind(request.id, request.text, request.status, request.response, request.branch ?? null)
+        .prepare('INSERT INTO dev_requests (id, text, status, response, branch, parent_request_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(request.id, request.text, request.status, request.response, request.branch ?? null, request.parentRequestId ?? null)
         .run();
     } catch (error) {
       if (isMissingTableError(error)) return new MemoryRadarDb(this.userId).insertDevRequest(request);
@@ -2124,6 +2230,206 @@ class D1RadarDb extends RadarDb {
         .run();
     } catch (error) {
       if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async claimDevRequest(requestId: string, run: DevRequestRun): Promise<boolean> {
+    try {
+      const claim = await this.db
+        .prepare(
+          `UPDATE dev_requests
+           SET status = 'in_progress', response = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'pending'`
+        )
+        .bind('Agent 已领取请求，正在分析。', requestId)
+        .run();
+      if ((claim.meta.changes ?? 0) !== 1) return false;
+
+      const attemptRow = await this.db
+        .prepare('SELECT COALESCE(MAX(attempt), 0) + 1 AS attempt FROM dev_request_runs WHERE request_id = ?')
+        .bind(requestId)
+        .first<{ attempt: number }>();
+      run.attempt = Number(attemptRow?.attempt ?? 1);
+      try {
+        await this.db
+          .prepare(
+            `INSERT INTO dev_request_runs
+             (id, request_id, attempt, status, phase, runner_id, runner_version, backend,
+              base_sha, result_sha, branch, summary, error_category, lease_expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .bind(
+            run.id, run.requestId, run.attempt, run.status, run.phase, run.runnerId,
+            run.runnerVersion, run.backend, run.baseSha, run.resultSha, run.branch,
+            run.summary, run.errorCategory, run.leaseExpiresAt
+          )
+          .run();
+      } catch (error) {
+        await this.db
+          .prepare(`UPDATE dev_requests SET status = 'pending', response = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+          .bind(requestId)
+          .run();
+        throw error;
+      }
+      return true;
+    } catch (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) return false;
+      throw error;
+    }
+  }
+
+  async listDevRequestRuns(requestIds?: string[]): Promise<DevRequestRun[]> {
+    try {
+      let sql = 'SELECT * FROM dev_request_runs';
+      const binds: unknown[] = [];
+      if (requestIds?.length) {
+        sql += ` WHERE request_id IN (${requestIds.map(() => '?').join(',')})`;
+        binds.push(...requestIds);
+      }
+      sql += ' ORDER BY started_at DESC';
+      const { results } = await this.db.prepare(sql).bind(...binds).all<DevRequestRunRow>();
+      return results.map(devRequestRunFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async insertDevRequestEvent(event: DevRequestEvent): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO dev_request_events
+           (id, request_id, run_id, sequence, phase, level, event_type, message, payload_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          event.id, event.requestId, event.runId, event.sequence, event.phase, event.level,
+          event.eventType, event.message.slice(0, 16000), JSON.stringify(event.payload ?? {})
+        )
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async listDevRequestEvents(requestId: string, limit = 100): Promise<DevRequestEvent[]> {
+    try {
+      const { results } = await this.db
+        .prepare('SELECT * FROM dev_request_events WHERE request_id = ? ORDER BY created_at ASC, sequence ASC LIMIT ?')
+        .bind(requestId, limit)
+        .all<DevRequestEventRow>();
+      return results.map(devRequestEventFromRow);
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    }
+  }
+
+  async finishDevRequestRun(
+    runId: string,
+    updates: Partial<Pick<DevRequestRun, 'status' | 'phase' | 'resultSha' | 'branch' | 'summary' | 'errorCategory' | 'leaseExpiresAt'>>
+  ): Promise<void> {
+    try {
+      const clauses = ['updated_at = CURRENT_TIMESTAMP'];
+      const binds: unknown[] = [];
+      const fields: Array<[keyof typeof updates, string]> = [
+        ['status', 'status'], ['phase', 'phase'], ['resultSha', 'result_sha'],
+        ['branch', 'branch'], ['summary', 'summary'], ['errorCategory', 'error_category'],
+        ['leaseExpiresAt', 'lease_expires_at']
+      ];
+      for (const [key, column] of fields) {
+        if (updates[key] === undefined) continue;
+        clauses.push(`${column} = ?`);
+        binds.push(updates[key]);
+      }
+      if (updates.status && updates.status !== 'running') clauses.push('finished_at = CURRENT_TIMESTAMP');
+      binds.push(runId);
+      await this.db.prepare(`UPDATE dev_request_runs SET ${clauses.join(', ')} WHERE id = ?`).bind(...binds).run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async retryDevRequest(id: string): Promise<boolean> {
+    try {
+      const result = await this.db
+        .prepare(
+          `UPDATE dev_requests
+           SET status = 'pending', response = '', branch = NULL, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status NOT IN ('pending', 'in_progress')`
+        )
+        .bind(id)
+        .run();
+      return (result.meta.changes ?? 0) === 1;
+    } catch (error) {
+      if (isMissingTableError(error)) return false;
+      throw error;
+    }
+  }
+
+  async recoverStaleDevRequests(nowIso: string): Promise<number> {
+    try {
+      const { results } = await this.db
+        .prepare(`SELECT id, request_id FROM dev_request_runs WHERE status = 'running' AND lease_expires_at < ?`)
+        .bind(nowIso)
+        .all<{ id: string; request_id: string }>();
+      for (const stale of results) {
+        await this.db.batch([
+          this.db.prepare(
+            `UPDATE dev_request_runs
+             SET status = 'failed', phase = 'failed', error_category = 'runner_lost',
+                 summary = 'Runner lease expired before the attempt completed.',
+                 finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND status = 'running'`
+          ).bind(stale.id),
+          this.db.prepare(
+            `UPDATE dev_requests
+             SET status = 'pending', response = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND status = 'in_progress'`
+          ).bind('上次运行中断，已自动重新排队。', stale.request_id)
+        ]);
+      }
+      return results.length;
+    } catch (error) {
+      if (isMissingTableError(error)) return 0;
+      throw error;
+    }
+  }
+
+  async upsertDevRequestRunner(runner: DevRequestRunner): Promise<void> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO dev_request_runners (id, status, version, backend, git_sha, detail, last_seen_at)
+           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(id) DO UPDATE SET
+             status = excluded.status,
+             version = excluded.version,
+             backend = excluded.backend,
+             git_sha = excluded.git_sha,
+             detail = excluded.detail,
+             last_seen_at = CURRENT_TIMESTAMP`
+        )
+        .bind(runner.id, runner.status, runner.version, runner.backend, runner.gitSha, runner.detail)
+        .run();
+    } catch (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+
+  async getDevRequestRunner(): Promise<DevRequestRunner | null> {
+    try {
+      const row = await this.db
+        .prepare('SELECT * FROM dev_request_runners ORDER BY last_seen_at DESC LIMIT 1')
+        .first<DevRequestRunnerRow>();
+      return row ? devRequestRunnerFromRow(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
       throw error;
     }
   }
@@ -2370,8 +2676,58 @@ function devRequestFromRow(row: DevRequestRow): DevRequest {
     status: row.status as DevRequest['status'],
     response: row.response,
     branch: row.branch ?? undefined,
+    parentRequestId: row.parent_request_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function devRequestRunFromRow(row: DevRequestRunRow): DevRequestRun {
+  return {
+    id: row.id,
+    requestId: row.request_id,
+    attempt: row.attempt,
+    status: row.status as DevRequestRun['status'],
+    phase: row.phase as DevRequestRun['phase'],
+    runnerId: row.runner_id,
+    runnerVersion: row.runner_version,
+    backend: row.backend,
+    baseSha: row.base_sha,
+    resultSha: row.result_sha,
+    branch: row.branch,
+    summary: row.summary,
+    errorCategory: row.error_category,
+    leaseExpiresAt: row.lease_expires_at,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at ?? undefined,
+    updatedAt: row.updated_at
+  };
+}
+
+function devRequestEventFromRow(row: DevRequestEventRow): DevRequestEvent {
+  return {
+    id: row.id,
+    requestId: row.request_id,
+    runId: row.run_id,
+    sequence: row.sequence,
+    phase: row.phase as DevRequestEvent['phase'],
+    level: row.level as DevRequestEvent['level'],
+    eventType: row.event_type,
+    message: row.message,
+    payload: parseJson<Record<string, unknown>>(row.payload_json, {}),
+    createdAt: row.created_at
+  };
+}
+
+function devRequestRunnerFromRow(row: DevRequestRunnerRow): DevRequestRunner {
+  return {
+    id: row.id,
+    status: row.status,
+    version: row.version,
+    backend: row.backend,
+    gitSha: row.git_sha,
+    detail: row.detail,
+    lastSeenAt: row.last_seen_at
   };
 }
 

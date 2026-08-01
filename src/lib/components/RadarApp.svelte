@@ -5,7 +5,19 @@
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
   import PackageTrackingView from '$lib/components/PackageTrackingView.svelte';
   import type { CoePayload } from '$lib/coe';
-  import type { CronJobStatus, DateCategory, DateReminder, FeedbackAction, JobResult, RadarItem, WatchTopic } from '$lib/server/types';
+  import type {
+    CronJobStatus,
+    DateCategory,
+    DateReminder,
+    DevRequest,
+    DevRequestEvent,
+    DevRequestRun,
+    DevRequestRunner,
+    FeedbackAction,
+    JobResult,
+    RadarItem,
+    WatchTopic
+  } from '$lib/server/types';
   import { Solar } from 'lunar-javascript';
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
@@ -331,9 +343,14 @@
   let addWatchError = $state('');
   let editWatchError = $state('');
   let devRequestText = $state('');
+  let devRequestParentId = $state<string | null>(null);
   let devRequestPending = $state(false);
   let devRequestMessage = $state('');
-  let devRequests = $state<Array<{id: string; text: string; status: string; response: string; createdAt?: string}>>([]);
+  let devRequests = $state<DevRequest[]>([]);
+  let devRequestRuns = $state<DevRequestRun[]>([]);
+  let devRequestEvents = $state<DevRequestEvent[]>([]);
+  let devRequestRunner = $state<DevRequestRunner | null>(null);
+  let devRequestRetrying = $state<string | null>(null);
   let expandedDevRequest = $state<string | null>(null);
   let allowlistEmails = $state<string[]>([]);
   let allowlistNewEmail = $state('');
@@ -397,6 +414,9 @@
     const timer = setInterval(() => {
       if (!document.hidden) invalidateAll();
     }, REFRESH_INTERVAL_MS);
+    const devRequestTimer = setInterval(() => {
+      if (!document.hidden && data.user?.isAdmin) loadDevRequests();
+    }, 15000);
 
     const onVisible = () => {
       if (!document.hidden) {
@@ -408,6 +428,7 @@
 
     return () => {
       clearInterval(timer);
+      clearInterval(devRequestTimer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   });
@@ -699,12 +720,70 @@
     try {
       const response = await fetch('/api/dev-requests');
       if (response.ok) {
-        const result = (await response.json()) as { requests: typeof devRequests };
+        const result = (await response.json()) as {
+          requests: DevRequest[];
+          runs?: DevRequestRun[];
+          runner?: DevRequestRunner | null;
+        };
         devRequests = result.requests;
+        devRequestRuns = result.runs ?? [];
+        devRequestRunner = result.runner ?? null;
       }
     } catch {
       // ignore
     }
+  }
+
+  async function toggleDevRequest(id: string) {
+    if (expandedDevRequest === id) {
+      expandedDevRequest = null;
+      devRequestEvents = [];
+      return;
+    }
+    expandedDevRequest = id;
+    try {
+      const response = await fetch(`/api/dev-requests?id=${encodeURIComponent(id)}`);
+      if (!response.ok) return;
+      const result = (await response.json()) as { events?: DevRequestEvent[] };
+      devRequestEvents = result.events ?? [];
+    } catch {
+      devRequestEvents = [];
+    }
+  }
+
+  async function retryDevRequest(id: string) {
+    devRequestRetrying = id;
+    devRequestMessage = '';
+    try {
+      const response = await fetch('/api/dev-requests', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'retry', id })
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      devRequestMessage = response.ok ? '已重新排队。' : result.error || '重试失败。';
+      await loadDevRequests();
+    } catch {
+      devRequestMessage = '重试失败。';
+    }
+    devRequestRetrying = null;
+  }
+
+  function continueDevRequest(request: DevRequest) {
+    devRequestParentId = request.id;
+    devRequestText = '';
+    devRequestMessage = `正在补充请求：${request.text.slice(0, 60)}`;
+  }
+
+  function runsForRequest(id: string): DevRequestRun[] {
+    return devRequestRuns.filter((run) => run.requestId === id).sort((a, b) => b.attempt - a.attempt);
+  }
+
+  function runnerHealthLabel(): string {
+    if (!devRequestRunner?.lastSeenAt) return 'Runner 尚未上报状态';
+    const ageMs = Date.now() - new Date(devRequestRunner.lastSeenAt.replace(' ', 'T') + (devRequestRunner.lastSeenAt.includes('Z') ? '' : 'Z')).getTime();
+    if (!Number.isFinite(ageMs) || ageMs > 20 * 60_000) return 'Runner 离线或状态过期';
+    return `Runner ${devRequestRunner.status} · ${devRequestRunner.backend} · v${devRequestRunner.version}`;
   }
 
   async function loadFeatures() {
@@ -822,10 +901,11 @@
       const response = await fetch('/api/dev-requests', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: devRequestText.trim(), token: manualJobToken })
+        body: JSON.stringify({ text: devRequestText.trim(), parentRequestId: devRequestParentId ?? undefined })
       });
       if (response.ok) {
         devRequestText = '';
+        devRequestParentId = null;
         devRequestMessage = '已提交，本地 AI Agent 会自动处理。';
         await loadDevRequests();
       } else {
@@ -2664,26 +2744,51 @@
             <div class="job-run-copy">
               <span>开发请求</span>
               <strong>功能/Bug 请求</strong>
-              <p>提交后本地 AI Agent 会自动处理：评估、实现、部署，或回复评估结果。</p>
+              <p>提交后 Agent 会记录分析、实现、验证和部署全过程。只有生产验证通过才会标记完成。</p>
+              <small style="color:var(--muted)">{runnerHealthLabel()}</small>
             </div>
             <div class="job-run-controls">
+              {#if devRequestParentId}
+                <span style="font-size:12px;color:var(--muted)">此内容会作为上一个请求的补充上下文提交。</span>
+              {/if}
               <textarea bind:value={devRequestText} rows="3" placeholder="描述功能需求或 Bug..."></textarea>
               <button class="small-button primary" type="button"
-                disabled={devRequestPending || devRequestText.trim().length < 4 || !manualJobToken}
+                disabled={devRequestPending || devRequestText.trim().length < 4}
                 onclick={submitDevRequest}>
                 {devRequestPending ? '提交中...' : '提交请求'}
               </button>
-              {#if !manualJobToken}<span style="font-size:12px;color:var(--muted)">需要先填写上方 ADMIN_TOKEN</span>{/if}
               {#if devRequestMessage}<span style="font-size:12px;color:var(--jade)">{devRequestMessage}</span>{/if}
             </div>
             {#if devRequests.length > 0}
               <div style="padding:12px 14px 0;display:grid;gap:8px">
                 {#each devRequests.slice(0, 5) as req}
-                  <button type="button" style="all:unset;cursor:pointer;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:left;display:block;width:100%;box-sizing:border-box"
-                    onclick={() => { expandedDevRequest = expandedDevRequest === req.id ? null : req.id }}>
-                    <strong style="color:var(--ink)">{expandedDevRequest === req.id ? req.text : req.text.slice(0, 80)}{expandedDevRequest !== req.id && req.text.length > 80 ? '…' : ''}</strong>
-                    <div style="margin-top:4px;color:var(--muted)">{req.status}{req.response ? ` · ${expandedDevRequest === req.id ? req.response : req.response.slice(0, 100)}${expandedDevRequest !== req.id && req.response.length > 100 ? '…' : ''}` : ''}</div>
-                  </button>
+                  <div style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:left;display:block;width:100%;box-sizing:border-box">
+                    <button type="button" style="all:unset;cursor:pointer;display:block;width:100%" onclick={() => toggleDevRequest(req.id)}>
+                      <strong style="color:var(--ink)">{expandedDevRequest === req.id ? req.text : req.text.slice(0, 80)}{expandedDevRequest !== req.id && req.text.length > 80 ? '…' : ''}</strong>
+                      <div style="margin-top:4px;color:var(--muted)">{req.status}{runsForRequest(req.id)[0] ? ` · ${runsForRequest(req.id)[0].phase}` : ''}{req.response ? ` · ${expandedDevRequest === req.id ? req.response : req.response.slice(0, 100)}${expandedDevRequest !== req.id && req.response.length > 100 ? '…' : ''}` : ''}</div>
+                    </button>
+                    {#if expandedDevRequest === req.id}
+                      <div style="display:grid;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+                        {#each runsForRequest(req.id) as run}
+                          <div style="color:var(--muted)">
+                            第 {run.attempt} 次 · {run.status} · {run.phase}{run.resultSha ? ` · ${run.resultSha.slice(0, 8)}` : ''}
+                            {#if run.summary}<div style="margin-top:2px;white-space:pre-wrap">{run.summary}</div>{/if}
+                          </div>
+                        {/each}
+                        {#each devRequestEvents.filter((event) => event.requestId === req.id) as event}
+                          <div style="color:var(--muted)">{event.phase} · {event.message.slice(0, 240)}</div>
+                        {/each}
+                        {#if req.status !== 'pending' && req.status !== 'in_progress'}
+                          <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            <button class="small-button" type="button" disabled={devRequestRetrying === req.id} onclick={() => retryDevRequest(req.id)}>
+                              {devRequestRetrying === req.id ? '重新排队中...' : '重试此请求'}
+                            </button>
+                            <button class="small-button" type="button" onclick={() => continueDevRequest(req)}>补充信息</button>
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
                 {/each}
               </div>
             {/if}

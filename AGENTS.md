@@ -40,3 +40,12 @@
 - Removing a package permanently deletes its event history and stops future checks and notifications.
 - Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
 - YXD requires browser rendering for reliable results. MH56 is server rendered. Validate D-EXI against the first live sample because no working D-EXI number was available during initial implementation.
+
+## Automated Development Requests
+
+- The coding subprocess may edit and test its isolated worktree, but must not commit, push, merge, or deploy. The development-request wrapper owns those actions.
+- Detect changes against the captured base SHA, including commits created by the subprocess. Do not rely only on the working-tree diff against `HEAD`.
+- Preserve the coding subprocess final response. A clarification is `needs_input`, not a successful no-op.
+- Store each attempt and phase as durable D1 run and event records. Redact tokens and cap stored output.
+- Mark a request completed only after required checks, publication to `main`, successful GitHub deployment, and live version verification.
+- Run the production local agent as scheduled single cycles from its dedicated `origin/main` worktree so code and configuration reload on every cycle.

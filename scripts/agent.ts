@@ -36,11 +36,25 @@ async function main() {
   log(`  AI backend: ${config.aiBackend}`);
   if (!config.radarToken) log('WARNING: No RADAR_TOKEN set. API calls may fail with 401.');
 
+  // Development requests have their own durable lease, phase history, and
+  // timeouts. Keep them outside the scan watchdog so a valid implementation
+  // or production deployment is not cut off by the search tick budget.
+  try {
+    await processDevRequests();
+  } catch (error) {
+    log(`Dev request error: ${error}`);
+  }
+
   await runGuardedTick();
 
   if (!config.once) {
     log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
     setInterval(async () => {
+      try {
+        await processDevRequests();
+      } catch (error) {
+        log(`Dev request error: ${error}`);
+      }
       await runGuardedTick();
       log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
     }, config.pollIntervalMs);
@@ -93,15 +107,6 @@ async function tick(): Promise<TickOutcome> {
   }
 
   const errors: string[] = [];
-
-  // Process pending dev requests every tick, regardless of scan tier
-  try {
-    await processDevRequests();
-  } catch (error) {
-    log(`Dev request error: ${error}`);
-    errors.push(`开发请求处理失败：${error instanceof Error ? error.message : String(error)}`);
-  }
-
   // Refine newly added interests into clean, searchable topics (once each)
   try {
     await optimizeInterests();

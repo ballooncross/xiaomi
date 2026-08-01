@@ -333,14 +333,70 @@ export type AiContextDocument = {
 
 export type DevRequestStatus = 'pending' | 'in_progress' | 'completed' | 'rejected' | 'replied';
 
+export type DevRequestRunStatus = 'running' | 'succeeded' | 'needs_input' | 'failed' | 'cancelled';
+
+export type DevRequestPhase =
+  | 'planning'
+  | 'implementing'
+  | 'verifying'
+  | 'publishing'
+  | 'deploying'
+  | 'completed'
+  | 'waiting_for_input'
+  | 'failed';
+
 export type DevRequest = {
   id: string;
   text: string;
   status: DevRequestStatus;
   response: string;
   branch?: string;
+  parentRequestId?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type DevRequestRun = {
+  id: string;
+  requestId: string;
+  attempt: number;
+  status: DevRequestRunStatus;
+  phase: DevRequestPhase;
+  runnerId: string;
+  runnerVersion: string;
+  backend: string;
+  baseSha: string;
+  resultSha: string;
+  branch: string;
+  summary: string;
+  errorCategory: string;
+  leaseExpiresAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  updatedAt?: string;
+};
+
+export type DevRequestEvent = {
+  id: string;
+  requestId: string;
+  runId: string;
+  sequence: number;
+  phase: DevRequestPhase;
+  level: 'info' | 'warning' | 'error';
+  eventType: string;
+  message: string;
+  payload?: Record<string, unknown>;
+  createdAt?: string;
+};
+
+export type DevRequestRunner = {
+  id: string;
+  status: string;
+  version: string;
+  backend: string;
+  gitSha: string;
+  detail: string;
+  lastSeenAt?: string;
 };
 
 export type AgentOutcomeStats = {
