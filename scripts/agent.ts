@@ -75,12 +75,12 @@ type TickOutcome = {
 
 /**
  * Run one tick with a hard time budget. A tick that hangs (e.g. a wedged
- * network call) must never block future ticks — the whole reason the agent
- * previously went silent for hours. The watchdog is shorter than the poll
- * interval so the next scheduled tick always gets a clean slate.
+ * network call) must never block future ticks. Without this guard, the agent
+ * previously went silent for hours. The production scheduler runs isolated
+ * single ticks, so the watchdog can allow longer scans without hanging forever.
  */
 async function runGuardedTick(): Promise<void> {
-  const budgetMs = Math.max(60000, config.pollIntervalMs - 60000);
+  const budgetMs = config.tickBudgetMs;
   const currentTick = ++tickCount;
   const startedAt = Date.now();
   log(`Heartbeat: tick #${currentTick} starting (budget ${Math.round(budgetMs / 1000)}s)`);

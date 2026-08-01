@@ -42,6 +42,7 @@ export const config = {
   once: process.argv.includes('--once'),
 
   pollIntervalMs: 10 * 60 * 1000,
+  tickBudgetMs: 18 * 60 * 1000,
   fullScanIntervalHours: 4,
   deepScanIntervalHours: 24,
   signalChangeThreshold: 3,
