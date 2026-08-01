@@ -47,6 +47,11 @@ async function main() {
 
   await runGuardedTick();
 
+  if (config.once) {
+    log('Single run complete.');
+    process.exit(0);
+  }
+
   if (!config.once) {
     log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
     setInterval(async () => {

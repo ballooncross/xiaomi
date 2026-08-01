@@ -29,7 +29,9 @@ The installed launch agent runs one cycle every ten minutes from a dedicated
 detached worktree tracking `origin/main`. Each cycle reloads the current code
 and `scripts/.env`, so changing the configured AI backend does not require a
 long-lived Node process restart. Dependencies are installed inside the runtime
-and refreshed only when `package-lock.json` changes.
+and refreshed only when `package-lock.json` changes. Single-run mode exits
+after the guarded scan even if a timed-out scan still has unresolved promises,
+so launchd can start the next scheduled cycle.
 
 Monitor: `tail -f /tmp/radar-agent.log` · status `pgrep -fl agent.ts` · stop `kill $(pgrep -f agent.ts)`.
 
