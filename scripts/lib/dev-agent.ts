@@ -280,7 +280,7 @@ async function implementInWorktree(
         errorCategory: 'deployment_unverified'
       };
     }
-    await event(context, 'deploying', 'deployment_verified', 'GitHub deployment and live footer were verified.', {
+    await event(context, 'deploying', 'deployment_verified', 'GitHub deployment and live app version were verified.', {
       resultSha: publishSha,
       workflowUrl: deployment.workflowUrl,
       liveVersion: deployment.liveVersion
@@ -403,7 +403,7 @@ async function waitForDeployment(
           const liveVersion = await waitForLiveVersion(expectedVersion);
           return liveVersion
             ? { success: true, detail: 'Deployment succeeded.', workflowUrl, liveVersion }
-            : { success: false, detail: `Workflow succeeded, but live footer did not show ${expectedVersion}.`, workflowUrl };
+            : { success: false, detail: `Workflow succeeded, but the live version endpoint did not show ${expectedVersion}.`, workflowUrl };
         }
       }
     } catch (error) {
