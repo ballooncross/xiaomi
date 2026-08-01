@@ -1452,6 +1452,7 @@
   function jobStatusLabel(status: string | undefined) {
     const labels: Record<string, string> = {
       ok: '正常',
+      running: '处理中',
       skipped: '跳过',
       found_earlier: '发现更早日期',
       blocked: '被验证拦截',
@@ -1464,6 +1465,7 @@
   function jobStatusClass(job: CronJobStatus) {
     if (!job.enabled) return 'disabled';
     if (!job.lastRun) return 'idle';
+    if (job.lastRun.status === 'running') return 'running';
     if (job.lastRun.status === 'ok' || job.lastRun.status === 'found_earlier') return 'success';
     if (job.lastRun.status === 'skipped') return 'skipped';
     return 'error';
@@ -2520,7 +2522,7 @@
               <div class="notebook-head compact-head">
                 <div>
                   <h2>定时任务状态</h2>
-                  <span>Cloudflare Cron 的启用状态和最近一次运行结果。</span>
+                  <span>Cloudflare Cron 与本地 Agent 的启用状态和最近一次运行结果。</span>
                 </div>
               </div>
               <div class="cron-job-list">
@@ -5012,6 +5014,18 @@
 
   .cron-job-row.success .cron-dot {
     background: var(--jade);
+  }
+
+  .cron-job-row.running .cron-dot {
+    background: #3f7fbc;
+    animation: cron-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes cron-pulse {
+    50% {
+      opacity: 0.35;
+      transform: scale(0.8);
+    }
   }
 
   .cron-job-row.skipped .cron-dot {

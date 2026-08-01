@@ -18,3 +18,8 @@
 - Production deploys via GitHub Actions on `main`. The workflow runs `npm version patch` before build/deploy, then commits `package.json` / `package-lock.json` with `[skip ci]` after a successful deploy so the live footer and git stay aligned.
 - Do not manually bump the patch version just for a normal production deploy; CI owns that. Prefer intentional pre-bumps only for special releases.
 - After merging, confirm the GitHub deployment succeeded, Cloudflare production references the merged commit, and the live footer shows the new patch version.
+
+## Local Agent Status
+
+- The local agent reports every tick to `POST /api/agent/status` with `running`, `ok`, or `error`.
+- Keep the `local-agent` entry in the 定时任务状态 list aligned with that endpoint so stale runs and failures remain visible to admins.

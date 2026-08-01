@@ -21,6 +21,8 @@ nohup caffeinate -i npx tsx scripts/agent.ts > /tmp/radar-agent.log 2>&1 &
 
 Monitor: `tail -f /tmp/radar-agent.log` · status `pgrep -fl agent.ts` · stop `kill $(pgrep -f agent.ts)`.
 
+Each tick also reports `running`, `ok`, or `error` to the radar. Admins can see the latest tick time and detail under 我的 > 工具 > 定时任务状态 > 本地 AI Agent. If the process stops reporting, the last timestamp remains visible so a stale agent is easy to spot.
+
 ## How a tick works
 
 Every 10 minutes the agent pulls `/api/agent/context` and decides a scan tier:
@@ -62,6 +64,7 @@ All under `/api/agent/`, authenticated with the `x-admin-token` header:
 - `POST /api/agent/signal` — preference signals: `interest`, `note`, `not_interested` (auto-creates blacklist topic), `region_hint`, `source_suggestion`, `free_text`
 - `POST /api/agent/context/compile` — force Layer 1 (raw signals) -> Layer 2 (structured context) recompile; also runs after every 5+ new signals and daily at 00:30 UTC
 - `GET /api/agent/feed/outcomes` — how agent submissions performed (save/dismiss rates by topic and source)
+- `POST /api/agent/status`: record the local process tick as `running`, `ok`, or `error` for the admin status card
 
 ## Track vs save
 
