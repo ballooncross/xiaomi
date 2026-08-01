@@ -1,4 +1,5 @@
 import type { FeedbackAction, RadarItem, WatchTopic } from './types';
+import { feedForItemKind } from '$lib/interests';
 
 export const MAX_TREND_AGE_DAYS = 28;
 
@@ -19,18 +20,19 @@ export type ScoringContext = {
 };
 
 export function scoreItem(item: RadarItem, topics: WatchTopic[], ctx?: ScoringContext): RadarItem {
+  const relevantTopics = topics.filter((topic) => topic.feed === feedForItemKind(item.kind));
   const haystack = [item.title, item.summary, item.description, item.location, ...item.artists, ...item.topics]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
 
-  if (topics.some((topic) => topic.enabled && topic.mode === 'blacklist' && matchesTopic(haystack, topic))) {
+  if (relevantTopics.some((topic) => topic.enabled && topic.mode === 'blacklist' && matchesTopic(haystack, topic))) {
     return { ...item, score: 0, status: 'dismissed', summary: item.summary || fallbackSummary(item) };
   }
 
   let score = sourceWeight[item.sourceType] ?? 5;
 
-  for (const topic of topics) {
+  for (const topic of relevantTopics) {
     if (!topic.enabled || topic.mode === 'blacklist') continue;
     const names = [topic.name, ...topic.aliases].map((value) => value.toLowerCase());
     if (names.some((name) => haystack.includes(name))) score += topic.priority * 10;
@@ -66,6 +68,20 @@ export function scoreItem(item: RadarItem, topics: WatchTopic[], ctx?: ScoringCo
   }
 
   return { ...item, score: Math.max(0, Math.min(score, 100)), summary: item.summary || fallbackSummary(item) };
+}
+
+/** Hide legacy catalog items whose only personal match belongs to the other feed. */
+export function isCrossFeedInterestLeak(item: RadarItem, topics: WatchTopic[]): boolean {
+  if (item.status === 'saved' || item.status === 'tracking') return false;
+  const itemFeed = feedForItemKind(item.kind);
+  const haystack = [item.title, item.summary, item.description, item.location, ...item.artists, ...item.topics]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const matches = topics.filter(
+    (topic) => topic.enabled && topic.mode === 'follow' && matchesTopic(haystack, topic)
+  );
+  return matches.some((topic) => topic.feed !== itemFeed) && !matches.some((topic) => topic.feed === itemFeed);
 }
 
 function matchesTopic(haystack: string, topic: WatchTopic): boolean {

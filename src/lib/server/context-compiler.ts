@@ -13,14 +13,16 @@ export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
 
   const version = (latestContext?.version ?? 0) + 1;
 
+  const trendTopics = topics.filter((topic) => topic.feed === 'trends');
+  const trendFeedback = recentFeedback.filter((feedback) => feedback.kind !== 'concert');
   const tracking = buildTracking(savedItems);
-  const interestProfile = buildInterestProfile(topics, signals, recentFeedback);
+  const interestProfile = buildInterestProfile(trendTopics, signals, trendFeedback);
   const queryStrategies = [
     ...buildTrackingStrategies(tracking),
-    ...buildQueryStrategies(topics, signals, recentFeedback)
+    ...buildQueryStrategies(trendTopics, signals, trendFeedback)
   ];
-  const activeThemes = detectActiveThemes(recentFeedback);
-  const sources = buildSourceConfig(recentFeedback, agentStats, signals);
+  const activeThemes = detectActiveThemes(trendFeedback);
+  const sources = buildSourceConfig(trendFeedback, agentStats, signals);
   const constraints = buildConstraints(signals);
 
   const regionHints = signals
@@ -59,12 +61,19 @@ export async function compileContext(db: RadarDb): Promise<AiContextDocument> {
   return doc;
 }
 
-type FeedbackRecord = { itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string };
+type FeedbackRecord = {
+  itemId: string;
+  action: string;
+  topics: string[];
+  sourceType: string;
+  kind?: RadarItem['kind'];
+  createdAt: string;
+};
 
 /** 重点跟踪 items become ongoing stories the agent hunts updates for. */
 function buildTracking(items: RadarItem[]): AiContextDocument['tracking'] {
   return items
-    .filter((item) => item.status === 'tracking')
+    .filter((item) => item.status === 'tracking' && item.kind !== 'concert')
     .slice(0, 10)
     .map((item) => ({
       itemId: item.id,

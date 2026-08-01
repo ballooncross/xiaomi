@@ -18,7 +18,7 @@ type PendingInterest = {
   aliases: string[];
   category: string;
   priority: number;
-  type: string;
+  feed: 'concerts' | 'trends';
   mode: string;
 };
 
@@ -96,7 +96,7 @@ For each interest below, rewrite it into one or more concrete topics:
 - "name": a SHORT searchable concept (max ~5 words). No sentences, no parentheses, no "(aliases: ...)" text.
 - "aliases": array of useful synonyms/translations for searching. Include BOTH an English and a 中文 form when relevant. Keep 2-6 aliases.
 - Split bundled interests into SEPARATE topics. Example: "展览礼品节宠物节等 coffee festival" -> three topics (gift fair, pet expo, coffee festival).
-- Keep "category" unless clearly wrong (allowed: business, career, life, geopolitics, concerts, general). Keep "priority" (1-5) unless clearly wrong.
+- Keep "category" unless clearly wrong (allowed: business, career, life, geopolitics, general). Keep "priority" (1-5) unless clearly wrong.
 - If an entry is NOT a real search topic but a complaint/instruction/feedback (e.g. "too much BYD, reduce it"), set "drop": true and omit replacements.
 - Preserve the user's original intent and language mix. Do not invent unrelated topics.
 
@@ -148,7 +148,7 @@ function parseOptimizations(text: string, pending: PendingInterest[]): Optimizat
   }
 }
 
-const CATEGORIES = new Set(['business', 'career', 'life', 'geopolitics', 'concerts', 'general']);
+const CATEGORIES = new Set(['business', 'career', 'life', 'geopolitics', 'general']);
 
 function normalizeReplacement(
   raw: unknown

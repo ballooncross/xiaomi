@@ -100,6 +100,6 @@ export function updateStateAfterScan(state: AgentState, context: AgentContext, t
 
 function activeTopicIds(context: AgentContext): string[] {
   return context.watchTopics
-    .filter((topic) => topic.enabled && topic.mode !== 'blacklist')
+    .filter((topic) => topic.enabled && topic.mode !== 'blacklist' && topic.feed === 'trends')
     .map((topic) => topic.id);
 }

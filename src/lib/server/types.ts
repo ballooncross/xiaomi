@@ -1,4 +1,5 @@
-export type WatchType = 'artist' | 'topic' | 'source';
+export type InterestFeed = 'concerts' | 'trends';
+export type TrendCategory = 'general' | 'business' | 'career' | 'life' | 'geopolitics';
 export type WatchMode = 'follow' | 'blacklist';
 export type OptimizeStatus = 'pending' | 'optimized' | 'locked';
 export type ItemKind = 'concert' | 'trend' | 'news' | 'opportunity' | 'insight';
@@ -10,10 +11,12 @@ export type DateCategory = 'birthday' | 'child_birthday' | 'anniversary' | 'memo
 
 export type WatchTopic = {
   id: string;
-  type: WatchType;
+  /** Strict processing lane. Concert interests never enter trend or news discovery. */
+  feed: InterestFeed;
   name: string;
   aliases: string[];
-  category: string;
+  /** Trend classification. Concert interests always use `general`. */
+  category: TrendCategory;
   priority: number;
   mode: WatchMode;
   enabled: boolean;

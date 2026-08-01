@@ -20,6 +20,8 @@ export const GET: RequestHandler = async ({ request, platform }) => {
     db.getRecentItemSummaries(7),
     db.listJobRuns('all-fetch', 1),
   ]);
+  const trendTopics = topics.filter((topic) => topic.feed === 'trends');
+  const trendFeedback = recentFeedback.filter((feedback) => feedback.kind !== 'concert');
 
   // Compute feedback patterns
   const savedTopics = new Set<string>();
@@ -27,7 +29,7 @@ export const GET: RequestHandler = async ({ request, platform }) => {
   const kindCounts: Record<string, number> = {};
   const sourceCounts: Record<string, number> = {};
 
-  for (const f of recentFeedback) {
+  for (const f of trendFeedback) {
     if (f.action === 'save' || f.action === 'track' || f.action === 'more_like_this') {
       for (const t of f.topics) savedTopics.add(t);
     }
@@ -38,7 +40,7 @@ export const GET: RequestHandler = async ({ request, platform }) => {
 
   // Engagement signals
   const topicEngagement: Record<string, { saves: number; dismisses: number; total: number }> = {};
-  for (const f of recentFeedback) {
+  for (const f of trendFeedback) {
     for (const t of f.topics) {
       if (!topicEngagement[t]) topicEngagement[t] = { saves: 0, dismisses: 0, total: 0 };
       topicEngagement[t].total++;
@@ -56,8 +58,8 @@ export const GET: RequestHandler = async ({ request, platform }) => {
     .map(([topic, e]) => ({ topic, dismissRate: e.dismisses / e.total, count: e.total }));
 
   return json({
-    watchTopics: topics,
-    recentFeedback: recentFeedback.slice(0, 50),
+    watchTopics: trendTopics,
+    recentFeedback: trendFeedback.slice(0, 50),
     feedbackPatterns: {
       savedTopics: [...savedTopics],
       dismissedTopics: [...dismissedTopics],

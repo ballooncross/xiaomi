@@ -19,7 +19,7 @@
   function featureAllowed(id: FeatureId): boolean {
     return Boolean(data.features?.[id]?.allowed);
   }
-  type PreferenceView = 'all' | WatchTopic['type'] | WatchTopic['mode'];
+  type PreferenceView = WatchTopic['feed'] | 'all' | 'blacklist';
   type ReminderView = DateReminder & {
     nextDate: string;
     daysLeft: number;
@@ -99,20 +99,20 @@
   let digestOpen = $state(false);
   let addWatchOpen = $state(false);
   let newWatchName = $state('');
-  let newWatchType = $state<WatchTopic['type']>('topic');
-  let newWatchCategory = $state('business');
+  let newWatchFeed = $state<WatchTopic['feed']>('trends');
+  let newWatchCategory = $state<WatchTopic['category']>('business');
   let newWatchPriority = $state(4);
   let newWatchMode = $state<WatchTopic['mode']>('follow');
   let newWatchOptimize = $state(true);
   let editingTopicId = $state<string | null>(null);
   let editWatchName = $state('');
-  let editWatchType = $state<WatchTopic['type']>('topic');
-  let editWatchCategory = $state('business');
+  let editWatchFeed = $state<WatchTopic['feed']>('trends');
+  let editWatchCategory = $state<WatchTopic['category']>('business');
   let editWatchPriority = $state(3);
   let editWatchMode = $state<WatchTopic['mode']>('follow');
   let editWatchOptimize = $state(true);
   let preferenceQuery = $state('');
-  let preferenceView = $state<PreferenceView>('all');
+  let preferenceView = $state<PreferenceView>('trends');
   let feedbackPending = $state<string | null>(null);
   let addWatchPending = $state(false);
 
@@ -516,9 +516,8 @@
 
   const preferenceTabs: Array<{ id: PreferenceView; label: string }> = [
     { id: 'all', label: '全部' },
-    { id: 'artist', label: '音乐人' },
-    { id: 'topic', label: '主题' },
-    { id: 'source', label: '来源' },
+    { id: 'concerts', label: '演出追踪' },
+    { id: 'trends', label: '趋势兴趣' },
     { id: 'blacklist', label: '已屏蔽' }
   ];
 
@@ -559,8 +558,8 @@
       .filter((item) => matchesSearch(item, searchQuery))
   );
   const savedItemCount = $derived(savedItems.filter(isSavedItem).length);
-  const watchTopics = $derived(topics.filter((topic) => topic.type === 'artist' && topic.mode !== 'blacklist'));
-  const interestTopics = $derived(topics.filter((topic) => topic.type !== 'artist' && topic.mode !== 'blacklist'));
+  const watchTopics = $derived(topics.filter((topic) => topic.feed === 'concerts' && topic.mode !== 'blacklist'));
+  const interestTopics = $derived(topics.filter((topic) => topic.feed === 'trends' && topic.mode !== 'blacklist'));
   const blacklistTopics = $derived(topics.filter((topic) => topic.mode === 'blacklist'));
   const filteredPreferenceTopics = $derived(filterPreferenceTopics(topics, preferenceQuery, preferenceView));
   const preferenceMatchCount = $derived(countPreferenceTopics(topics, preferenceQuery, preferenceView));
@@ -570,9 +569,9 @@
   );
   const greeting = $derived(getGreeting(activeView, visibleItems.length));
   const digestPreview = $derived(buildDigestPreview(items));
-  const addWatchTitle = $derived(getAddWatchTitle(newWatchType, newWatchMode));
-  const addWatchHint = $derived(getAddWatchHint(newWatchType, newWatchCategory, newWatchMode));
-  const addWatchPlaceholder = $derived(getAddWatchPlaceholder(newWatchType, newWatchCategory, newWatchMode));
+  const addWatchTitle = $derived(getAddWatchTitle(newWatchFeed, newWatchMode));
+  const addWatchHint = $derived(getAddWatchHint(newWatchFeed, newWatchCategory, newWatchMode));
+  const addWatchPlaceholder = $derived(getAddWatchPlaceholder(newWatchFeed, newWatchCategory, newWatchMode));
   const nextReminder = $derived(reminders.reduce<ReminderView | undefined>((closest, reminder) => {
     if (!closest || reminder.daysLeft < closest.daysLeft) return reminder;
     return closest;
@@ -1119,23 +1118,24 @@
     }
   }
 
-  function openAddWatch(type: WatchTopic['type'], category: string) {
-    newWatchType = type;
-    newWatchCategory = category;
-    newWatchPriority = type === 'artist' ? 5 : 4;
+  function openAddWatch(feed: WatchTopic['feed'], category: WatchTopic['category'] = 'general') {
+    newWatchFeed = feed;
+    newWatchCategory = feed === 'concerts' ? 'general' : category;
+    newWatchPriority = feed === 'concerts' ? 5 : 4;
     newWatchMode = 'follow';
+    newWatchOptimize = feed === 'trends';
     addWatchError = '';
     addWatchOpen = true;
     editingTopicId = null;
     searchOpen = false;
     digestOpen = false;
-    const targetView = type === 'artist' ? 'concerts' : 'trends';
+    const targetView = feed;
     activeView = targetView;
     void syncViewPath(targetView);
   }
 
   function openAddBlacklist() {
-    openAddWatch('artist', 'concerts');
+    openAddWatch('concerts');
     newWatchMode = 'blacklist';
   }
 
@@ -1147,13 +1147,13 @@
       return;
     }
 
-    const optimizeStatus: WatchTopic['optimizeStatus'] = newWatchOptimize ? 'pending' : 'locked';
+    const optimizeStatus: WatchTopic['optimizeStatus'] = newWatchFeed === 'trends' && newWatchOptimize ? 'pending' : 'locked';
     const optimisticTopic: WatchTopic = {
-      id: `${newWatchType}-${name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-')}`,
-      type: newWatchType,
+      id: `${newWatchFeed}-${name.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-')}`,
+      feed: newWatchFeed,
       name,
       aliases: [],
-      category: newWatchCategory,
+      category: newWatchFeed === 'concerts' ? 'general' : newWatchCategory,
       priority: newWatchPriority,
       mode: newWatchMode,
       enabled: true,
@@ -1168,8 +1168,8 @@
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         name,
-        type: newWatchType,
-        category: newWatchCategory,
+        feed: newWatchFeed,
+        category: newWatchFeed === 'concerts' ? 'general' : newWatchCategory,
         priority: newWatchPriority,
         mode: newWatchMode,
         optimizeStatus
@@ -1186,7 +1186,7 @@
   function startEditTopic(topic: WatchTopic) {
     editingTopicId = topic.id;
     editWatchName = topic.name;
-    editWatchType = topic.type;
+    editWatchFeed = topic.feed;
     editWatchCategory = topic.category;
     editWatchPriority = topic.priority;
     editWatchMode = topic.mode;
@@ -1210,17 +1210,19 @@
     const prevStatus = previous?.optimizeStatus ?? 'optimized';
     // Checked = open it back up for the agent; unchecked keeps whatever
     // non-pending state it had (already-optimized stays optimized, else locked).
-    const optimizeStatus: WatchTopic['optimizeStatus'] = editWatchOptimize
+    const optimizeStatus: WatchTopic['optimizeStatus'] = editWatchFeed === 'concerts'
+      ? 'locked'
+      : editWatchOptimize
       ? 'pending'
       : prevStatus === 'pending'
         ? 'locked'
         : prevStatus;
     const optimisticTopic: WatchTopic = {
       id: editId,
-      type: editWatchType,
+      feed: editWatchFeed,
       name,
       aliases: previous?.aliases ?? [],
-      category: editWatchCategory,
+      category: editWatchFeed === 'concerts' ? 'general' : editWatchCategory,
       priority: editWatchPriority,
       mode: editWatchMode,
       enabled: true,
@@ -1235,8 +1237,8 @@
       body: JSON.stringify({
         id: editId,
         name,
-        type: editWatchType,
-        category: editWatchCategory,
+        feed: editWatchFeed,
+        category: editWatchFeed === 'concerts' ? 'general' : editWatchCategory,
         priority: editWatchPriority,
         mode: editWatchMode,
         enabled: true,
@@ -1484,16 +1486,16 @@
 
   function matchesPreferenceTopic(topic: WatchTopic, query: string, view: PreferenceView) {
     if (view !== 'all') {
-      if (view === 'blacklist' || view === 'follow') {
+      if (view === 'blacklist') {
         if (topic.mode !== view) return false;
-      } else if (topic.type !== view || topic.mode === 'blacklist') {
+      } else if (topic.feed !== view || topic.mode === 'blacklist') {
         return false;
       }
     }
 
     const normalized = query.trim().toLowerCase();
     if (!normalized) return true;
-    return [topic.name, topic.type, topic.category, topic.mode, ...topic.aliases].join(' ').toLowerCase().includes(normalized);
+    return [topic.name, topic.feed, topic.category, topic.mode, ...topic.aliases].join(' ').toLowerCase().includes(normalized);
   }
 
   function buildDigestPreview(sourceItems: RadarItem[]) {
@@ -1507,27 +1509,23 @@
     return lines.join('\n');
   }
 
-  function getAddWatchTitle(type: WatchTopic['type'], mode: WatchTopic['mode']) {
+  function getAddWatchTitle(feed: WatchTopic['feed'], mode: WatchTopic['mode']) {
     if (mode === 'blacklist') return '添加屏蔽规则';
-    if (type === 'artist') return '添加音乐人';
-    if (type === 'source') return '添加来源';
-    return '添加兴趣';
+    return feed === 'concerts' ? '添加演出追踪' : '添加趋势兴趣';
   }
 
-  function getAddWatchHint(type: WatchTopic['type'], category: string, mode: WatchTopic['mode']) {
-    if (mode === 'blacklist') return '从自动发现中隐藏匹配的演出、主题或来源';
-    if (type === 'artist') return '跟踪新加坡演唱会和活动信号';
-    if (type === 'source') return '跟踪可信网站、博客或官方账号';
+  function getAddWatchHint(feed: WatchTopic['feed'], category: string, mode: WatchTopic['mode']) {
+    if (mode === 'blacklist') return feed === 'concerts' ? '隐藏匹配的演出活动' : '隐藏匹配的趋势内容';
+    if (feed === 'concerts') return '只跟踪新加坡演唱会和现场演出，不抓取音乐人新闻或娱乐八卦';
     if (category === 'business') return '跟踪公司、产品、市场或创业机会信号';
     if (category === 'career') return '跟踪岗位市场、技能和招聘信号';
     if (category === 'life') return '跟踪本地生活、政策变化、消费和日常实用信号';
     return '在每日趋势流中跟踪这个主题';
   }
 
-  function getAddWatchPlaceholder(type: WatchTopic['type'], category: string, mode: WatchTopic['mode']) {
+  function getAddWatchPlaceholder(feed: WatchTopic['feed'], category: string, mode: WatchTopic['mode']) {
     if (mode === 'blacklist') return '例如：要隐藏的艺人或活动关键词';
-    if (type === 'artist') return '例如：One Spark、TWICE、Coldplay、陈奕迅';
-    if (type === 'source') return '例如：JYPETWICE 官方 X、CNA、Music Matters';
+    if (feed === 'concerts') return '例如：TWICE、Coldplay、陈奕迅';
     if (category === 'business') return '例如：Dreame、追觅、消费硬件风险';
     if (category === 'career') return '例如：新加坡 AI 产品岗位';
     if (category === 'life') return '例如：新加坡 HDB 政策、COE 价格、本地餐饮变化';
@@ -1535,16 +1533,18 @@
   }
 
   function preferenceMeta(topic: WatchTopic) {
-    const type = topic.type === 'artist' ? '音乐人' : topic.type === 'source' ? '来源' : '主题';
+    const type = topic.feed === 'concerts' ? '演出追踪' : '趋势兴趣';
     const mode = topic.mode === 'blacklist' ? '已屏蔽' : '已关注';
     const categories: Record<string, string> = {
       business: '商业',
       career: '职业',
       life: '生活',
       geopolitics: '地缘政治',
-      concerts: '演出'
+      general: '通用'
     };
-    return `${type} · ${mode} · ${categories[topic.category] ?? topic.category} · P${topic.priority}`;
+    return topic.feed === 'concerts'
+      ? `${type} · ${mode} · P${topic.priority}`
+      : `${type} · ${mode} · ${categories[topic.category] ?? topic.category} · P${topic.priority}`;
   }
 
   function getGreeting(view: View, count: number) {
@@ -1647,7 +1647,7 @@
       <circle cx="11" cy="11" r="6.2"></circle>
       <path d="m16 16 4.2 4.2"></path>
     </svg>
-    <input bind:value={preferenceQuery} placeholder="搜索音乐人、主题、来源..." />
+    <input bind:value={preferenceQuery} placeholder="搜索演出追踪或趋势兴趣..." />
   </div>
 
   <div class="preference-tabs" aria-label="偏好筛选">
@@ -1696,7 +1696,7 @@
         </div>
       </article>
     {:else}
-      <p class="quiet-copy">没有匹配的偏好。你可以添加音乐人、兴趣、来源或屏蔽规则。</p>
+      <p class="quiet-copy">没有匹配的偏好。你可以添加演出追踪、趋势兴趣或屏蔽规则。</p>
     {/each}
   </div>
 {/snippet}
@@ -1735,7 +1735,7 @@
         </svg>
       </button>
       <button class:active={digestOpen} class="button" onclick={toggleDigest}>摘要</button>
-      <button class="button primary" onclick={() => openAddWatch('topic', 'business')}>添加关注</button>
+      <button class="button primary" onclick={() => openAddWatch('trends', 'business')}>添加趋势兴趣</button>
     </div>
   </nav>
 
@@ -1808,18 +1808,19 @@
               </div>
               <div class="watch-form">
                 <input bind:value={newWatchName} placeholder={addWatchPlaceholder} />
-                <select bind:value={newWatchType} aria-label="关注类型">
-                  <option value="topic">主题</option>
-                  <option value="artist">音乐人</option>
-                  <option value="source">来源</option>
+                <select bind:value={newWatchFeed} aria-label="关注用途">
+                  <option value="trends">趋势兴趣</option>
+                  <option value="concerts">演出追踪</option>
                 </select>
+                {#if newWatchFeed === 'trends'}
                 <select bind:value={newWatchCategory} aria-label="关注分类">
                   <option value="business">商业</option>
                   <option value="career">职业</option>
                   <option value="life">生活</option>
                   <option value="geopolitics">地缘政治</option>
-                  <option value="concerts">演出</option>
+                  <option value="general">通用</option>
                 </select>
+                {/if}
                 <select bind:value={newWatchPriority} aria-label="优先级">
                   <option value={1}>优先级 1</option>
                   <option value={2}>优先级 2</option>
@@ -1831,15 +1832,18 @@
                   <option value="follow">关注</option>
                   <option value="blacklist">屏蔽</option>
                 </select>
+                {#if newWatchFeed === 'trends'}
                 <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
                   <input type="checkbox" bind:checked={newWatchOptimize} />
                   AI 优化
                 </label>
+                {/if}
                 <button class="small-button primary" disabled={addWatchPending} onclick={addWatchTopic}>
                   {addWatchPending ? '添加中...' : '添加'}
                 </button>
               </div>
               {#if addWatchError}<p class="form-error">{addWatchError}</p>{/if}
+              {#if newWatchFeed === 'trends'}
               <div class="nl-interest">
                 <label for="nl-interest-input">或者直接用自然语言描述（AI 会理解细节和例外）</label>
                 <textarea
@@ -1855,6 +1859,7 @@
                   {#if nlInterestMessage}<span class="nl-interest-note">{nlInterestMessage}</span>{/if}
                 </div>
               </div>
+              {/if}
             </div>
           {/if}
 
@@ -1873,18 +1878,19 @@
               </div>
               <div class="watch-form edit-form">
                 <input bind:value={editWatchName} placeholder="偏好名称" />
-                <select bind:value={editWatchType} aria-label="关注类型">
-                  <option value="topic">主题</option>
-                  <option value="artist">音乐人</option>
-                  <option value="source">来源</option>
+                <select bind:value={editWatchFeed} aria-label="关注用途">
+                  <option value="trends">趋势兴趣</option>
+                  <option value="concerts">演出追踪</option>
                 </select>
+                {#if editWatchFeed === 'trends'}
                 <select bind:value={editWatchCategory} aria-label="关注分类">
                   <option value="business">商业</option>
                   <option value="career">职业</option>
                   <option value="life">生活</option>
                   <option value="geopolitics">地缘政治</option>
-                  <option value="concerts">演出</option>
+                  <option value="general">通用</option>
                 </select>
+                {/if}
                 <select bind:value={editWatchPriority} aria-label="优先级">
                   <option value={1}>优先级 1</option>
                   <option value={2}>优先级 2</option>
@@ -1896,10 +1902,12 @@
                   <option value="follow">关注</option>
                   <option value="blacklist">屏蔽</option>
                 </select>
+                {#if editWatchFeed === 'trends'}
                 <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
                   <input type="checkbox" bind:checked={editWatchOptimize} />
                   AI 优化
                 </label>
+                {/if}
                 <button class="small-button primary" disabled={topicPending === editingTopicId} onclick={saveTopicEdit}>
                   {topicPending === editingTopicId ? '保存中...' : '保存'}
                 </button>
@@ -1988,7 +1996,7 @@
             <div>
               <div class="eyebrow">偏好</div>
               <h1>兴趣与关注</h1>
-              <p>管理音乐人、趋势主题、来源和屏蔽规则。新账号会带一份基础兴趣包，可随时增删。</p>
+              <p>演出追踪只查活动，趋势兴趣用于新闻与机会发现。两条信息流相互隔离。</p>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button
@@ -1999,8 +2007,11 @@
               >
                 {starterPending ? '…' : '恢复基础兴趣'}
               </button>
-              <button class="small-button primary" type="button" onclick={() => openAddWatch('topic', 'business')}>
-                添加关注
+              <button class="small-button" type="button" onclick={() => openAddWatch('concerts')}>
+                添加演出追踪
+              </button>
+              <button class="small-button primary" type="button" onclick={() => openAddWatch('trends', 'business')}>
+                添加趋势兴趣
               </button>
             </div>
           </div>
@@ -2017,13 +2028,13 @@
             </section>
           {/if}
           <div class="settings-grid compact">
-            <button class:active={preferenceView === 'artist'} type="button" onclick={() => (preferenceView = 'artist')}>
+            <button class:active={preferenceView === 'concerts'} type="button" onclick={() => (preferenceView = 'concerts')}>
               <strong>{watchTopics.length}</strong>
-              <span>音乐人</span>
+              <span>演出追踪</span>
             </button>
-            <button class:active={preferenceView === 'topic'} type="button" onclick={() => (preferenceView = 'topic')}>
+            <button class:active={preferenceView === 'trends'} type="button" onclick={() => (preferenceView = 'trends')}>
               <strong>{interestTopics.length}</strong>
-              <span>兴趣主题</span>
+              <span>趋势兴趣</span>
             </button>
             <button class:active={preferenceView === 'blacklist'} type="button" onclick={() => (preferenceView = 'blacklist')}>
               <strong>{blacklistTopics.length}</strong>
@@ -2683,11 +2694,11 @@
             <div class="settings-grid compact">
               <button type="button" onclick={() => setView('interests')}>
                 <strong>{interestTopics.length}</strong>
-                <span>兴趣主题</span>
+                <span>趋势兴趣</span>
               </button>
               <button type="button" onclick={() => setView('interests')}>
                 <strong>{watchTopics.length}</strong>
-                <span>音乐人</span>
+                <span>演出追踪</span>
               </button>
               {#if featureAllowed('coe_page')}
               <button type="button" onclick={() => setView('coe')}>
@@ -3103,18 +3114,19 @@
       </div>
       <div class="modal-form watch-form">
         <input bind:value={newWatchName} placeholder={addWatchPlaceholder} />
-        <select bind:value={newWatchType} aria-label="关注类型">
-          <option value="topic">主题</option>
-          <option value="artist">音乐人</option>
-          <option value="source">来源</option>
+        <select bind:value={newWatchFeed} aria-label="关注用途">
+          <option value="trends">趋势兴趣</option>
+          <option value="concerts">演出追踪</option>
         </select>
+        {#if newWatchFeed === 'trends'}
         <select bind:value={newWatchCategory} aria-label="关注分类">
           <option value="business">商业</option>
           <option value="career">职业</option>
           <option value="life">生活</option>
           <option value="geopolitics">地缘政治</option>
-          <option value="concerts">演出</option>
+          <option value="general">通用</option>
         </select>
+        {/if}
         <select bind:value={newWatchPriority} aria-label="优先级">
           <option value={1}>优先级 1</option>
           <option value={2}>优先级 2</option>
@@ -3126,10 +3138,12 @@
           <option value="follow">关注</option>
           <option value="blacklist">屏蔽</option>
         </select>
+        {#if newWatchFeed === 'trends'}
         <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
           <input type="checkbox" bind:checked={newWatchOptimize} />
           AI 优化
         </label>
+        {/if}
       </div>
       {#if addWatchError}<p class="form-error">{addWatchError}</p>{/if}
       <div class="modal-actions">
@@ -3156,18 +3170,19 @@
       </div>
       <div class="modal-form watch-form">
         <input bind:value={editWatchName} placeholder="偏好名称" />
-        <select bind:value={editWatchType} aria-label="关注类型">
-          <option value="topic">主题</option>
-          <option value="artist">音乐人</option>
-          <option value="source">来源</option>
+        <select bind:value={editWatchFeed} aria-label="关注用途">
+          <option value="trends">趋势兴趣</option>
+          <option value="concerts">演出追踪</option>
         </select>
+        {#if editWatchFeed === 'trends'}
         <select bind:value={editWatchCategory} aria-label="关注分类">
           <option value="business">商业</option>
           <option value="career">职业</option>
           <option value="life">生活</option>
           <option value="geopolitics">地缘政治</option>
-          <option value="concerts">演出</option>
+          <option value="general">通用</option>
         </select>
+        {/if}
         <select bind:value={editWatchPriority} aria-label="优先级">
           <option value={1}>优先级 1</option>
           <option value={2}>优先级 2</option>
@@ -3179,10 +3194,12 @@
           <option value="follow">关注</option>
           <option value="blacklist">屏蔽</option>
         </select>
+        {#if editWatchFeed === 'trends'}
         <label class="check-row optimize-check" title="允许本地 AI 代理把这条兴趣整理成更精准的关键词（可拆分成多条）">
           <input type="checkbox" bind:checked={editWatchOptimize} />
           AI 优化
         </label>
+        {/if}
       </div>
       {#if editWatchError}<p class="form-error">{editWatchError}</p>{/if}
       <div class="modal-actions">

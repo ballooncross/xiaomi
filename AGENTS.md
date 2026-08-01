@@ -13,6 +13,13 @@
 - Treat web trend, news, and opportunity items with a missing or invalid publication date as unverified and exclude them from the radar.
 - Verify freshness fixes against the stored production row and the original article date, not only normalized in-memory fixtures.
 
+## Interest Processing Lanes
+
+- `watch_topics.feed` is the authoritative routing field: `concerts` or `trends`.
+- Concert interests are event trackers only. Never send them to news search, AI trend prompts, trend scoring, trend feedback learning, active-story follow-ups, or interest optimization.
+- Trend `category` values classify results but never route ingestion. Concert entries use `general` because concerts are represented by `feed`, not by a category value.
+- Actual source subscriptions belong to the source subsystem. Do not model a source as a user interest keyword.
+
 ## Versioned Deployments
 
 - Production deploys via GitHub Actions on `main`. The workflow runs `npm version patch` before build/deploy, then commits `package.json` / `package-lock.json` with `[skip ci]` after a successful deploy so the live footer and git stay aligned.

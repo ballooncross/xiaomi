@@ -4,10 +4,10 @@ import type { WatchTopic } from '../types';
 
 const baseTopic: WatchTopic = {
   id: 'artist-test',
-  type: 'artist',
+  feed: 'concerts',
   name: 'Test Artist',
   aliases: [],
-  category: 'concerts',
+  category: 'general',
   priority: 5,
   mode: 'follow',
   enabled: true

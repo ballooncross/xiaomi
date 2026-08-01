@@ -4,6 +4,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
 import { requireSessionUser } from '$lib/server/request-auth';
 import { runConcertFetchJob, runTrendFetchJob } from '$lib/server/jobs';
+import { interestFeedOf, normalizeTrendCategory } from '$lib/interests';
 import type { Env, WatchTopic } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -15,8 +16,8 @@ export const GET: RequestHandler = async ({ platform, locals }) => {
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
   const user = requireSessionUser(locals);
-  const body = (await request.json()) as Partial<WatchTopic>;
-  if (!body.name || !body.type) return json({ error: 'name and type are required' }, { status: 400 });
+  const body = (await request.json()) as WatchTopicInput;
+  if (!body.name) return json({ error: 'name is required' }, { status: 400 });
 
   const topic = topicFromBody(body);
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
@@ -28,9 +29,9 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
 export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
   const user = requireSessionUser(locals);
-  const body = (await request.json()) as Partial<WatchTopic>;
-  if (!body.id || !body.name || !body.type) {
-    return json({ error: 'id, name and type are required' }, { status: 400 });
+  const body = (await request.json()) as WatchTopicInput;
+  if (!body.id || !body.name) {
+    return json({ error: 'id and name are required' }, { status: 400 });
   }
 
   const topic = topicFromBody(body);
@@ -53,26 +54,28 @@ export const DELETE: RequestHandler = async ({ request, platform, locals }) => {
 
 async function fetchForTopic(env: Env, topic: WatchTopic): Promise<void> {
   if (topic.mode === 'blacklist') return;
-  if (topic.type === 'artist' || topic.category === 'concerts') {
+  if (topic.feed === 'concerts') {
     await runConcertFetchJob(env);
     return;
   }
   await runTrendFetchJob(env);
 }
 
-function topicFromBody(body: Partial<WatchTopic>): WatchTopic {
+type WatchTopicInput = Partial<WatchTopic> & { type?: 'artist' | 'topic' | 'source' };
+
+function topicFromBody(body: WatchTopicInput): WatchTopic {
   const name = body.name?.trim() ?? '';
-  const type = body.type ?? 'topic';
+  const feed = interestFeedOf(body);
   return {
-    id: body.id || `${type}-${slug(name)}`,
-    type,
+    id: body.id || `${feed}-${slug(name)}`,
+    feed,
     name,
     aliases: normalizeAliases(body.aliases),
-    category: body.category ?? (type === 'artist' ? 'concerts' : 'general'),
+    category: feed === 'concerts' ? 'general' : normalizeTrendCategory(body.category),
     priority: clampPriority(body.priority),
     mode: body.mode ?? 'follow',
     enabled: body.enabled ?? true,
-    optimizeStatus: body.optimizeStatus ?? 'pending'
+    optimizeStatus: feed === 'concerts' ? 'locked' : body.optimizeStatus ?? 'pending'
   };
 }
 

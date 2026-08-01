@@ -16,7 +16,7 @@ type BandsintownEvent = {
 
 export async function fetchBandsintownConcerts(env: Env, topics: WatchTopic[]): Promise<RadarItem[]> {
   const appId = env.BANDSINTOWN_APP_ID || 'personal-radar';
-  const artists = topics.filter((topic) => topic.enabled && topic.type === 'artist' && topic.mode !== 'blacklist').slice(0, 18);
+  const artists = topics.filter((topic) => topic.enabled && topic.feed === 'concerts' && topic.mode !== 'blacklist').slice(0, 18);
   const results = await Promise.all(artists.map((artist) => fetchArtistEvents(appId, artist.name)));
   return results.flat();
 }

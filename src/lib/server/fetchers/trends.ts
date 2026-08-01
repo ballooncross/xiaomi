@@ -67,7 +67,7 @@ const parser = new XMLParser({
 });
 
 export async function buildTrendSearchItems(topics: WatchTopic[]): Promise<RadarItem[]> {
-  const trendTopics = topics.filter((topic) => topic.enabled && topic.type === 'topic' && topic.category !== 'concerts');
+  const trendTopics = topics.filter((topic) => topic.enabled && topic.feed === 'trends');
   const topicItems = await Promise.all(trendTopics.slice(0, 8).map(fetchTopicItems));
   const rssItems = await fetchCuratedRssItems(trendTopics);
   return dedupeItems([...topicItems.flat(), ...rssItems])
