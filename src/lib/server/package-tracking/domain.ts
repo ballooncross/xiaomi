@@ -76,6 +76,9 @@ export function normalizePackageStatus(value: string): PackageStatus {
     '报关完成',
     '已开船',
     '开船',
+    '预计航班到达时间',
+    '正在中转',
+    '货物到仓',
     '清关',
     '到达',
     '离开'
