@@ -12,6 +12,7 @@ const MAX_PROVIDER_BYTES = 1_000_000;
 const PROVIDER_TIMEOUT_MS = 15_000;
 const BROWSER_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'PersonalRadarPackageTracker/1.0';
+const DEXI_USER_AGENT = 'Mozilla/5.0';
 
 type YxdRow = { trackingNumber: string; time: string; note: string; location: string };
 
@@ -60,23 +61,55 @@ export function parseYxdRows(rows: YxdRow[]): ProviderEvent[] {
   );
 }
 
-export function parseDexiXml(xml: string): ProviderEvent[] {
+export function parseDexiXml(xml: string, trackingNumber?: string): ProviderEvent[] {
   const $ = load(xml, { xmlMode: false });
   const events: ProviderEvent[] = [];
   $('tr').each((_, row) => {
-    const cells = $(row).find('td').toArray().map((cell) => $(cell).text().replace(/\s+/g, ' ').trim());
+    const cells = $(row).children('td').toArray().map((cell) => $(cell).text().replace(/\s+/g, ' ').trim());
+    const detailDateIndex = cells.findIndex((cell) => /^\d{2}\/\d{2}\/\d{4}$/.test(cell));
+    const detailDate = detailDateIndex >= 0
+      ? parseDexiDateTime(cells[detailDateIndex] ?? '', cells[detailDateIndex + 1] ?? '')
+      : undefined;
+    if (detailDate && cells[detailDateIndex + 3]) {
+      const message = cells[detailDateIndex + 3];
+      events.push({
+        status: normalizePackageStatus(message),
+        providerStatus: message,
+        message,
+        eventAt: detailDate,
+        location: cells[detailDateIndex + 2] || undefined
+      });
+      return;
+    }
+
     const timeIndex = cells.findIndex((cell) => /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(cell));
-    if (timeIndex < 0) return;
-    const time = cells[timeIndex];
-    const detail = cells.slice(timeIndex + 1).filter(Boolean);
-    const message = detail[0] ?? 'Tracking update';
-    const location = detail.length > 1 ? detail[detail.length - 1] : undefined;
+    if (timeIndex >= 0) {
+      const time = cells[timeIndex];
+      const detail = cells.slice(timeIndex + 1).filter(Boolean);
+      const message = detail[0] ?? 'Tracking update';
+      const location = detail.length > 1 ? detail[detail.length - 1] : undefined;
+      events.push({
+        status: normalizePackageStatus(message),
+        providerStatus: message,
+        message,
+        eventAt: parseProviderTimestamp(time),
+        location
+      });
+      return;
+    }
+
+    const trackingIndex = cells.findIndex((cell) =>
+      trackingNumber ? cell === trackingNumber : /^[A-Z0-9_-]{4,80}$/.test(cell)
+    );
+    if (trackingIndex < 0) return;
+    const eventAt = parseDexiOnTimestamp(cells[trackingIndex + 2] ?? '');
+    const message = cells[trackingIndex + 1] ?? '';
+    if (!eventAt || !message) return;
     events.push({
       status: normalizePackageStatus(message),
       providerStatus: message,
       message,
-      eventAt: parseProviderTimestamp(time),
-      location
+      eventAt
     });
   });
   return sortEvents(events);
@@ -137,28 +170,115 @@ async function lookupYxd(env: Env, trackingNumber: string): Promise<ProviderLook
 
 async function lookupDexi(trackingNumber: string): Promise<ProviderLookupResult> {
   const sourceUrl = 'http://www.d-exi.com/querytracks?tracknow=new';
-  const pageResponse = await providerFetch(sourceUrl);
+  const pageResponse = await providerFetch(sourceUrl, {
+    headers: { 'user-agent': DEXI_USER_AGENT }
+  });
   const cookie = pageResponse.headers.get('set-cookie')?.split(';')[0] ?? '';
   const pageHtml = await readBoundedText(pageResponse);
   const formState = pageHtml.match(/name=["']FormState["'][^>]*value=["']([^"']+)/i)?.[1] ?? '';
+  if (!formState) throw new Error('D-EXI did not return form state');
+  const tabId = `radar${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  const requestHeaders = {
+    'user-agent': DEXI_USER_AGENT,
+    ...(cookie ? { cookie } : {}),
+    'x-TabID': tabId,
+    'x-requested-with': 'XMLHttpRequest',
+    referer: sourceUrl
+  };
+  const fieldUrl = new URL('http://www.d-exi.com/querytracks_SEARCH_STR_value');
+  fieldUrl.search = new URLSearchParams({
+    _popup_: '0',
+    _event_: 'accepted',
+    value: trackingNumber,
+    _ajax_: '1',
+    _rnd_: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
+    formstate: formState,
+    _parentProc_: ''
+  }).toString();
+  const fieldResponse = await providerFetch(fieldUrl.toString(), { headers: requestHeaders });
+  await readBoundedText(fieldResponse, 'gb18030');
+
   const body = new URLSearchParams({
     FormState: formState,
     SEARCH_STR: trackingNumber,
     _event_: 'accepted',
-    value: 'search',
+    value: '搜索',
     _ajax_: '1'
   });
   const response = await providerFetch('http://www.d-exi.com/querytracks_TrackingSearchBtn_value', {
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
-      ...(cookie ? { cookie } : {})
+      ...requestHeaders
     },
     body
   });
   const xml = await readBoundedText(response, 'gb18030');
-  const events = parseDexiXml(xml);
-  return { providerId: 'dexi', sourceUrl, found: events.length > 0, events };
+  const summaryEvents = parseDexiXml(xml, trackingNumber);
+  const resultRow = findDexiResultRow(xml, trackingNumber);
+  let events = summaryEvents;
+  if (resultRow) {
+    const rowClickUrl = new URL('http://www.d-exi.com/querylist');
+    rowClickUrl.search = new URLSearchParams({
+      _event_: 'rowclicked',
+      _bidv_: resultRow,
+      _parentProc_: 'querytracks',
+      _parentRid_: '',
+      _ajax_: '1',
+      _popup_: '0',
+      _rid_: String((crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % 900_000 + 100_000),
+      _rnd_: crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+    }).toString();
+    const rowClickResponse = await providerFetch(rowClickUrl.toString(), { headers: requestHeaders });
+    await readBoundedText(rowClickResponse, 'gb18030');
+
+    const detailResponse = await providerFetch('http://www.d-exi.com/querytracksfm', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        ...requestHeaders
+      },
+      body: new URLSearchParams({
+        pressedbutton: 'change_btn',
+        _bidv_: resultRow,
+        FormState: formState
+      })
+    });
+    const detailHtml = await readBoundedText(detailResponse, 'gb18030');
+    const detailEvents = parseDexiXml(detailHtml, trackingNumber);
+    if (detailEvents.length > 0) events = detailEvents;
+  }
+  return {
+    providerId: 'dexi',
+    sourceUrl,
+    found: events.length > 0,
+    events,
+    estimatedDeliveryAt: estimatedDeliveryFromDexiEvents(events)
+  };
+}
+
+function findDexiResultRow(xml: string, trackingNumber: string): string | undefined {
+  const $ = load(xml, { xmlMode: false });
+  const row = $('tr').toArray()
+    .find((candidate) => $(candidate).children('td').toArray().some((cell) => $(cell).text().trim() === trackingNumber));
+  return row ? $(row).attr('data-nt-id') : undefined;
+}
+
+function parseDexiDateTime(date: string, time: string): string | undefined {
+  const match = `${date.trim()} ${time.trim()}`.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return undefined;
+  const [, day, month, year, hour, minute] = match;
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:00+08:00`).toISOString();
+}
+
+function parseDexiOnTimestamp(value: string): string | undefined {
+  const match = value.trim().match(/^(?:On:\s*)?(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/i);
+  if (!match) return undefined;
+  return parseDexiDateTime(`${match[1]}/${match[2]}/${match[3]}`, `${match[4]}:${match[5]}`);
+}
+
+function estimatedDeliveryFromDexiEvents(events: ProviderEvent[]): string | undefined {
+  return [...events].reverse().find((event) => /预计航班到达时间|estimated flight arrival/i.test(event.message))?.eventAt;
 }
 
 function parseYxdRowsFromHtml(html: string, trackingNumber: string): YxdRow[] {

@@ -24,10 +24,10 @@ Provider selection starts with known number formats, then tries the configured a
 | Provider | Lookup method | Known format |
 |----------|---------------|--------------|
 | YXD | Cloudflare Browser rendering, with direct HTML fallback | `ADN...` |
-| D-EXI | Form session followed by its AJAX tracking endpoint | `LX...` |
+| D-EXI | Stateful form search followed by its detail endpoint | `LX...` |
 | MH56 | Server-rendered tracking page | `YD...` |
 
-The provider list is maintained in code. There is no provider-management UI. D-EXI `LX...` numbers route directly to its adapter so they do not wait for unrelated provider lookups first.
+The provider list is maintained in code. There is no provider-management UI. D-EXI requires its tracking-field update and result-row selection requests before loading full details. It uses day-first timestamps in Singapore time and requires a browser-compatible user agent.
 
 ## Storage and scheduling
 

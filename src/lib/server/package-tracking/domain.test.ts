@@ -24,6 +24,8 @@ describe('package tracking domain', () => {
     expect(normalizePackageStatus('signed for')).toBe('delivered');
     expect(normalizePackageStatus('出口申报 Export declaration')).toBe('in_transit');
     expect(normalizePackageStatus('已开船，预计到港时间08-04号')).toBe('in_transit');
+    expect(normalizePackageStatus('预计航班到达时间')).toBe('in_transit');
+    expect(normalizePackageStatus('正在中转至目的地')).toBe('in_transit');
     expect(normalizePackageStatus('Out for delivery')).toBe('out_for_delivery');
     expect(normalizePackageStatus('Custom carrier wording')).toBe('unknown');
   });
