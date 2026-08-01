@@ -2,6 +2,8 @@ import { config, radarHeaders } from './config';
 import { log } from './utils';
 import type { AgentContext, AgentSignal, DiscoveredItem } from './types';
 
+export type LocalAgentStatus = 'running' | 'ok' | 'error';
+
 /**
  * The radar API is normally fast, but a stalled TCP connection on a bare
  * `fetch` has no timeout and would wedge the whole tick forever (this is what
@@ -14,6 +16,24 @@ async function radarFetch(path: string, init?: RequestInit, timeoutMs = 25000): 
     return await fetch(`${config.radarUrl}${path}`, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function reportAgentStatus(status: LocalAgentStatus, detail: string): Promise<boolean> {
+  try {
+    const response = await radarFetch('/api/agent/status', {
+      method: 'POST',
+      headers: radarHeaders,
+      body: JSON.stringify({ status, detail })
+    }, 10000);
+    if (!response.ok) {
+      log(`Agent status report failed: ${response.status} ${response.statusText}`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    log(`Agent status report error: ${error}`);
+    return false;
   }
 }
 
@@ -34,21 +54,15 @@ export async function fetchContext(): Promise<AgentContext | null> {
 export async function submitFeeds(
   items: DiscoveredItem[]
 ): Promise<{ accepted: number; duplicates: number; promoted: number; merged?: number }> {
-  try {
-    const response = await radarFetch('/api/agent/feed', {
-      method: 'POST',
-      headers: radarHeaders,
-      body: JSON.stringify({ items })
-    });
-    if (!response.ok) {
-      log(`Feed submit failed: ${response.status}`);
-      return { accepted: 0, duplicates: 0, promoted: 0 };
-    }
-    return (await response.json()) as { accepted: number; duplicates: number; promoted: number; merged?: number };
-  } catch (error) {
-    log(`Feed submit error: ${error}`);
-    return { accepted: 0, duplicates: 0, promoted: 0 };
+  const response = await radarFetch('/api/agent/feed', {
+    method: 'POST',
+    headers: radarHeaders,
+    body: JSON.stringify({ items })
+  });
+  if (!response.ok) {
+    throw new Error(`Feed submit failed: ${response.status} ${response.statusText}`);
   }
+  return (await response.json()) as { accepted: number; duplicates: number; promoted: number; merged?: number };
 }
 
 export async function submitSignals(signals: AgentSignal[]): Promise<void> {

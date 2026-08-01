@@ -1,5 +1,6 @@
 import { getDb } from './db';
 import { isCronJobFeatureEnabled } from './features';
+import { LOCAL_AGENT_JOB_NAME } from './local-agent-status';
 import type { CronJobStatus, Env } from './types';
 
 type CronJobDefinition = Omit<CronJobStatus, 'enabled' | 'lastRun'> & {
@@ -7,6 +8,13 @@ type CronJobDefinition = Omit<CronJobStatus, 'enabled' | 'lastRun'> & {
 };
 
 const scheduledJobs: CronJobDefinition[] = [
+  {
+    jobName: LOCAL_AGENT_JOB_NAME,
+    label: '本地 AI Agent',
+    description: '本机 Agent 拉取上下文、处理开发请求并发现新内容。',
+    schedule: '每 10 分钟 · 本机',
+    enabled: () => true
+  },
   {
     jobName: 'fetch-concerts',
     label: '演出抓取',
