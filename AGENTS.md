@@ -39,7 +39,7 @@
 - Archive delivered packages only after the delivery update has been handled successfully.
 - Removing a package permanently deletes its event history and stops future checks and notifications.
 - Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
-- YXD requires browser rendering for reliable results. MH56 is server rendered. Validate D-EXI against the first live sample because no working D-EXI number was available during initial implementation.
+- YXD requires browser rendering for reliable results. MH56 is server rendered. D-EXI tracking numbers use the `LX...` format and must route directly to the D-EXI adapter.
 
 ## Gym Exercise Search
 

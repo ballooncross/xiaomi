@@ -48,6 +48,7 @@ export function normalizeTrackingNumber(value: string): string {
 export function providerCandidates(trackingNumber: string): PackageProviderId[] {
   if (/^ADN\d+/i.test(trackingNumber)) return ['yxd'];
   if (/^YD\d+/i.test(trackingNumber)) return ['mh56'];
+  if (/^LX\d+/i.test(trackingNumber)) return ['dexi'];
   return ['mh56', 'yxd', 'dexi'];
 }
 

@@ -16,6 +16,8 @@ describe('package tracking domain', () => {
   it('routes known formats first', () => {
     expect(providerCandidates('ADN99972')[0]).toBe('yxd');
     expect(providerCandidates('YD51821898')[0]).toBe('mh56');
+    expect(providerCandidates('LX22203349875')).toEqual(['dexi']);
+    expect(providerCandidates('TRACK123')).toEqual(['mh56', 'yxd', 'dexi']);
   });
 
   it('normalizes provider statuses', () => {

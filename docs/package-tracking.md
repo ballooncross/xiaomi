@@ -24,10 +24,10 @@ Provider selection starts with known number formats, then tries the configured a
 | Provider | Lookup method | Known format |
 |----------|---------------|--------------|
 | YXD | Cloudflare Browser rendering, with direct HTML fallback | `ADN...` |
-| D-EXI | Form session followed by its AJAX tracking endpoint | Unknown |
+| D-EXI | Form session followed by its AJAX tracking endpoint | `LX...` |
 | MH56 | Server-rendered tracking page | `YD...` |
 
-The provider list is maintained in code. There is no provider-management UI. D-EXI did not have a working sample number during initial implementation, so its form request and parser are covered by tests but still require validation against the first live D-EXI package.
+The provider list is maintained in code. There is no provider-management UI. D-EXI `LX...` numbers route directly to its adapter so they do not wait for unrelated provider lookups first.
 
 ## Storage and scheduling
 
