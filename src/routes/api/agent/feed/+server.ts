@@ -173,7 +173,7 @@ function validateKind(kind?: string): AgentFeedItem['kind'] {
 function matchesAnyTopic(feed: AgentFeedItem, topics: WatchTopic[]): boolean {
   const feedText = [feed.title, feed.summary, ...feed.topics].join(' ').toLowerCase();
   return topics.some((topic) => {
-    if (!topic.enabled || topic.mode === 'blacklist') return false;
+    if (!topic.enabled || topic.mode === 'blacklist' || topic.feed !== 'trends') return false;
     return [topic.name, ...topic.aliases].some((name) => feedText.includes(name.toLowerCase()));
   });
 }

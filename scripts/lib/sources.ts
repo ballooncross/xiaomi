@@ -165,7 +165,9 @@ export function buildQueries(context: AgentContext, tier: ScanTier, changedTopic
     });
   }
 
-  const activeTopics = context.watchTopics.filter((topic) => topic.enabled && topic.mode !== 'blacklist');
+  const activeTopics = context.watchTopics.filter(
+    (topic) => topic.enabled && topic.mode !== 'blacklist' && topic.feed === 'trends'
+  );
   const topicsToSearch =
     tier === 'targeted' && changedTopics.length > 0
       ? activeTopics.filter((topic) => changedTopics.some((name) => name.toLowerCase() === topic.name.toLowerCase()))

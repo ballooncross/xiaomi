@@ -13,7 +13,7 @@ export type AiSearchResult = {
  */
 export function buildTrendPrompt(context: AgentContext): string {
   const interests = context.watchTopics
-    .filter((topic) => topic.enabled && topic.mode !== 'blacklist')
+    .filter((topic) => topic.enabled && topic.mode !== 'blacklist' && topic.feed === 'trends')
     .map((topic) => `- ${topic.name} (priority ${topic.priority}/5, ${topic.category})`)
     .join('\n');
 

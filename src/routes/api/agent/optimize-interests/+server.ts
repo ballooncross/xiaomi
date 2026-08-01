@@ -3,6 +3,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
 import { getAdminScopedDb } from '$lib/server/users';
 import { compileContext } from '$lib/server/context-compiler';
+import { normalizeTrendCategory } from '$lib/interests';
 import type { Env, WatchTopic } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -21,14 +22,14 @@ export const GET: RequestHandler = async ({ request, platform }) => {
   const db = await getAdminScopedDb(env);
   const topics = await db.listTopics();
   const pending = topics
-    .filter((t) => (t.optimizeStatus ?? 'optimized') === 'pending')
+    .filter((t) => t.feed === 'trends' && (t.optimizeStatus ?? 'optimized') === 'pending')
     .map((t) => ({
       id: t.id,
       name: t.name,
       aliases: t.aliases,
       category: t.category,
       priority: t.priority,
-      type: t.type,
+      feed: t.feed,
       mode: t.mode
     }));
 
@@ -91,11 +92,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     for (let i = 0; i < replacements.length; i++) {
       const r = replacements[i];
       // Reuse the source id for the first replacement to preserve history.
-      const id = i === 0 ? source.id : uniqueId(source.type, r.name, usedIds, byId);
+      const id = i === 0 ? source.id : uniqueId(source.feed, r.name, usedIds, byId);
       usedIds.add(id);
       await db.upsertTopic({
         id,
-        type: source.type,
+        feed: source.feed,
         name: r.name,
         aliases: r.aliases,
         category: r.category,
@@ -118,24 +119,24 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 function normalizeReplacement(
   r: Replacement,
   source: WatchTopic
-): { name: string; aliases: string[]; category: string; priority: number } | null {
+): { name: string; aliases: string[]; category: WatchTopic['category']; priority: number } | null {
   const name = typeof r.name === 'string' ? r.name.trim() : '';
   if (!name) return null;
   const aliases = Array.isArray(r.aliases)
     ? [...new Set(r.aliases.map((a) => String(a).trim()).filter((a) => a && a !== name))]
     : [];
   const priority = clampPriority(r.priority ?? source.priority);
-  const category = typeof r.category === 'string' && r.category ? r.category : source.category;
+  const category = normalizeTrendCategory(r.category ?? source.category);
   return { name, aliases, category, priority };
 }
 
 function uniqueId(
-  type: string,
+  feed: string,
   name: string,
   used: Set<string>,
   existing: Map<string, WatchTopic>
 ): string {
-  const base = `${type}-${slug(name)}`;
+  const base = `${feed}-${slug(name)}`;
   let id = base;
   let n = 2;
   while (used.has(id) || existing.has(id)) {

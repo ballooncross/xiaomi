@@ -57,7 +57,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       if (!alreadyExists) {
         await db.upsertTopic({
           id: `blacklist-${slug(input.value)}`,
-          type: 'topic',
+          feed: 'trends',
           name: input.value,
           aliases: [],
           category: 'general',

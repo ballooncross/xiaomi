@@ -219,13 +219,23 @@ export const defaultDateReminders: DateReminder[] = [
 
 function topic(
   id: string,
-  type: WatchTopic['type'],
+  legacyType: 'artist' | 'topic',
   name: string,
   aliases: string[],
   category: string,
   priority: number
 ): WatchTopic {
-  return { id, type, name, aliases, category, priority, mode: 'follow', enabled: true };
+  const feed = legacyType === 'artist' ? 'concerts' : 'trends';
+  return {
+    id,
+    feed,
+    name,
+    aliases,
+    category: feed === 'concerts' ? 'general' : category as WatchTopic['category'],
+    priority,
+    mode: 'follow',
+    enabled: true
+  };
 }
 
 function lunarReminder(

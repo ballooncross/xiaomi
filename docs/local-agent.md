@@ -79,6 +79,15 @@ All under `/api/agent/`, authenticated with the `x-admin-token` header:
 
 The 添加关注 card has a free-text box ("我关注追觅 IPO、财务和公司架构新闻，但不关心具体产品发布"). The text is stored verbatim as a Layer 1 `interest` signal via `POST /api/interests` and the context recompiles immediately. The AI backend receives the raw text and respects exclusions when picking items; during full/deep scans it also extracts explicit exclusions into `derivedAvoid`, which come back as `not_interested` signals so the keyword scorer and blacklist learn them too.
 
+## Interest processing lanes
+
+Every user interest has one explicit `feed`: `trends` or `concerts`.
+
+- `trends` entries become news, trend, and opportunity queries. Their `category` adds classification context such as business, career, life, or geopolitics.
+- `concerts` entries are artist or show trackers consumed only by Ticketmaster and Bandsintown. They are excluded from AI news prompts, local-agent queries, trend scoring, trend feedback learning, story follow-ups, and interest optimization.
+- A musician must be added separately to `trends` if the user intentionally wants news about that musician. A concert tracker alone never authorizes entertainment news or gossip.
+- User-entered sources are not a separate interest kind. Actual source configuration belongs to the source registry and learned-source flow.
+
 ## Writing interests that actually surface trends
 
 How you phrase an interest determines the search query the agent runs. `buildQueries` (in `scripts/lib/sources.ts`) turns each watch topic into search terms from its **name + aliases**, splitting Latin and CJK terms into separate `en` and `zh` queries.

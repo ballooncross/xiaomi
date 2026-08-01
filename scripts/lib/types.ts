@@ -1,6 +1,7 @@
 export type AgentContext = {
   watchTopics: Array<{
     id: string;
+    feed: 'concerts' | 'trends';
     name: string;
     aliases: string[];
     category: string;

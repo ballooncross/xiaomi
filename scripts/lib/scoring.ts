@@ -12,7 +12,7 @@ export function scoreRelevance(item: DiscoveredItem, context: AgentContext): Dis
   const matchedTopics: string[] = [];
 
   for (const topic of context.watchTopics) {
-    if (!topic.enabled || topic.mode === 'blacklist') continue;
+    if (!topic.enabled || topic.mode === 'blacklist' || topic.feed !== 'trends') continue;
     const names = [topic.name, ...topic.aliases].map((name) => name.toLowerCase());
     if (names.some((name) => name && haystack.includes(name))) {
       confidence += 0.1 * (topic.priority / 5);

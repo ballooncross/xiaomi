@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultWatchTopics, demoItems } from './seed';
-import { isStaleItem, scoreItem } from './scoring';
+import { isCrossFeedInterestLeak, isStaleItem, scoreItem } from './scoring';
 
 describe('scoreItem', () => {
   it('prioritizes watched Singapore concerts', () => {
@@ -33,10 +33,10 @@ describe('scoreItem', () => {
         ...defaultWatchTopics,
         {
           id: 'artist-noisy',
-          type: 'artist',
+          feed: 'concerts',
           name: 'Noisy Artist',
           aliases: [],
-          category: 'concerts',
+          category: 'general',
           priority: 5,
           mode: 'blacklist',
           enabled: true
@@ -46,6 +46,66 @@ describe('scoreItem', () => {
 
     expect(scored.status).toBe('dismissed');
     expect(scored.score).toBe(0);
+  });
+
+  it('does not use concert interests to boost musician news', () => {
+    const item = {
+      ...demoItems[0],
+      kind: 'news' as const,
+      sourceType: 'agent',
+      title: 'Coldplay shares an entertainment update',
+      artists: [],
+      topics: ['Coldplay'],
+      score: 0
+    };
+
+    const scored = scoreItem(item, defaultWatchTopics);
+    const baseline = scoreItem(item, defaultWatchTopics.filter((topic) => topic.feed === 'trends'));
+
+    expect(scored.score).toBe(baseline.score);
+  });
+
+  it('still uses a same-name trend interest to boost news', () => {
+    const item = {
+      ...demoItems[0],
+      kind: 'news' as const,
+      sourceType: 'agent',
+      title: 'Coldplay ticketing business changes',
+      artists: [],
+      topics: ['Coldplay'],
+      score: 0
+    };
+    const trendInterest = {
+      ...defaultWatchTopics.find((topic) => topic.name === 'Coldplay')!,
+      id: 'trends-coldplay-business',
+      feed: 'trends' as const,
+      category: 'business' as const
+    };
+
+    const scored = scoreItem(item, [...defaultWatchTopics, trendInterest]);
+
+    const concertOnly = scoreItem(item, defaultWatchTopics);
+    expect(scored.score).toBeGreaterThan(concertOnly.score);
+  });
+
+  it('hides stored musician news unless a trend interest also matches', () => {
+    const item = {
+      ...demoItems[0],
+      kind: 'news' as const,
+      title: 'Coldplay celebrity news',
+      artists: [],
+      topics: ['Coldplay'],
+      status: 'new' as const
+    };
+    const trendInterest = {
+      ...defaultWatchTopics.find((topic) => topic.name === 'Coldplay')!,
+      id: 'trends-coldplay-business',
+      feed: 'trends' as const,
+      category: 'business' as const
+    };
+
+    expect(isCrossFeedInterestLeak(item, defaultWatchTopics)).toBe(true);
+    expect(isCrossFeedInterestLeak(item, [...defaultWatchTopics, trendInterest])).toBe(false);
   });
 });
 

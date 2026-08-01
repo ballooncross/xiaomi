@@ -1,8 +1,9 @@
 import type { DedupExisting, MergeAction } from './dedup';
 import type { CoeBiddingRound, CoeCategory } from '$lib/coe';
 import { DEFAULT_NOTIFY_PREFS, parseNotifyPrefs, type NotifyPrefs } from '$lib/notify-prefs';
-import { MAX_TREND_AGE_DAYS, scoreItem } from './scoring';
+import { isCrossFeedInterestLeak, MAX_TREND_AGE_DAYS, scoreItem } from './scoring';
 import { defaultDateReminders, demoItems, defaultWatchTopics } from './seed';
+import { interestFeedOf, normalizeTrendCategory } from '$lib/interests';
 import type {
   AgentFeedItem,
   AgentOutcomeStats,
@@ -86,6 +87,7 @@ type FeedbackJoinRow = {
   action: string;
   topics: string;
   source_type: string;
+  kind: RadarItem['kind'] | null;
   created_at: string;
   item_id: string;
 };
@@ -93,7 +95,8 @@ type FeedbackJoinRow = {
 type TopicRow = {
   id: string;
   user_id?: string;
-  type: WatchTopic['type'];
+  type?: string;
+  feed?: string;
   name: string;
   aliases: string;
   category: string;
@@ -252,11 +255,11 @@ function mergeItemWithState(item: RadarItem, state?: MemoryUserItemState): Radar
   };
 }
 
-/** Union of all enabled follow topics across every user, deduped by lowercased name keeping highest priority. */
+/** Union of all enabled follow topics, deduped within each processing lane. */
 function dedupeTopicsByName(topics: WatchTopic[]): WatchTopic[] {
   const byName = new Map<string, WatchTopic>();
   for (const topic of topics) {
-    const key = topic.name.toLowerCase();
+    const key = `${topic.feed}:${topic.name.toLowerCase()}`;
     const existing = byName.get(key);
     if (!existing || topic.priority > existing.priority) byName.set(key, topic);
   }
@@ -346,7 +349,7 @@ export abstract class RadarDb {
   abstract getAgentOutcomeStats(): Promise<AgentOutcomeStats>;
 
   // Feedback query for context compilation
-  abstract listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>>;
+  abstract listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; kind?: RadarItem['kind']; createdAt: string }>>;
 
   // Impression tracking
   abstract recordImpressions(itemIds: string[], impressionType?: string): Promise<void>;
@@ -422,6 +425,7 @@ class MemoryRadarDb extends RadarDb {
         const date = new Date(item.publishedAt ?? item.createdAt ?? 0).getTime();
         return date > cutoff;
       })
+      .filter((item) => !isCrossFeedInterestLeak(item, topics))
       .map((item) => scoreItem(item, topics))
       .filter((item) => !(item.score === 0 && item.status === 'dismissed'))
       .sort((a, b) => b.score - a.score)
@@ -740,7 +744,7 @@ class MemoryRadarDb extends RadarDb {
     };
   }
 
-  async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
+  async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; kind?: RadarItem['kind']; createdAt: string }>> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     const feedback = getUserFeedback(this.uid);
     const latestByItem = new Map<string, (typeof feedback)[number]>();
@@ -752,7 +756,7 @@ class MemoryRadarDb extends RadarDb {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((f) => {
         const item = memory.items.find((i) => i.id === f.itemId);
-        return { itemId: f.itemId, action: f.action, topics: item?.topics ?? [], sourceType: item?.sourceType ?? '', createdAt: f.createdAt };
+        return { itemId: f.itemId, action: f.action, topics: item?.topics ?? [], sourceType: item?.sourceType ?? '', kind: item?.kind, createdAt: f.createdAt };
       });
   }
 
@@ -868,10 +872,11 @@ class D1RadarDb extends RadarDb {
     try {
       await this.db
         .prepare(
-          `INSERT INTO watch_topics (user_id, id, type, name, aliases, category, priority, mode, enabled, optimize_status, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `INSERT INTO watch_topics (user_id, id, type, feed, name, aliases, category, priority, mode, enabled, optimize_status, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(user_id, id) DO UPDATE SET
            type = excluded.type,
+           feed = excluded.feed,
            name = excluded.name,
            aliases = excluded.aliases,
            category = excluded.category,
@@ -884,7 +889,8 @@ class D1RadarDb extends RadarDb {
         .bind(
           userId,
           topic.id,
-          topic.type,
+          topic.feed === 'concerts' ? 'artist' : 'topic',
+          topic.feed,
           topic.name,
           JSON.stringify(topic.aliases),
           topic.category,
@@ -957,7 +963,9 @@ class D1RadarDb extends RadarDb {
         .all<ItemRow>();
       const topics = await this.listTopics();
       return results
-        .map((row) => scoreItem(itemFromRow(row), topics))
+        .map(itemFromRow)
+        .filter((item) => !isCrossFeedInterestLeak(item, topics))
+        .map((item) => scoreItem(item, topics))
         .filter((item) => !(item.score === 0 && item.status === 'dismissed'))
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
@@ -1906,7 +1914,7 @@ class D1RadarDb extends RadarDb {
     }
   }
 
-  async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; createdAt: string }>> {
+  async listRecentFeedback(days: number): Promise<Array<{ itemId: string; action: string; topics: string[]; sourceType: string; kind?: RadarItem['kind']; createdAt: string }>> {
     if (!this.userId) return [];
     try {
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -1919,7 +1927,7 @@ class D1RadarDb extends RadarDb {
              WHERE f.created_at >= ? AND f.user_id = ?
                AND f.action IN ('save', 'track', 'unsave', 'not_relevant', 'more_like_this', 'less_like_this')
            )
-           SELECT f.item_id, f.action, i.topics, i.source_type, f.created_at
+           SELECT f.item_id, f.action, i.topics, i.source_type, i.kind, f.created_at
            FROM ranked_feedback f
            LEFT JOIN items i ON f.item_id = i.id
            WHERE f.rank = 1
@@ -1932,6 +1940,7 @@ class D1RadarDb extends RadarDb {
         action: r.action,
         topics: parseJson<string[]>(r.topics, []),
         sourceType: r.source_type ?? '',
+        kind: r.kind ?? undefined,
         createdAt: r.created_at
       }));
     } catch (error) {
@@ -2246,12 +2255,13 @@ function itemFromRow(row: ItemRow): RadarItem {
 }
 
 function topicFromRow(row: TopicRow): WatchTopic {
+  const feed = interestFeedOf(row);
   return {
     id: row.id,
-    type: row.type,
+    feed,
     name: row.name,
     aliases: parseJson<string[]>(row.aliases, []),
-    category: row.category,
+    category: feed === 'concerts' ? 'general' : normalizeTrendCategory(row.category),
     priority: row.priority,
     mode: row.mode ?? 'follow',
     enabled: row.enabled === 1,

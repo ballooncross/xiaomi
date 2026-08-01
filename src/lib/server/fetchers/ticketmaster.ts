@@ -15,8 +15,8 @@ type TicketmasterEvent = {
 export async function fetchTicketmasterConcerts(env: Env, topics: WatchTopic[]): Promise<RadarItem[]> {
   if (!env.TICKETMASTER_API_KEY) return [];
 
-  const artistTopics = topics.filter((topic) => topic.enabled && topic.type === 'artist' && topic.mode !== 'blacklist');
-  const blacklist = topics.filter((topic) => topic.enabled && topic.mode === 'blacklist');
+  const artistTopics = topics.filter((topic) => topic.enabled && topic.feed === 'concerts' && topic.mode !== 'blacklist');
+  const blacklist = topics.filter((topic) => topic.enabled && topic.feed === 'concerts' && topic.mode === 'blacklist');
   const artistResults = await Promise.all(artistTopics.slice(0, 12).map((topic) => fetchTicketmasterQuery(env, topic.name, 'artist')));
   const popularResults = await fetchTicketmasterQuery(env, undefined, 'popular');
   return [...popularResults, ...artistResults.flat()].filter((item) => !matchesAnyBlacklist(item, blacklist));
