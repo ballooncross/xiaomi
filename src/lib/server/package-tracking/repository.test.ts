@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { PackageTracking } from '../types';
 import {
   createPackageTracking,
+  listDuePackageTrackings,
   listPackageTrackings,
   listPendingPackageNotifications,
+  markPackageDelivered,
   markPackageNotificationsSent,
   recordPackageLookup,
   recordPackageNoData
@@ -68,5 +70,60 @@ describe('package tracking repository state transitions', () => {
 
     await markPackageNotificationsSent({}, userId, [item.id]);
     expect((await listPackageTrackings({}, userId))[0].state).toBe('archived');
+  });
+
+  it('keeps frequent checks enabled after a Singapore milestone even when the latest message changes', async () => {
+    const userId = crypto.randomUUID();
+    const { item } = await createPackageTracking({}, userId, 'LX22203349875');
+    await recordPackageLookup({}, item, {
+      providerId: 'dexi',
+      sourceUrl: 'http://www.d-exi.com/querytracks?tracknow=new',
+      found: true,
+      events: [
+        {
+          status: 'in_transit',
+          providerStatus: '货物已到港',
+          message: '货物已到港',
+          eventAt: '2026-08-04T01:00:00.000Z',
+          location: '新加坡'
+        },
+        {
+          status: 'in_transit',
+          providerStatus: '等待本地转运',
+          message: '等待本地转运',
+          eventAt: '2026-08-04T03:00:00.000Z'
+        }
+      ]
+    });
+
+    expect(item.providerStatus).toBe('等待本地转运');
+    expect(item.frequentCheckAt).toBe('2026-08-04T01:00:00.000Z');
+    expect((await listDuePackageTrackings({}, true)).map((candidate) => candidate.id)).toContain(item.id);
+  });
+
+  it('manually marks a D-EXI package delivered and archives the acknowledged event', async () => {
+    const userId = crypto.randomUUID();
+    const { item } = await createPackageTracking({}, userId, 'LX987654321');
+    await recordPackageLookup({}, item, {
+      providerId: 'dexi',
+      sourceUrl: 'http://www.d-exi.com/querytracks?tracknow=new',
+      found: true,
+      events: [{
+        status: 'unknown',
+        providerStatus: '本地服务商处理中',
+        message: '本地服务商处理中',
+        eventAt: '2026-08-04T03:00:00.000Z',
+        location: '新加坡'
+      }]
+    });
+
+    const delivered = await markPackageDelivered({}, userId, item.id);
+    expect(delivered).toMatchObject({ state: 'archived', status: 'delivered' });
+    expect(delivered?.events?.[0]).toMatchObject({
+      status: 'delivered',
+      providerStatus: '手动标记为已送达'
+    });
+    expect(delivered?.events?.[0].notifiedAt).toBeDefined();
+    expect(await listPendingPackageNotifications({}, userId)).toHaveLength(0);
   });
 });

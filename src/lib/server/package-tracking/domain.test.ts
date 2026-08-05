@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   eventFingerprint,
+  isSingaporeArrivalOrCustomsEvent,
   normalizePackageStatus,
   normalizeTrackingNumber,
   parseProviderTimestamp,
@@ -27,7 +28,32 @@ describe('package tracking domain', () => {
     expect(normalizePackageStatus('预计航班到达时间')).toBe('in_transit');
     expect(normalizePackageStatus('正在中转至目的地')).toBe('in_transit');
     expect(normalizePackageStatus('Out for delivery')).toBe('out_for_delivery');
+    expect(normalizePackageStatus('收货人已签收')).toBe('delivered');
+    expect(normalizePackageStatus('签收失败')).toBe('delivery_attempted');
+    expect(normalizePackageStatus('等待签收')).toBe('out_for_delivery');
     expect(normalizePackageStatus('Custom carrier wording')).toBe('unknown');
+  });
+
+  it('detects confirmed Singapore arrival and customs milestones without treating an ETA as arrival', () => {
+    expect(isSingaporeArrivalOrCustomsEvent({
+      providerStatus: '货物已到港',
+      message: '货物已到港',
+      location: '新加坡'
+    })).toBe(true);
+    expect(isSingaporeArrivalOrCustomsEvent({
+      providerStatus: 'Customs clearance in progress',
+      message: 'Customs clearance in progress at SIN'
+    })).toBe(true);
+    expect(isSingaporeArrivalOrCustomsEvent({
+      providerStatus: '预计航班到达时间',
+      message: '预计航班到达时间',
+      location: '新加坡'
+    })).toBe(false);
+    expect(isSingaporeArrivalOrCustomsEvent({
+      providerStatus: '清关中',
+      message: '清关中',
+      location: '中国'
+    })).toBe(false);
   });
 
   it('treats provider timestamps as UTC+8', () => {

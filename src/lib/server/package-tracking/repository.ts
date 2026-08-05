@@ -6,7 +6,13 @@ import type {
   PackageTrackingEvent,
   PackageTrackingState
 } from '../types';
-import { eventFingerprint, latestProviderEvent, type ProviderLookupResult } from './domain';
+import {
+  eventFingerprint,
+  eventFromStored,
+  isSingaporeArrivalOrCustomsEvent,
+  latestProviderEvent,
+  type ProviderLookupResult
+} from './domain';
 
 type PackageRow = {
   id: string;
@@ -24,6 +30,7 @@ type PackageRow = {
   last_checked_at: string | null;
   last_success_at: string | null;
   last_error: string | null;
+  frequent_check_at: string | null;
   unresolved_since: string;
   delivered_at: string | null;
   archived_at: string | null;
@@ -155,16 +162,21 @@ export async function deletePackageTracking(env: Env, userId: string, packageId:
   return true;
 }
 
-export async function listDuePackageTrackings(env: Env): Promise<PackageTracking[]> {
+export async function listDuePackageTrackings(env: Env, frequentOnly = false): Promise<PackageTracking[]> {
   if (!env.DB) {
-    return [...memoryPackagesByUser.values()].flat().filter((item) => item.state === 'active' || item.state === 'awaiting_tracking_data');
+    return [...memoryPackagesByUser.values()].flat().filter((item) =>
+      (item.state === 'active' || item.state === 'awaiting_tracking_data')
+      && (!frequentOnly || Boolean(item.frequentCheckAt))
+    );
   }
   const { results } = await env.DB
     .prepare(
       `SELECT * FROM package_trackings
        WHERE state IN ('active', 'awaiting_tracking_data')
+         AND (? = 0 OR frequent_check_at IS NOT NULL)
        ORDER BY COALESCE(last_checked_at, created_at) ASC`
     )
+    .bind(frequentOnly ? 1 : 0)
     .all<PackageRow>();
   return (results ?? []).map(packageFromRow);
 }
@@ -178,6 +190,8 @@ export async function recordPackageLookup(
   const now = new Date().toISOString();
   const latest = latestProviderEvent(result.events)!;
   const deliveredAt = latest.status === 'delivered' ? latest.eventAt : item.deliveredAt;
+  const frequentCheckAt = item.frequentCheckAt ?? [...result.events, ...(item.events ?? []).map(eventFromStored)]
+    .find(isSingaporeArrivalOrCustomsEvent)?.eventAt;
   const storedEvents = await Promise.all(
     result.events.map(async (event): Promise<PackageTrackingEvent> => ({
       id: crypto.randomUUID(),
@@ -207,6 +221,7 @@ export async function recordPackageLookup(
       lastCheckedAt: now,
       lastSuccessAt: now,
       lastError: undefined,
+      frequentCheckAt,
       deliveredAt,
       updatedAt: now,
       events: [...newEvents, ...(item.events ?? [])].sort((a, b) => b.eventAt.localeCompare(a.eventAt))
@@ -236,7 +251,7 @@ export async function recordPackageLookup(
       `UPDATE package_trackings SET
          provider_id = ?, state = 'active', status = ?, provider_status = ?, latest_event_at = ?,
          latest_location = ?, estimated_delivery_at = ?, source_url = ?, last_checked_at = ?,
-         last_success_at = ?, last_error = NULL, delivered_at = ?, updated_at = ?
+         last_success_at = ?, last_error = NULL, frequent_check_at = ?, delivered_at = ?, updated_at = ?
        WHERE id = ? AND user_id = ?`
     ).bind(
       result.providerId,
@@ -248,6 +263,7 @@ export async function recordPackageLookup(
       result.sourceUrl,
       now,
       now,
+      frequentCheckAt ?? null,
       deliveredAt ?? null,
       now,
       item.id,
@@ -256,6 +272,65 @@ export async function recordPackageLookup(
   );
   await env.DB.batch(statements);
   return (await getPackageTracking(env, item.userId, item.id))!;
+}
+
+export async function markPackageDelivered(
+  env: Env,
+  userId: string,
+  packageId: string
+): Promise<PackageTracking | null> {
+  const item = await getPackageTracking(env, userId, packageId);
+  if (!item) return null;
+  if (item.status === 'delivered' && item.state === 'archived') return item;
+  const now = new Date().toISOString();
+  const message = '手动标记为已送达';
+  const event: PackageTrackingEvent = {
+    id: crypto.randomUUID(),
+    packageId,
+    fingerprint: await eventFingerprint({
+      status: 'delivered',
+      providerStatus: message,
+      message,
+      eventAt: now,
+      location: item.latestLocation
+    }),
+    status: 'delivered',
+    providerStatus: message,
+    message,
+    eventAt: now,
+    location: item.latestLocation,
+    notifiedAt: now,
+    createdAt: now
+  };
+  if (!env.DB) {
+    Object.assign(item, {
+      state: 'archived',
+      status: 'delivered',
+      providerStatus: message,
+      latestEventAt: now,
+      deliveredAt: now,
+      archivedAt: now,
+      updatedAt: now,
+      events: [event, ...(item.events ?? []).map((existing) => ({ ...existing, notifiedAt: existing.notifiedAt ?? now }))]
+    });
+    return item;
+  }
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO package_tracking_events
+       (id, package_id, fingerprint, status, provider_status, message, event_at, location, notified_at, created_at)
+       VALUES (?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?)`
+    ).bind(event.id, packageId, event.fingerprint, message, message, now, item.latestLocation ?? null, now, now),
+    env.DB.prepare(
+      `UPDATE package_tracking_events SET notified_at = ? WHERE package_id = ? AND notified_at IS NULL`
+    ).bind(now, packageId),
+    env.DB.prepare(
+      `UPDATE package_trackings SET state = 'archived', status = 'delivered', provider_status = ?,
+         latest_event_at = ?, delivered_at = ?, archived_at = ?, updated_at = ?
+       WHERE id = ? AND user_id = ?`
+    ).bind(message, now, now, now, now, packageId, userId)
+  ]);
+  return getPackageTracking(env, userId, packageId);
 }
 
 export async function recordPackageNoData(env: Env, item: PackageTracking): Promise<PackageTracking> {
@@ -374,6 +449,7 @@ function packageFromRow(row: PackageRow): PackageTracking {
     lastCheckedAt: row.last_checked_at ?? undefined,
     lastSuccessAt: row.last_success_at ?? undefined,
     lastError: row.last_error ?? undefined,
+    frequentCheckAt: row.frequent_check_at ?? undefined,
     unresolvedSince: row.unresolved_since,
     deliveredAt: row.delivered_at ?? undefined,
     archivedAt: row.archived_at ?? undefined,

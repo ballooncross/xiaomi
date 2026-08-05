@@ -16,6 +16,7 @@ import {
   listDuePackageTrackings,
   listPackageTrackings,
   listPendingPackageNotifications,
+  markPackageDelivered,
   markPackageNotificationsSent,
   recordPackageFailure,
   recordPackageLookup,
@@ -79,7 +80,10 @@ export async function refreshPackageLocally(env: Env, userId: string, packageId:
   return recordPackageFailure(env, item, errors.join('; ') || 'All package providers failed');
 }
 
-export async function runPackageTrackingJob(env: Env): Promise<JobResult> {
+export async function runPackageTrackingJob(
+  env: Env,
+  options: { frequentOnly?: boolean } = {}
+): Promise<JobResult> {
   const db = getDb(env);
   if (!(await isFeatureEnabled(db, 'package_tracking'))) {
     const detail = 'feature package_tracking disabled';
@@ -87,7 +91,7 @@ export async function runPackageTrackingJob(env: Env): Promise<JobResult> {
     return { inserted: 0, updated: 0, considered: 0, notified: 0, detail };
   }
 
-  const due = await listDuePackageTrackings(env);
+  const due = await listDuePackageTrackings(env, options.frequentOnly);
   const refreshed: PackageTracking[] = [];
   const refreshErrors: string[] = [];
   for (const item of due) {
@@ -132,6 +136,7 @@ export async function runPackageTrackingJob(env: Env): Promise<JobResult> {
   }
 
   const detail = [
+    `mode=${options.frequentOnly ? 'singapore-priority' : 'daily'}`,
     `checked=${due.length}`,
     `notified=${notified}`,
     refreshErrors.length ? `errors=${refreshErrors.join(' | ')}` : '',
@@ -181,4 +186,14 @@ export function renderPackageList(packages: PackageTracking[]): string {
 
 export async function listTrackedPackages(env: Env, userId: string): Promise<PackageTracking[]> {
   return listPackageTrackings(env, userId);
+}
+
+export async function manuallyMarkPackageDelivered(
+  env: Env,
+  userId: string,
+  packageId: string
+): Promise<PackageTracking> {
+  const item = await markPackageDelivered(env, userId, packageId);
+  if (!item) throw new Error('Package tracking item was not found.');
+  return item;
 }

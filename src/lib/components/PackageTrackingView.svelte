@@ -95,6 +95,23 @@
     }
   }
 
+  async function markDelivered(item: PackageTracking) {
+    if (!window.confirm(`确认 ${item.label || item.trackingNumber} 已送达？包裹将移到历史。`)) return;
+    pendingId = item.id;
+    message = '';
+    try {
+      const response = await fetch(`/api/packages/${encodeURIComponent(item.id)}/delivered`, { method: 'POST' });
+      const result = await response.json() as { item?: PackageTracking; error?: string };
+      if (!response.ok || !result.item) throw new Error(result.error || '无法标记为已送达');
+      packages = packages.map((candidate) => candidate.id === item.id ? result.item! : candidate);
+      message = '已手动标记为送达并移到历史。';
+    } catch (error) {
+      message = error instanceof Error ? error.message : '无法标记为已送达';
+    } finally {
+      pendingId = null;
+    }
+  }
+
   function formatDate(value?: string): string {
     if (!value) return '尚未查询';
     return new Intl.DateTimeFormat('zh-CN', {
@@ -114,7 +131,7 @@
     <div>
       <div class="eyebrow">个人物流雷达</div>
       <h1>包裹跟踪</h1>
-      <p>每天 08:30 检查物流。只有出现新进展时才发送 Telegram。</p>
+      <p>每天 08:30 检查物流。抵达新加坡或进入清关后每天检查 4 次，只有新进展才发送 Telegram。</p>
     </div>
   </header>
 
@@ -198,6 +215,11 @@
                 {pendingId === item.id ? '刷新中…' : '手动刷新'}
               </button>
             {/if}
+            {#if item.providerId === 'dexi' && item.state !== 'archived' && item.status !== 'delivered'}
+              <button class="delivered" type="button" disabled={pendingId === item.id} onclick={() => markDelivered(item)}>
+                标记已送达
+              </button>
+            {/if}
             <button class="danger" type="button" disabled={pendingId === item.id} onclick={() => removePackage(item)}>删除</button>
           </footer>
         </article>
@@ -248,6 +270,7 @@
   .package-card footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 16px; }
   .package-card footer a { margin-right: auto; color: var(--plum); font-size: 12px; font-weight: 700; }
   .package-card footer button { background: var(--ink); padding: 8px 12px; font-size: 12px; }
+  .package-card footer button.delivered { background: #3f6f46; }
   .package-card footer button.danger { background: transparent; color: #9d3d2e; border: 1px solid #d9a69c; }
   .package-empty { border: 1px dashed var(--line); border-radius: 18px; padding: 28px; text-align: center; color: var(--muted); }
   .package-empty strong { color: var(--ink); }

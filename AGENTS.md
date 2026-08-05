@@ -41,6 +41,9 @@
 - Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
 - YXD requires browser rendering for reliable results. MH56 is server rendered. D-EXI `LX...` lookups require the tracking-field update and result-row selection requests, the Chinese search-button value, day-first timestamps in Singapore time, and a browser-compatible user agent for full details. Preserve non-empty cells after a D-EXI status because they contain supplemental values such as the estimated-arrival date.
 
+- Once an event confirms arrival or customs processing in Singapore, persist priority checking even if later provider wording changes. Priority packages run at 08:30, 12:30, 16:30, and 20:30 Singapore time.
+- Derive D-EXI package status from its newest detail event. Keep the manual delivered action as a fallback for unrecognized provider wording, and archive that acknowledged update without a redundant notification.
+
 ## Gym Exercise Search
 
 - Recent exercise queries are frontend-only and stored in local storage under `personal-radar-gym-recent-searches`.

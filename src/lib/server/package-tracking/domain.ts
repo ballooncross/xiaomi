@@ -55,11 +55,31 @@ export function providerCandidates(trackingNumber: string): PackageProviderId[] 
 export function normalizePackageStatus(value: string): PackageStatus {
   const text = value.trim().toLowerCase();
   if (!text) return 'unknown';
-  if (matches(text, ['signed for', 'delivered', '已签收', '签收', '妥投', '已送达'])) return 'delivered';
   if (matches(text, ['returned', 'return to sender', '退回', '退件'])) return 'returned';
-  if (matches(text, ['out for delivery', 'with courier', '派送中', '派件中', '正在派送'])) return 'out_for_delivery';
-  if (matches(text, ['delivery attempted', 'unsuccessful delivery', '派送未成功', '投递失败'])) return 'delivery_attempted';
+  if (matches(text, [
+    'delivery attempted',
+    'unsuccessful delivery',
+    '派送未成功',
+    '投递失败',
+    '签收失败',
+    '未签收'
+  ])) return 'delivery_attempted';
   if (matches(text, ['exception', 'delayed', 'delay', 'failed', '异常', '延误', '失败'])) return 'exception';
+  if (matches(text, ['out for delivery', 'with courier', '派送中', '派件中', '正在派送', '等待签收'])) {
+    return 'out_for_delivery';
+  }
+  if (matches(text, [
+    'signed for',
+    'delivered',
+    '已签收',
+    '签收',
+    '妥投',
+    '已送达',
+    '派送完成',
+    '完成派送',
+    '成功派送',
+    '收货人已签收'
+  ])) return 'delivered';
   if (matches(text, [
     'shipped',
     'in transit',
@@ -108,6 +128,18 @@ export async function eventFingerprint(event: ProviderEvent): Promise<string> {
 
 export function latestProviderEvent(events: ProviderEvent[]): ProviderEvent | undefined {
   return [...events].sort((a, b) => b.eventAt.localeCompare(a.eventAt))[0];
+}
+
+export function isSingaporeArrivalOrCustomsEvent(
+  event: Pick<ProviderEvent, 'providerStatus' | 'message' | 'location'>
+): boolean {
+  const text = [event.providerStatus, event.message, event.location ?? ''].join(' ').toLowerCase();
+  const isSingapore = /singapore|新加坡|(?:^|\W)(?:sg|sin)(?:\W|$)/i.test(text);
+  if (!isSingapore) return false;
+  if (/清关|通关|customs?/i.test(text)) return true;
+  const isArrival = /到港|抵达|到达|arriv(?:e|ed|al)|landed/i.test(text);
+  const isForecast = /预计|预期|计划|estimated|expected|eta|scheduled/i.test(text);
+  return isArrival && !isForecast;
 }
 
 export function eventFromStored(event: PackageTrackingEvent): ProviderEvent {

@@ -50,6 +50,7 @@ export type PackageTracking = {
   lastCheckedAt?: string;
   lastSuccessAt?: string;
   lastError?: string;
+  frequentCheckAt?: string;
   unresolvedSince: string;
   deliveredAt?: string;
   archivedAt?: string;

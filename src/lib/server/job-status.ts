@@ -39,8 +39,8 @@ const scheduledJobs: CronJobDefinition[] = [
   {
     jobName: 'package-tracking',
     label: '包裹物流检查',
-    description: '刷新活跃包裹，仅在物流有新进展时发送 Telegram。',
-    schedule: '每天 08:30',
+    description: '每日刷新活跃包裹；抵达新加坡或进入清关后改为每日 4 次，仅有新进展时通知。',
+    schedule: '每天 08:30 · 新加坡阶段 4 次/天',
     enabled: () => true
   },
   {

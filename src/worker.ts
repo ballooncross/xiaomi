@@ -15,6 +15,11 @@ export default {
       ctx.waitUntil(compileContext(getDb(env)).catch(() => {}));
       return;
     }
+    // Singapore arrival/customs packages get three additional daytime checks.
+    if (hourMinute === '04:30' || hourMinute === '08:30' || hourMinute === '12:30') {
+      ctx.waitUntil(runPackageTrackingJob(env, { frequentOnly: true }));
+      return;
+    }
     // Wed/Thu 10:00 UTC = 18:00 SGT — typical COE result window (+ holiday slip to Thu)
     if (hourMinute === '10:00') {
       ctx.waitUntil(runCoeCheckJob(env));
