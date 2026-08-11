@@ -4,11 +4,12 @@ import { compileContext } from './lib/server/context-compiler';
 import { getDb } from './lib/server/db';
 import type { Env } from './lib/server/types';
 import { refreshPackageLocally, runPackageTrackingJob } from './lib/server/package-tracking/service';
+import { routeScheduledJob } from './lib/server/cron-routing';
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    const hourMinute = new Date(event.scheduledTime).toISOString().slice(11, 16);
-    if (hourMinute === '00:30') {
+    const job = routeScheduledJob(event.cron, event.scheduledTime);
+    if (job === 'daily') {
       ctx.waitUntil(runDailyDigestJob(env));
       ctx.waitUntil(runPackageTrackingJob(env));
       // Recompile AI context daily after digest
@@ -16,12 +17,12 @@ export default {
       return;
     }
     // Singapore arrival/customs packages get three additional daytime checks.
-    if (hourMinute === '04:30' || hourMinute === '08:30' || hourMinute === '12:30') {
+    if (job === 'package-frequent') {
       ctx.waitUntil(runPackageTrackingJob(env, { frequentOnly: true }));
       return;
     }
-    // Wed/Thu 10:00 UTC = 18:00 SGT — typical COE result window (+ holiday slip to Thu)
-    if (hourMinute === '10:00') {
+    // Keep result alerts independent from slower general ingestion jobs.
+    if (job === 'coe-check') {
       ctx.waitUntil(runCoeCheckJob(env));
       return;
     }

@@ -31,6 +31,11 @@
 - The local agent reports every tick to `POST /api/agent/status` with `running`, `ok`, or `error`.
 - Keep the `local-agent` entry in the 定时任务状态 list aligned with that endpoint so stale runs and failures remain visible to admins.
 
+## COE Notifications
+
+- Poll COE results through a dedicated hourly cron trigger. Keep this check independent from general concert and trend ingestion so slow or failed ingestion cannot delay a result notification.
+- Route the dedicated COE trigger by its cron expression. Keep `COE_CHECK_CRON` and `wrangler.cron.toml` aligned.
+
 ## Package Tracking
 
 - Package tracking data is user scoped. Telegram commands must resolve the linked chat to a Personal Radar user before reading or changing packages.
