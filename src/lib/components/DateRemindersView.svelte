@@ -6,6 +6,7 @@
   type ReminderView = DateReminder & {
     nextDate: string;
     daysLeft: number;
+    hasPassed?: boolean;
     dateLabel: string;
     daysSince?: number;
     ageLabel?: string;
@@ -52,6 +53,7 @@
   const allMilestones = $derived(
     reminders
       .flatMap((r) => r.upcomingMilestones.map((m) => ({ ...m, reminderTitle: r.title })))
+      .filter((m) => m.daysFromNow >= 0)
       .sort((a, b) => a.daysFromNow - b.daysFromNow)
       .slice(0, 6)
   );
@@ -140,8 +142,8 @@
           {/if}
         </div>
         <div class="date-count">
-          <span>剩余</span>
-          <strong>{reminder.daysLeft}</strong>
+          <span>{reminder.daysLeft < 0 ? '已过' : '剩余'}</span>
+          <strong>{Math.abs(reminder.daysLeft)}</strong>
           <em>天</em>
         </div>
         <div class="date-actions">

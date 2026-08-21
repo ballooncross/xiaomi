@@ -43,11 +43,13 @@ export function renderTelegramDigest(digest: Digest): string {
 export function buildReminderDigestMessage(reminders: DateReminder[]): string | null {
   const sorted = sortReminders(reminders);
   const upcoming = sorted
-    .filter((reminder) => reminder.remindDaysBefore.includes(reminder.daysLeft))
+    .filter((reminder) => reminder.daysLeft >= 0 && reminder.remindDaysBefore.includes(reminder.daysLeft))
     .slice(0, 6);
 
   const today = todayInSingapore();
-  const milestones = getAllUpcomingMilestones(sorted, today, 1).slice(0, 4);
+  const milestones = getAllUpcomingMilestones(sorted, today, 1)
+    .filter((m) => m.daysFromNow >= 0)
+    .slice(0, 4);
 
   if (upcoming.length === 0 && milestones.length === 0) return null;
 

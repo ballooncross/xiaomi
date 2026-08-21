@@ -124,6 +124,27 @@ describe('enrichDate', () => {
     expect(holidayLabels).toContain('儿童节');
   });
 
+  it('drops a holiday once the day is over', () => {
+    const reminder = makeReminder({ year: 2025, month: 1, day: 1, category: 'anniversary' });
+    // 七夕 2026 falls on 2026-08-19; the day after it must not be listed as upcoming.
+    const onTheDay = enrichDate(reminder, new Date(Date.UTC(2026, 7, 19)));
+    expect(onTheDay.upcomingMilestones.find((m) => m.label === '七夕')?.daysFromNow).toBe(0);
+
+    const dayAfter = enrichDate(reminder, new Date(Date.UTC(2026, 7, 20)));
+    expect(dayAfter.upcomingMilestones.find((m) => m.label === '七夕')).toBeUndefined();
+    expect(dayAfter.upcomingMilestones.every((m) => m.daysFromNow >= 0)).toBe(true);
+  });
+
+  it('drops a day-count milestone once the day is over', () => {
+    const reminder = makeReminder({ year: 2026, month: 1, day: 1, category: 'anniversary' });
+    // day 100 lands on 2026-04-11.
+    const onTheDay = enrichDate(reminder, new Date(Date.UTC(2026, 3, 11)));
+    expect(onTheDay.upcomingMilestones.find((m) => m.label === '百天纪念')?.daysFromNow).toBe(0);
+
+    const dayAfter = enrichDate(reminder, new Date(Date.UTC(2026, 3, 12)));
+    expect(dayAfter.upcomingMilestones.find((m) => m.label === '百天纪念')).toBeUndefined();
+  });
+
   it('does not include holidays for regular birthday category', () => {
     const reminder = makeReminder({ year: 2000, month: 1, day: 15, category: 'birthday' });
     const today = new Date(Date.UTC(2025, 1, 10));
@@ -170,6 +191,18 @@ describe('getAllUpcomingMilestones', () => {
     const remindersWithView = [{ ...reminder, nextDate: '2027-01-15', daysLeft: 198 }];
     const milestones = getAllUpcomingMilestones(remindersWithView, today, 30);
     expect(milestones).toEqual([]);
+  });
+
+  it('never reports a negative countdown for past holidays', () => {
+    const reminder = makeReminder({ id: 'a1', title: '恋爱', category: 'anniversary', year: undefined });
+    const dayAfterQixi = new Date(Date.UTC(2026, 7, 20));
+    const milestones = getAllUpcomingMilestones(
+      [{ ...reminder, nextDate: '', daysLeft: 0 }],
+      dayAfterQixi,
+      1
+    );
+    expect(milestones.map((m) => m.label)).not.toContain('七夕');
+    expect(milestones.every((m) => m.daysFromNow >= 0)).toBe(true);
   });
 
   it('deduplicates holidays across multiple anniversary reminders', () => {
