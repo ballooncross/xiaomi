@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildReminderDigestMessage, buildTemplateDigest, renderTelegramDigest } from './digest';
 import { demoItems } from './seed';
 import type { DateReminder } from './types';
@@ -44,5 +44,33 @@ describe('digest', () => {
 
   it('returns null when there are no reminders', () => {
     expect(buildReminderDigestMessage([])).toBeNull();
+  });
+
+  it('does not announce a holiday that is already over', () => {
+    // 七夕 2026 fell on 2026-08-19, so nothing should go out on the 20th.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-20T09:00:00+08:00'));
+
+    const reminder: DateReminder = {
+      id: 'r2',
+      title: '恋爱纪念',
+      calendarType: 'gregorian',
+      category: 'anniversary',
+      year: 2026,
+      month: 1,
+      day: 1,
+      lunarIsLeapMonth: false,
+      repeat: 'annual',
+      note: '',
+      pinned: false,
+      enabled: true,
+      remindDaysBefore: [0, 1, 7]
+    };
+
+    expect(buildReminderDigestMessage([reminder])).toBeNull();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 });

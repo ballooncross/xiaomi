@@ -47,6 +47,7 @@
   type ReminderView = DateReminder & {
     nextDate: string;
     daysLeft: number;
+    hasPassed?: boolean;
     dateLabel: string;
     daysSince?: number;
     ageLabel?: string;
@@ -631,10 +632,13 @@
   const addWatchHint = $derived(getAddWatchHint(newWatchFeed, newWatchCategory, newWatchMode));
   const addWatchPlaceholder = $derived(getAddWatchPlaceholder(newWatchFeed, newWatchCategory, newWatchMode));
   const nextReminder = $derived(reminders.reduce<ReminderView | undefined>((closest, reminder) => {
+    if (reminder.daysLeft < 0) return closest;
     if (!closest || reminder.daysLeft < closest.daysLeft) return reminder;
     return closest;
   }, undefined));
-  const upcomingReminders = $derived(reminders.filter((reminder) => reminder.daysLeft <= 30).slice(0, 4));
+  const upcomingReminders = $derived(
+    reminders.filter((reminder) => reminder.daysLeft >= 0 && reminder.daysLeft <= 30).slice(0, 4)
+  );
 
   function datepicker(node: HTMLInputElement) {
     let picker: { destroy: () => void } | undefined;

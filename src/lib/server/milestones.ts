@@ -103,6 +103,14 @@ function getHolidaysForCategory(category: DateCategory): HolidayDef[] {
   return [];
 }
 
+/**
+ * A milestone only counts as upcoming when it is today or later. Anything in the
+ * past would otherwise be announced as "-1 天后".
+ */
+function isUpcoming(daysFromNow: number, windowDays: number): boolean {
+  return daysFromNow >= 0 && daysFromNow <= windowDays;
+}
+
 function resolveHolidays(holidays: HolidayDef[], today: Date, windowDays: number): Milestone[] {
   const results: Milestone[] = [];
   const currentYear = today.getUTCFullYear();
@@ -122,7 +130,7 @@ function resolveHolidays(holidays: HolidayDef[], today: Date, windowDays: number
         date = utcDate(year, h.month, h.day);
       }
       const daysFromNow = diffDays(today, date);
-      if (daysFromNow >= -1 && daysFromNow <= windowDays) {
+      if (isUpcoming(daysFromNow, windowDays)) {
         results.push({
           label: h.label,
           dayNumber: 0,
@@ -154,10 +162,7 @@ export function enrichDate(reminder: DateReminder, today: Date): DateEnrichment 
   const ageLabel = buildAgeLabel(reminder.category, daysSince);
   const milestones = getMilestonesForCategory(reminder.category);
   const dayCountMilestones = milestones
-    .filter((m) => {
-      const daysFromNow = m.day - daysSince;
-      return daysFromNow >= -1 && daysFromNow <= windowDays;
-    })
+    .filter((m) => isUpcoming(m.day - daysSince, windowDays))
     .map((m) => ({
       label: m.label,
       dayNumber: m.day,
@@ -202,7 +207,7 @@ export function getAllUpcomingMilestones(
 
     for (const m of milestones) {
       const daysFromNow = m.day - daysSince;
-      if (daysFromNow >= 0 && daysFromNow <= windowDays) {
+      if (isUpcoming(daysFromNow, windowDays)) {
         results.push({
           label: m.label,
           dayNumber: m.day,

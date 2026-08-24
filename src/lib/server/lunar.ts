@@ -9,6 +9,8 @@ const singaporeTimeZone = 'Asia/Singapore';
 export type ReminderView = DateReminder & {
   nextDate: string;
   daysLeft: number;
+  /** True for one-off dates whose only occurrence is already behind us. */
+  hasPassed: boolean;
   dateLabel: string;
   daysSince?: number;
   ageLabel?: string;
@@ -20,10 +22,12 @@ export function enrichReminder(reminder: DateReminder, now = new Date()): Remind
   const today = todayInSingapore(now);
   const nextDate = nextOccurrence(reminder, today);
   const enrichment = enrichDate(reminder, today);
+  const daysLeft = diffDays(today, nextDate);
   return {
     ...reminder,
     nextDate: formatYmd(nextDate),
-    daysLeft: diffDays(today, nextDate),
+    daysLeft,
+    hasPassed: daysLeft < 0,
     dateLabel: formatReminderDate(reminder, nextDate),
     ...enrichment,
   };
@@ -33,7 +37,13 @@ export function sortReminders(reminders: DateReminder[], now = new Date()): Remi
   return reminders
     .filter((reminder) => reminder.enabled)
     .map((reminder) => enrichReminder(reminder, now))
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.daysLeft - b.daysLeft || a.title.localeCompare(b.title));
+    .sort(
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) ||
+        Number(a.hasPassed) - Number(b.hasPassed) ||
+        a.daysLeft - b.daysLeft ||
+        a.title.localeCompare(b.title)
+    );
 }
 
 export function nextOccurrence(reminder: DateReminder, today = todayInSingapore()): Date {
