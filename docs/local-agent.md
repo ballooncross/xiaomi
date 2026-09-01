@@ -23,6 +23,16 @@ Install the production scheduler:
 scripts/install-agent.sh
 ```
 
+The installer writes the launch agent plist for the current machine, so the
+home directory and repository path are resolved at install time. Run it from
+the checkout the runtime worktree should track, or set `RADAR_SOURCE_ROOT`
+to point at that checkout.
+
+Dependency installs use the repository `.npmrc`, which pins the public npm
+registry. A machine-level `~/.npmrc` pointing at a private registry would
+otherwise break `npm ci` for the runtime and for development-request
+worktrees.
+
 The installed launch agent runs one cycle every ten minutes from a dedicated
 detached worktree tracking `origin/main`. Each cycle reloads the current code
 and `scripts/.env`, so changing the configured AI backend does not require a

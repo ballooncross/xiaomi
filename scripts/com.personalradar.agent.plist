@@ -9,15 +9,15 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>exec '/Users/stevebai/Library/Application Support/Personal Radar/run-agent.sh'</string>
+    <string>exec '__RADAR_INSTALL_DIR__/run-agent.sh'</string>
   </array>
 
   <key>EnvironmentVariables</key>
   <dict>
     <key>RADAR_SOURCE_ROOT</key>
-    <string>/Users/stevebai/workspace/xiaomi</string>
+    <string>__RADAR_SOURCE_ROOT__</string>
     <key>RADAR_AGENT_RUNTIME</key>
-    <string>/Users/stevebai/Library/Application Support/Personal Radar/agent-runtime</string>
+    <string>__RADAR_INSTALL_DIR__/agent-runtime</string>
   </dict>
 
   <key>RunAtLoad</key>
@@ -26,9 +26,9 @@
   <integer>600</integer>
 
   <key>StandardOutPath</key>
-  <string>/Users/stevebai/Library/Logs/personal-radar-agent.log</string>
+  <string>__RADAR_LOG_PATH__</string>
   <key>StandardErrorPath</key>
-  <string>/Users/stevebai/Library/Logs/personal-radar-agent.log</string>
+  <string>__RADAR_LOG_PATH__</string>
 
   <key>ProcessType</key>
   <string>Background</string>
