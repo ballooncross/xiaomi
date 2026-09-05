@@ -74,7 +74,7 @@
 
   .google-btn {
     border-radius: var(--radius-sm);
-    background: white;
+    background: var(--surface);
     font-weight: 500;
     min-height: var(--control-h-lg);
     padding: 0 var(--space-4);
@@ -86,8 +86,8 @@
   }
 
   .error-banner {
-    background: #fef2f2;
-    color: var(--accent);
+    background: var(--danger-bg);
+    color: var(--danger-text);
     border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
     border-radius: var(--radius-sm);
     padding: var(--space-3) var(--space-4);

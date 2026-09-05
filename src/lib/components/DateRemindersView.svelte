@@ -193,7 +193,7 @@
     border-radius: var(--radius-xl);
     padding: 28px;
     background:
-      linear-gradient(105deg, rgba(251, 241, 228, 0.96), rgba(215, 242, 220, 0.62)),
+      linear-gradient(105deg, color-mix(in srgb, var(--cream) 96%, transparent), color-mix(in srgb, var(--mint) 62%, transparent)),
       radial-gradient(circle at 86% 18%, rgba(143, 165, 126, 0.22), transparent 30%);
   }
 
@@ -251,9 +251,9 @@
     padding: 22px 24px;
     min-height: 210px;
     background:
-      linear-gradient(rgba(251, 241, 228, 0.65), rgba(251, 241, 228, 0.84)),
+      linear-gradient(color-mix(in srgb, var(--cream) 65%, transparent), color-mix(in srgb, var(--cream) 84%, transparent)),
       url('/visuals/reminder-paper.svg'),
-      #fbf1e4;
+      var(--cream);
     background-size: cover;
     background-position: center;
   }
@@ -285,7 +285,7 @@
   .feature-age {
     margin-top: 4px;
     font-size: 14px;
-    color: #6d9f99;
+    color: var(--sage);
     font-weight: 700;
   }
 
@@ -293,8 +293,8 @@
     border: 1px solid var(--line);
     border-radius: 18px;
     padding: 20px;
-    background: rgba(255, 253, 247, 0.92);
-    box-shadow: 0 18px 48px rgba(38, 29, 20, 0.08);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: 0 18px 48px var(--shadow-color);
   }
 
   .milestone-head {
@@ -330,12 +330,12 @@
   }
 
   .milestone-card.milestone-today {
-    background: linear-gradient(105deg, rgba(126, 167, 157, 0.18), rgba(244, 223, 189, 0.3));
+    background: linear-gradient(105deg, rgba(126, 167, 157, 0.18), color-mix(in srgb, var(--gold) 30%, transparent));
   }
 
   .milestone-days {
     text-align: center;
-    color: #6d9f99;
+    color: var(--sage);
   }
 
   .milestone-days strong {
@@ -395,7 +395,7 @@
   }
 
   .date-age {
-    color: #6d9f99 !important;
+    color: var(--sage) !important;
     font-weight: 700;
     font-size: 12px;
   }
@@ -415,7 +415,7 @@
   }
 
   .date-row.pinned {
-    background: linear-gradient(105deg, rgba(244, 223, 189, 0.7), rgba(255, 253, 247, 0.96));
+    background: linear-gradient(105deg, color-mix(in srgb, var(--gold) 70%, transparent), color-mix(in srgb, var(--surface) 96%, transparent));
   }
 
   .date-icon {
@@ -452,7 +452,7 @@
 
   .date-count {
     min-width: 120px;
-    color: #6d9f99;
+    color: var(--sage);
     text-align: right;
     white-space: nowrap;
   }

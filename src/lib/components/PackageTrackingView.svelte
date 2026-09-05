@@ -252,11 +252,11 @@
   .package-card code { color: var(--muted); font-size: 12px; }
   .package-provider { color: var(--plum); font-size: 11px; font-weight: 900; letter-spacing: .1em; }
   .package-status { flex: 0 0 auto; border-radius: 999px; background: color-mix(in srgb, var(--amber) 20%, transparent); color: var(--ink); padding: 7px 10px; font-size: 12px; font-weight: 800; }
-  .package-status[data-status='delivered'] { background: #dcebd9; color: #315f35; }
-  .package-status[data-status='exception'] { background: #f2d6cf; color: #8b3527; }
+  .package-status[data-status='delivered'] { background: var(--success-bg); color: var(--success-text); }
+  .package-status[data-status='exception'] { background: var(--danger-bg); color: var(--danger-text); }
   .waiting-copy, .attention-copy, .error-copy { margin: 14px 0 0; border-radius: 12px; padding: 10px 12px; font-size: 12px; }
   .waiting-copy { background: var(--cream); color: var(--muted); }
-  .attention-copy, .error-copy { background: #fff0e8; color: #8b452d; }
+  .attention-copy, .error-copy { background: var(--danger-bg); color: var(--danger-text); }
   .package-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
   .package-facts div { min-width: 0; }
   .package-facts dt { color: var(--muted); font-size: 11px; }
@@ -271,7 +271,7 @@
   .package-card footer a { margin-right: auto; color: var(--plum); font-size: 12px; font-weight: 700; }
   .package-card footer button { background: var(--ink); padding: 8px 12px; font-size: 12px; }
   .package-card footer button.delivered { background: #3f6f46; }
-  .package-card footer button.danger { background: transparent; color: #9d3d2e; border: 1px solid #d9a69c; }
+  .package-card footer button.danger { background: transparent; color: var(--danger-text); border: 1px solid var(--danger-text); }
   .package-empty { border: 1px dashed var(--line); border-radius: 18px; padding: 28px; text-align: center; color: var(--muted); }
   .package-empty strong { color: var(--ink); }
   .package-empty p { margin: 6px 0 0; }

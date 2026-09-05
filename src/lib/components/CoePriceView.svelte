@@ -448,7 +448,7 @@
   .coe-table th {
     color: var(--muted);
     font-weight: var(--weight-black);
-    background: color-mix(in srgb, var(--mint) 35%, white);
+    background: color-mix(in srgb, var(--mint) 35%, var(--mix-base));
   }
 
   .coe-table tr:last-child td {

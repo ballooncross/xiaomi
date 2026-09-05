@@ -25,6 +25,18 @@
   --line: rgba(36, 27, 20, 0.13);
   --sea: #2d6382;
   --sage: #7ea79d;
+  --amber: #c39b64;
+  --mix-base: #fff;
+  --paper-glass: rgba(255, 248, 235, 0.88);
+  --backdrop: rgba(39, 31, 23, 0.28);
+  --shadow-color: rgba(38, 29, 20, 0.18);
+  --warning-bg: #fff7dc;
+  --warning-line: #ead69c;
+  --warning-text: #795c1d;
+  --success-bg: #dcebd9;
+  --success-text: #315f35;
+  --danger-bg: #f2d6cf;
+  --danger-text: #8b3527;
 
   /* Type */
   --font-sans:
@@ -63,13 +75,51 @@
   /* Elevation / control */
   --shadow-sm: 0 2px 8px rgba(36, 27, 20, 0.08);
   --shadow-md: 0 18px 42px rgba(38, 29, 20, 0.16);
+  --shadow-soft: var(--shadow-sm);
   --control-h: 36px;
   --control-h-lg: 42px;
   --ease: 140ms ease;
 
   font-family: var(--font-sans);
+  color-scheme: light;
   color: var(--ink);
   background: var(--canvas);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #171b1a;
+    --surface: #202624;
+    --canvas: #0f1312;
+    --ink: #f4eadc;
+    --muted: #bbaea1;
+    --accent: #f07868;
+    --accent-text: #fffaf0;
+    --gold: #e6b653;
+    --jade: #65c5a9;
+    --mint: #263f37;
+    --plum: #e479a6;
+    --rose: #4a2d2d;
+    --cream: #2c2923;
+    --line: rgba(244, 234, 220, 0.15);
+    --sea: #79b8da;
+    --sage: #8fbdb2;
+    --amber: #d6ad70;
+    --mix-base: #202624;
+    --paper-glass: rgba(23, 27, 26, 0.9);
+    --backdrop: rgba(0, 0, 0, 0.58);
+    --shadow-color: rgba(0, 0, 0, 0.42);
+    --warning-bg: #44391f;
+    --warning-line: #77622d;
+    --warning-text: #f0cf75;
+    --success-bg: #203b2a;
+    --success-text: #91d39d;
+    --danger-bg: #492b28;
+    --danger-text: #ffab9c;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.28);
+    --shadow-md: 0 18px 42px rgba(0, 0, 0, 0.34);
+    color-scheme: dark;
+  }
 }
 
 body {
@@ -80,6 +130,16 @@ body {
     radial-gradient(circle at 8% 12%, rgba(31, 111, 91, 0.12) 0 96px, transparent 97px),
     linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0)),
     var(--canvas);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background:
+      radial-gradient(circle at 92% 8%, rgba(228, 121, 166, 0.1) 0 88px, transparent 89px),
+      radial-gradient(circle at 8% 12%, rgba(101, 197, 169, 0.1) 0 96px, transparent 97px),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent),
+      var(--canvas);
+  }
 }
 
 button,
@@ -171,17 +231,17 @@ a {
   border-radius: var(--radius-pill);
   font-size: var(--text-sm);
   font-weight: var(--weight-black);
-  background: color-mix(in srgb, var(--line) 70%, white);
+  background: color-mix(in srgb, var(--line) 70%, var(--mix-base));
   color: var(--muted);
 }
 
 .chip-up {
-  background: color-mix(in srgb, var(--accent) 18%, white);
+  background: color-mix(in srgb, var(--accent) 18%, var(--mix-base));
   color: var(--accent);
 }
 
 .chip-down {
-  background: color-mix(in srgb, var(--jade) 18%, white);
+  background: color-mix(in srgb, var(--jade) 18%, var(--mix-base));
   color: var(--jade);
 }
 
@@ -226,7 +286,7 @@ a {
 }
 
 .btn:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--jade) 55%, white);
+  outline: 2px solid color-mix(in srgb, var(--jade) 55%, var(--mix-base));
   outline-offset: 2px;
   transform: none;
 }
@@ -254,7 +314,7 @@ a {
 }
 
 .btn-soft:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--mint) 78%, white);
+  background: color-mix(in srgb, var(--mint) 78%, var(--mix-base));
   border-color: var(--jade);
 }
 
@@ -318,7 +378,7 @@ a {
 
 .icon-btn:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--jade) 48%, var(--line));
-  background: color-mix(in srgb, var(--mint) 70%, white);
+  background: color-mix(in srgb, var(--mint) 70%, var(--mix-base));
 }
 
 .icon-btn:active:not(:disabled),
