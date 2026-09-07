@@ -1,6 +1,12 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { coeChartLabelIndexes, coeRoundsForRange, type CoeChartRange } from '$lib/coe-chart';
+  import {
+    coeChartLabelIndexes,
+    coeChartNearestIndex,
+    coeChartTooltipPlacement,
+    coeRoundsForRange,
+    type CoeChartRange
+  } from '$lib/coe-chart';
   import type { CoeBiddingRound, CoeCategory, CoeCategoryResult, CoePayload } from '$lib/coe';
   import { formatSgd } from '$lib/coe';
 
@@ -33,6 +39,10 @@
   let chartRange = $state<CoeChartRange>(12);
   let chartCategories = $state<CoeCategory[]>(['A', 'B']);
   let chartScroll = $state<HTMLDivElement>();
+  let chartSvg = $state<SVGSVGElement>();
+  // Index into chartRounds under the pointer (hover) or selected by tap/keyboard (pinned).
+  let activeIndex = $state<number | null>(null);
+  let activePinned = $state(false);
 
   const PRIMARY: CoeCategory[] = ['A', 'B'];
   const EXTRA: CoeCategory[] = ['C', 'D', 'E'];
@@ -114,6 +124,79 @@
     chartCategories = chartCategories.includes(category)
       ? chartCategories.filter((item) => item !== category)
       : [...chartCategories, category];
+    clearActivePoint();
+  }
+
+  const activeRound = $derived(activeIndex == null ? null : (chartRounds[activeIndex] ?? null));
+  const activeSeries = $derived.by(() => {
+    if (activeIndex == null || !activeRound) return [];
+    const previous = activeIndex > 0 ? chartRounds[activeIndex - 1] : null;
+    return chartCategories
+      .map((category) => {
+        const premium = premiumOf(activeRound, category);
+        if (premium == null) return null;
+        return {
+          category,
+          premium,
+          y: chartY(premium),
+          change: delta(premium, previous ? premiumOf(previous, category) : null)
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry != null);
+  });
+  const tooltipAnchor = $derived.by(() => {
+    if (activeIndex == null || activeSeries.length === 0) return null;
+    const x = chartX(activeIndex);
+    const y = Math.min(...activeSeries.map((entry) => entry.y));
+    return { x, y, ...coeChartTooltipPlacement(x, y, chartWidth) };
+  });
+
+  function clearActivePoint(): void {
+    activeIndex = null;
+    activePinned = false;
+  }
+
+  function indexFromClientX(clientX: number): number | null {
+    if (!chartSvg) return null;
+    const rect = chartSvg.getBoundingClientRect();
+    if (rect.width === 0) return null;
+    const x = ((clientX - rect.left) / rect.width) * chartWidth;
+    return coeChartNearestIndex(x, CHART_LEFT, chartWidth - CHART_RIGHT, chartRounds.length);
+  }
+
+  function handleChartPointerMove(event: PointerEvent): void {
+    if (event.pointerType !== 'mouse' || activePinned) return;
+    activeIndex = indexFromClientX(event.clientX);
+  }
+
+  function handleChartPointerLeave(event: PointerEvent): void {
+    if (event.pointerType !== 'mouse' || activePinned) return;
+    activeIndex = null;
+  }
+
+  function handleChartClick(event: MouseEvent): void {
+    const index = indexFromClientX(event.clientX);
+    if (index == null) return;
+    if (activePinned && activeIndex === index) {
+      clearActivePoint();
+      return;
+    }
+    activeIndex = index;
+    activePinned = true;
+  }
+
+  function handleChartKeydown(event: KeyboardEvent): void {
+    if (chartRounds.length === 0) return;
+    if (event.key === 'Escape') {
+      clearActivePoint();
+      return;
+    }
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const step = event.key === 'ArrowLeft' ? -1 : 1;
+    const current = activeIndex ?? chartRounds.length - 1;
+    activeIndex = Math.min(chartRounds.length - 1, Math.max(0, activeIndex == null ? current : current + step));
+    activePinned = true;
   }
 
   function chartX(index: number): number {
@@ -142,6 +225,7 @@
 
   async function selectChartRange(range: CoeChartRange): Promise<void> {
     chartRange = range;
+    clearActivePoint();
     await tick();
     if (chartScroll) chartScroll.scrollLeft = chartScroll.scrollWidth;
   }
@@ -332,9 +416,21 @@
           <div class="coe-chart-empty">所选范围内暂无历史报价。</div>
         {:else}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex (focus enables keyboard scrolling) -->
-          <div class="coe-chart-scroll" bind:this={chartScroll} role="region" tabindex="0" aria-label="COE 历史价格折线图，可横向滚动">
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions (pointer and arrow keys pick a data point) -->
+          <div
+            class="coe-chart-scroll"
+            bind:this={chartScroll}
+            role="region"
+            tabindex="0"
+            aria-label="COE 历史价格折线图，可横向滚动。悬停、点击或使用左右方向键查看具体报价。"
+            onpointermove={handleChartPointerMove}
+            onpointerleave={handleChartPointerLeave}
+            onclick={handleChartClick}
+            onkeydown={handleChartKeydown}
+          >
             <svg
               class="coe-chart"
+              bind:this={chartSvg}
               style={`width: ${chartWidth}px`}
               viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
               role="img"
@@ -370,14 +466,53 @@
                         cy={chartY(premium)}
                         r="3.5"
                         style={`--series-color: ${CATEGORY_COLORS[category]}`}
-                      >
-                        <title>{round.label} · Cat {category} · {formatSgd(premium)}</title>
-                      </circle>
+                      ></circle>
                     {/if}
                   {/each}
                 {/if}
               {/each}
+
+              {#if tooltipAnchor}
+                <line
+                  class="chart-guide"
+                  x1={tooltipAnchor.x}
+                  x2={tooltipAnchor.x}
+                  y1={CHART_TOP}
+                  y2={CHART_HEIGHT - CHART_BOTTOM}
+                ></line>
+                {#each activeSeries as entry (entry.category)}
+                  <circle
+                    class="chart-point chart-point-active"
+                    cx={tooltipAnchor.x}
+                    cy={entry.y}
+                    r="5.5"
+                    style={`--series-color: ${CATEGORY_COLORS[entry.category]}`}
+                  ></circle>
+                {/each}
+              {/if}
             </svg>
+
+            {#if tooltipAnchor && activeRound}
+              <div
+                class={`coe-chart-tooltip h-${tooltipAnchor.horizontal} v-${tooltipAnchor.vertical}`}
+                style={`left: ${tooltipAnchor.x}px; top: ${tooltipAnchor.y}px`}
+                role="status"
+                aria-live="polite"
+              >
+                <div class="coe-chart-tooltip-title">{activeRound.label}</div>
+                {#each activeSeries as entry (entry.category)}
+                  <div class="coe-chart-tooltip-row">
+                    <span class="coe-chart-tooltip-swatch" style={`background: ${CATEGORY_COLORS[entry.category]}`}></span>
+                    <span class="coe-chart-tooltip-cat">Cat {entry.category}</span>
+                    <strong>{formatSgd(entry.premium)}</strong>
+                    <span class={`coe-chart-tooltip-delta ${entry.change.tone}`}>{entry.change.text}</span>
+                  </div>
+                {/each}
+                {#if activePinned}
+                  <div class="coe-chart-tooltip-hint">再次点击关闭</div>
+                {/if}
+              </div>
+            {/if}
           </div>
           {#if chartWidth > 900}
             <p class="coe-chart-hint">左右滚动查看完整时间范围，日期标签已抽样以保持清晰。</p>
@@ -676,15 +811,112 @@
   }
 
   .coe-chart-scroll {
+    position: relative;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-gutter: stable;
+    touch-action: pan-x pan-y;
   }
 
   .coe-chart {
     display: block;
     height: 320px;
     max-width: none;
+    cursor: crosshair;
+  }
+
+  .chart-guide {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+  }
+
+  .chart-point-active {
+    stroke-width: 3;
+    pointer-events: none;
+  }
+
+  .coe-chart-tooltip {
+    position: absolute;
+    z-index: 2;
+    min-width: 168px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    pointer-events: none;
+    --tooltip-shift-x: -50%;
+    --tooltip-shift-y: calc(-100% - 14px);
+    transform: translate(var(--tooltip-shift-x), var(--tooltip-shift-y));
+  }
+
+  .coe-chart-tooltip.h-left {
+    --tooltip-shift-x: -12px;
+  }
+
+  .coe-chart-tooltip.h-right {
+    --tooltip-shift-x: calc(-100% + 12px);
+  }
+
+  .coe-chart-tooltip.v-below {
+    --tooltip-shift-y: 14px;
+  }
+
+  .coe-chart-tooltip-title {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: var(--text-xs, 12px);
+  }
+
+  .coe-chart-tooltip-row {
+    display: grid;
+    grid-template-columns: 10px auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .coe-chart-tooltip-row strong {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .coe-chart-tooltip-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .coe-chart-tooltip-cat {
+    color: var(--muted);
+  }
+
+  .coe-chart-tooltip-delta {
+    font-size: var(--text-xs, 12px);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .coe-chart-tooltip-delta.up {
+    color: var(--accent);
+  }
+
+  .coe-chart-tooltip-delta.down {
+    color: var(--jade);
+  }
+
+  .coe-chart-tooltip-delta.flat {
+    color: var(--muted);
+  }
+
+  .coe-chart-tooltip-hint {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: var(--text-xs, 12px);
   }
 
   .chart-grid {
