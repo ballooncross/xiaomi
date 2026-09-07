@@ -270,11 +270,20 @@ async function implementInWorktree(
     const publishPackage = JSON.parse(readFileSync(join(worktreeDir, 'package.json'), 'utf8')) as { version?: string };
     const deployment = await waitForDeployment(worktreeDir, publishSha, expectedPatchVersion(publishPackage.version));
     if (!deployment.success) {
+      const workflowNote = deployment.workflowUrl ? ` Workflow: ${deployment.workflowUrl}` : '';
+      await event(context, 'deploying', 'deployment_failed', `Production deployment was not verified: ${deployment.detail}${workflowNote}`, {
+        resultSha: publishSha,
+        workflowUrl: deployment.workflowUrl,
+        detail: deployment.detail,
+        logExcerpt: deployment.logExcerpt
+      }, 'error');
+      const workflowLine = deployment.workflowUrl ? `\n工作流：${deployment.workflowUrl}` : '';
+      const logLine = deployment.logExcerpt ? `\n失败日志：\n${deployment.logExcerpt}` : '';
       return {
         status: 'replied',
         runStatus: 'needs_input',
         phase: 'waiting_for_input',
-        response: `代码已发布到 main (${publishSha.slice(0, 8)})，但生产验证未完成：${deployment.detail}`,
+        response: `代码已发布到 main (${publishSha.slice(0, 8)})，但生产验证未完成：${deployment.detail}${workflowLine}${logLine}`,
         branch,
         resultSha: publishSha,
         errorCategory: 'deployment_unverified'
@@ -367,7 +376,15 @@ function verifyWorktree(cwd: string): Record<string, string> {
     ['build', ['run', 'build']]
   ] as const) {
     try {
-      const output = execFileSync('npm', args, { cwd, timeout: 5 * 60_000, stdio: 'pipe', maxBuffer: 10 * 1024 * 1024 });
+      // GitHub runners execute the same checks in UTC. Mirror that here so a
+      // timezone-dependent test cannot pass locally and then fail the deploy.
+      const output = execFileSync('npm', args, {
+        cwd,
+        timeout: 5 * 60_000,
+        stdio: 'pipe',
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, TZ: 'UTC' }
+      });
       results[name] = output.toString().slice(-1000);
     } catch (error) {
       const detail = childError(error);
@@ -381,22 +398,27 @@ async function waitForDeployment(
   cwd: string,
   commitSha: string,
   expectedVersion: string | null
-): Promise<{ success: boolean; detail: string; workflowUrl?: string; liveVersion?: string }> {
+): Promise<{ success: boolean; detail: string; workflowUrl?: string; liveVersion?: string; logExcerpt?: string }> {
   const deadline = Date.now() + DEPLOYMENT_TIMEOUT_MS;
   let workflowUrl = '';
   while (Date.now() < deadline) {
     try {
       const raw = execFileSync(
         'gh',
-        ['run', 'list', '--workflow', 'Deploy', '--commit', commitSha, '--json', 'status,conclusion,url', '--limit', '1'],
+        ['run', 'list', '--workflow', 'Deploy', '--commit', commitSha, '--json', 'status,conclusion,url,databaseId', '--limit', '1'],
         { cwd, timeout: 30000, stdio: 'pipe' }
       ).toString();
-      const runs = JSON.parse(raw) as Array<{ status: string; conclusion: string; url: string }>;
+      const runs = JSON.parse(raw) as Array<{ status: string; conclusion: string; url: string; databaseId?: number }>;
       const run = runs[0];
       if (run) {
         workflowUrl = run.url;
         if (run.status === 'completed' && run.conclusion !== 'success') {
-          return { success: false, detail: `GitHub workflow concluded ${run.conclusion}.`, workflowUrl };
+          return {
+            success: false,
+            detail: `GitHub workflow concluded ${run.conclusion}.`,
+            workflowUrl,
+            logExcerpt: failedWorkflowLog(cwd, run.databaseId)
+          };
         }
         if (run.status === 'completed' && run.conclusion === 'success') {
           if (!expectedVersion) return { success: true, detail: 'Deployment succeeded.', workflowUrl };
@@ -412,6 +434,32 @@ async function waitForDeployment(
     await delay(5000);
   }
   return { success: false, detail: 'Timed out waiting for the GitHub deployment.', workflowUrl };
+}
+
+function failedWorkflowLog(cwd: string, runId?: number): string {
+  if (!runId) return '';
+  try {
+    const raw = execFileSync('gh', ['run', 'view', String(runId), '--log-failed'], {
+      cwd,
+      timeout: 60000,
+      stdio: 'pipe',
+      maxBuffer: 10 * 1024 * 1024
+    }).toString();
+    // gh emits ANSI colour codes as raw escapes or caret notation ("^[[31m").
+    const ansiPattern = new RegExp(`(?:${String.fromCharCode(27)}|\\^\\[)\\[[0-9;]*m`, 'g');
+    const lines = raw
+      .split('\n')
+      // gh prefixes each line with "job\tstep\ttimestamp "; keep the message.
+      .map((line) => line.replace(/^[^\t]*\t[^\t]*\t\S*\s?/, ''))
+      .map((line) => line.replace(ansiPattern, '').trimEnd())
+      .filter((line) => line.length > 0 && !/^Post job cleanup|^\[command\]|^Cleaning up orphan|Node(\.js)? 20 is|^Temporarily overriding HOME|^Adding repository directory/.test(line));
+    const errorIndex = lines.findIndex((line) => /##\[error\]|\bFAIL\b|Error:/.test(line));
+    const start = Math.max(0, (errorIndex >= 0 ? errorIndex : lines.length) - 5);
+    return redact(lines.slice(start, start + 40).join('\n')).slice(0, 4000);
+  } catch (error) {
+    log(`Failed workflow log fetch failed: ${errorMessage(error)}`);
+    return '';
+  }
 }
 
 async function waitForLiveVersion(expectedVersion: string): Promise<string | null> {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildReminderDigestMessage, buildTemplateDigest, renderTelegramDigest } from './digest';
+import { todayInSingapore } from './lunar';
 import { demoItems } from './seed';
 import type { DateReminder } from './types';
 
@@ -17,15 +18,20 @@ describe('digest', () => {
   });
 
   it('builds a standalone dates message that does not include trend copy', () => {
-    const today = new Date();
+    // Reminders are evaluated against the Singapore calendar date. Pin the clock
+    // to a moment where UTC (GitHub runners) and Singapore are on different days
+    // so the test cannot pass locally and fail in CI.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-05T17:40:00Z'));
+    const today = todayInSingapore();
     const reminder: DateReminder = {
       id: 'r1',
       title: '测试生日',
       calendarType: 'gregorian',
       category: 'birthday',
-      year: today.getFullYear() - 30,
-      month: today.getMonth() + 1,
-      day: today.getDate(),
+      year: today.getUTCFullYear() - 30,
+      month: today.getUTCMonth() + 1,
+      day: today.getUTCDate(),
       lunarIsLeapMonth: false,
       repeat: 'annual',
       note: '',
