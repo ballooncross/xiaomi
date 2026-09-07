@@ -65,4 +65,6 @@
 - Preserve the coding subprocess final response. A clarification is `needs_input`, not a successful no-op.
 - Store each attempt and phase as durable D1 run and event records. Redact tokens and cap stored output.
 - Mark a request completed only after required checks, publication to `main`, successful GitHub deployment, and live version verification.
+- Run the required checks with `TZ=UTC` so they match the GitHub runner. Date logic and tests must derive "today" from `todayInSingapore()`, never from the local `Date` getters.
+- When the GitHub deployment fails or times out, record a `deployment_failed` event with the workflow URL and the failed-step log excerpt, and put both in the request response. Never leave the timeline at `deployment_started`.
 - Run the production local agent as scheduled single cycles from its dedicated `origin/main` worktree so code and configuration reload on every cycle.
