@@ -8,6 +8,7 @@ import type {
   AgentFeedItem,
   AgentOutcomeStats,
   AiContextDocument,
+  AiContextSnapshotMeta,
   DateReminder,
   DevRequest,
   DevRequestEvent,
@@ -197,6 +198,23 @@ type MemoryUserItemState = {
 
 const DEFAULT_MEMORY_USER = 'memory-user';
 
+/**
+ * Agent outcome stats look at a trailing window rather than all history. The
+ * unbounded version scanned the whole outcomes table on every read, which was
+ * a large share of the daily D1 rows read.
+ */
+const AGENT_OUTCOME_WINDOW_DAYS = 90;
+
+/**
+ * SQLite's CURRENT_TIMESTAMP writes 'YYYY-MM-DD HH:MM:SS', so a JavaScript ISO
+ * string does not compare correctly against those rows: for the same calendar
+ * day the 'T' separator sorts after a space, which silently drops rows. Any
+ * cutoff compared against a CURRENT_TIMESTAMP column has to be in this shape.
+ */
+function sqliteTimestamp(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+}
+
 const memory = {
   users: [] as Array<{
     id: string;
@@ -222,7 +240,7 @@ const memory = {
   coeRounds: [] as CoeBiddingRound[],
   agentFeeds: [] as AgentFeedItem[],
   preferenceSignalsByUser: new Map<string, PreferenceSignal[]>(),
-  aiContextByUser: new Map<string, (AiContextDocument & { id: string })[]>(),
+  aiContextByUser: new Map<string, (AiContextDocument & { id: string; signalCount: number })[]>(),
   agentOutcomes: [] as Array<{ id: string; agentFeedId: string; outcome: string; createdAt: string }>,
   impressionsByUser: new Map<string, Array<{ id: string; itemId: string; impressionType: string; createdAt: string }>>(),
   notifications: [] as Array<{ id: string; itemId?: string; channel: string; type: string; status: string; message: string; createdAt: string }>,
@@ -363,10 +381,13 @@ export abstract class RadarDb {
   // Preference signal methods
   abstract insertPreferenceSignal(signal: PreferenceSignal): Promise<void>;
   abstract listPreferenceSignals(options?: { since?: string; type?: string; limit?: number }): Promise<PreferenceSignal[]>;
+  abstract countPreferenceSignals(): Promise<number>;
 
   // AI context methods
   abstract insertAiContextSnapshot(doc: AiContextDocument): Promise<void>;
   abstract getLatestAiContext(): Promise<AiContextDocument | null>;
+  /** Version and signal count only, for deciding whether a recompile is due. */
+  abstract getLatestAiContextMeta(): Promise<AiContextSnapshotMeta | null>;
 
   // Agent outcome methods
   abstract recordAgentOutcome(feedId: string, outcome: string): Promise<void>;
@@ -754,8 +775,16 @@ class MemoryRadarDb extends RadarDb {
     return signals.slice(0, options?.limit ?? 500);
   }
 
+  async countPreferenceSignals(): Promise<number> {
+    return getUserPreferenceSignals(this.uid).length;
+  }
+
   async insertAiContextSnapshot(doc: AiContextDocument): Promise<void> {
-    getUserAiContexts(this.uid).push({ ...doc, id: crypto.randomUUID() });
+    getUserAiContexts(this.uid).push({
+      ...doc,
+      id: crypto.randomUUID(),
+      signalCount: getUserPreferenceSignals(this.uid).length
+    });
   }
 
   async getLatestAiContext(): Promise<AiContextDocument | null> {
@@ -764,12 +793,20 @@ class MemoryRadarDb extends RadarDb {
     return contexts[contexts.length - 1];
   }
 
+  async getLatestAiContextMeta(): Promise<AiContextSnapshotMeta | null> {
+    const contexts = getUserAiContexts(this.uid);
+    const latest = contexts[contexts.length - 1];
+    if (!latest) return null;
+    return { version: latest.version, signalCount: latest.signalCount };
+  }
+
   async recordAgentOutcome(feedId: string, outcome: string): Promise<void> {
     memory.agentOutcomes.push({ id: crypto.randomUUID(), agentFeedId: feedId, outcome, createdAt: new Date().toISOString() });
   }
 
   async getAgentOutcomeStats(): Promise<AgentOutcomeStats> {
-    const outcomes = memory.agentOutcomes;
+    const cutoff = Date.now() - AGENT_OUTCOME_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const outcomes = memory.agentOutcomes.filter((o) => Date.parse(o.createdAt) >= cutoff);
     return {
       total: outcomes.length,
       saved: outcomes.filter((o) => o.outcome === 'saved').length,
@@ -1929,6 +1966,20 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async countPreferenceSignals(): Promise<number> {
+    if (!this.userId) return 0;
+    try {
+      const row = await this.db
+        .prepare('SELECT COUNT(*) as cnt FROM preference_signals WHERE user_id = ?')
+        .bind(this.userId)
+        .first<{ cnt: number }>();
+      return row?.cnt ?? 0;
+    } catch (error) {
+      if (isMissingTableError(error)) return 0;
+      throw error;
+    }
+  }
+
   async insertAiContextSnapshot(doc: AiContextDocument): Promise<void> {
     if (!this.userId) return;
     try {
@@ -1980,6 +2031,22 @@ class D1RadarDb extends RadarDb {
     }
   }
 
+  async getLatestAiContextMeta(): Promise<AiContextSnapshotMeta | null> {
+    if (!this.userId) return null;
+    try {
+      const row = await this.db
+        .prepare(
+          'SELECT version, signal_count FROM ai_context_snapshots WHERE user_id = ? ORDER BY version DESC LIMIT 1'
+        )
+        .bind(this.userId)
+        .first<{ version: number; signal_count: number }>();
+      return row ? { version: row.version, signalCount: row.signal_count } : null;
+    } catch (error) {
+      if (isMissingTableError(error)) return null;
+      throw error;
+    }
+  }
+
   async recordAgentOutcome(feedId: string, outcome: string): Promise<void> {
     try {
       await this.db
@@ -1996,12 +2063,16 @@ class D1RadarDb extends RadarDb {
     try {
       // JOIN instead of `IN (...)` — D1 caps bound parameters at 100, and
       // production already has 160+ distinct outcome feed ids.
+      // The created_at bound keeps this off a full table scan; without it the
+      // query read every outcome ever recorded on each call.
       const { results: rows } = await this.db
         .prepare(
           `SELECT o.agent_feed_id, o.outcome, f.source, f.topics
            FROM agent_suggestion_outcomes o
-           LEFT JOIN agent_feeds f ON f.id = o.agent_feed_id`
+           LEFT JOIN agent_feeds f ON f.id = o.agent_feed_id
+           WHERE o.created_at >= ?`
         )
+        .bind(sqliteTimestamp(new Date(Date.now() - AGENT_OUTCOME_WINDOW_DAYS * 24 * 60 * 60 * 1000)))
         .all<{ agent_feed_id: string; outcome: string; source: string | null; topics: string | null }>();
 
       const stats: AgentOutcomeStats = {
