@@ -22,8 +22,12 @@
 
   <key>RunAtLoad</key>
   <true/>
+  <!-- Temporarily 30 minutes instead of 10 while D1 read amplification is
+       fixed. Each tick currently costs tens of thousands of D1 rows read,
+       which saturates the daily free-tier limit. Restore 600 once the index
+       and recompile fixes are verified in production. -->
   <key>StartInterval</key>
-  <integer>600</integer>
+  <integer>1800</integer>
 
   <key>StandardOutPath</key>
   <string>__RADAR_LOG_PATH__</string>
