@@ -39,3 +39,39 @@ export function coeChartLabelIndexes(pointCount: number, maxLabels = 7): number[
 	indexes.push(pointCount - 1);
 	return indexes;
 }
+
+/**
+ * Maps a horizontal position inside the plot to the nearest data point index.
+ * Positions outside the plot snap to the first or last point.
+ */
+export function coeChartNearestIndex(
+	x: number,
+	plotLeft: number,
+	plotRight: number,
+	pointCount: number
+): number | null {
+	if (pointCount <= 0 || !Number.isFinite(x)) return null;
+	if (pointCount === 1 || plotRight <= plotLeft) return 0;
+	const ratio = (x - plotLeft) / (plotRight - plotLeft);
+	const index = Math.round(ratio * (pointCount - 1));
+	return Math.min(pointCount - 1, Math.max(0, index));
+}
+
+export type CoeChartTooltipPlacement = {
+	horizontal: 'center' | 'left' | 'right';
+	vertical: 'above' | 'below';
+};
+
+/** Keeps the tooltip inside the chart near the edges and top. */
+export function coeChartTooltipPlacement(
+	x: number,
+	y: number,
+	chartWidth: number,
+	edgeMargin = 120,
+	topMargin = 96
+): CoeChartTooltipPlacement {
+	return {
+		horizontal: x < edgeMargin ? 'left' : x > chartWidth - edgeMargin ? 'right' : 'center',
+		vertical: y < topMargin ? 'below' : 'above'
+	};
+}
