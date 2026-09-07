@@ -3,6 +3,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
 import { getAdminScopedDb } from '$lib/server/users';
 import { compileContext } from '$lib/server/context-compiler';
+import { isAgentScanLog, shouldRecompileContext } from '$lib/server/context-recompile';
 import type { Env, PreferenceSignal, SignalType } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -31,6 +32,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
   const db = await getAdminScopedDb(env);
   let accepted = 0;
+  let meaningfulSignals = 0;
 
   for (const input of body.signals) {
     if (!input.type || !VALID_TYPES.has(input.type as SignalType)) continue;
@@ -47,6 +49,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
     await db.insertPreferenceSignal(signal);
     accepted++;
+    if (!isAgentScanLog(signal.signalType, signal.source)) meaningfulSignals++;
 
     // Auto-create blacklist topic for "not_interested" signals
     if (input.type === 'not_interested' && input.value) {
@@ -69,12 +72,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     }
   }
 
-  // Auto-recompile context if enough new signals accumulated
+  // Auto-recompile context if enough new signals accumulated. Only signals
+  // that can change the context are counted, and the total is compared against
+  // the count stored on the snapshot so both sides measure the same thing.
   let contextRecompileTriggered = false;
-  const latestContext = await db.getLatestAiContext();
-  const currentSignalCount = (await db.listPreferenceSignals({ limit: 1000 })).length;
-  const lastCompiledCount = latestContext ? (latestContext.stats?.totalFeedbackEvents ?? 0) : 0;
-  if (currentSignalCount - lastCompiledCount >= 5 || !latestContext) {
+  const snapshot = await db.getLatestAiContextMeta();
+  const totalSignals = meaningfulSignals > 0 ? await db.countPreferenceSignals() : 0;
+  if (shouldRecompileContext({ snapshot, meaningfulSignals, totalSignals })) {
     await compileContext(db);
     contextRecompileTriggered = true;
   }

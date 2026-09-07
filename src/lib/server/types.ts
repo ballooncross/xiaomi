@@ -400,6 +400,12 @@ export type DevRequestRunner = {
   lastSeenAt?: string;
 };
 
+export type AiContextSnapshotMeta = {
+  version: number;
+  /** Total preference signals that existed when the snapshot was compiled. */
+  signalCount: number;
+};
+
 export type AgentOutcomeStats = {
   total: number;
   saved: number;
