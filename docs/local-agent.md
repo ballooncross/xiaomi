@@ -17,7 +17,22 @@ npm run agent -- --once      # single tick
 npm run agent:dry            # search but do not submit
 ```
 
-Install the production scheduler:
+## Running on a schedule
+
+`--once` runs a single tick and exits. Two options keep the agent running.
+
+### Option 1: foreground loop
+
+```bash
+npm run agent
+```
+
+Without `--once`, the process stays alive and ticks every 10 minutes
+(`pollIntervalMs` in `scripts/lib/config.ts`). It stops when the terminal
+closes or the Mac sleeps, and it does not reload code or `scripts/.env`
+between ticks. Use it for a test session, not as the production runner.
+
+### Option 2: launchd scheduler (recommended)
 
 ```bash
 scripts/install-agent.sh
@@ -33,24 +48,45 @@ registry. A machine-level `~/.npmrc` pointing at a private registry would
 otherwise break `npm ci` for the runtime and for development-request
 worktrees.
 
-The installed launch agent runs one cycle every ten minutes from a dedicated
-detached worktree tracking `origin/main`. Each cycle reloads the current code
-and `scripts/.env`, so changing the configured AI backend does not require a
-long-lived Node process restart. Dependencies are installed inside the runtime
-and refreshed only when `package-lock.json` changes. Single-run mode exits
-after the guarded scan even if a timed-out scan still has unresolved promises,
-so launchd can start the next scheduled cycle.
+The installed launch agent runs one `--once` cycle on a fixed interval from a
+dedicated detached worktree tracking `origin/main`. Each cycle reloads the
+current code and `scripts/.env`, so changing the configured AI backend does
+not require a long-lived Node process restart. Dependencies are installed
+inside the runtime and refreshed only when `package-lock.json` changes.
+Single-run mode exits after the guarded scan even if a timed-out scan still
+has unresolved promises, so launchd can start the next scheduled cycle.
+
+The interval is `StartInterval` in `scripts/com.personalradar.agent.plist`,
+in seconds. It is currently 1800 (30 minutes) while D1 read amplification is
+being fixed; the long-term target is 600. To change it, edit the plist and run
+`scripts/install-agent.sh` again. The installer unloads the old service and
+bootstraps the new one. `RunAtLoad` is true, so a cycle starts right after
+install and after each login. Cycles missed while the Mac sleeps are
+coalesced into one run on wake.
+
+Manage the service with `launchctl`:
+
+```bash
+launchctl print gui/$(id -u)/com.personalradar.agent          # state, last exit code
+launchctl kickstart -k gui/$(id -u)/com.personalradar.agent   # run a cycle now
+tail -f ~/Library/Logs/personal-radar-agent.log               # follow the log
+launchctl bootout gui/$(id -u)/com.personalradar.agent        # stop and unload
+```
+
+`bootout` stops scheduling but leaves the plist and the runtime worktree in
+place. Run `scripts/install-agent.sh` to start again. For a full uninstall,
+also remove `~/Library/LaunchAgents/com.personalradar.agent.plist` and
+`~/Library/Application Support/Personal Radar`, then run `git worktree prune`
+in the source checkout.
 
 Do not run a separate continuous `caffeinate` or `nohup` process alongside the
-installed scheduler. Multiple legacy runners can race for requests. Monitor
-with `tail -f ~/Library/Logs/personal-radar-agent.log` and inspect the service
-with `launchctl print gui/$(id -u)/com.personalradar.agent`.
+installed scheduler. Multiple legacy runners can race for requests.
 
 Each tick also reports `running`, `ok`, or `error` to the radar. Admins can see the latest tick time and detail under 我的 > 工具 > 定时任务状态 > 本地 AI Agent. If the process stops reporting, the last timestamp remains visible so a stale agent is easy to spot.
 
 ## How a tick works
 
-Every 10 minutes the agent pulls `/api/agent/context` and decides a scan tier:
+On every tick the agent pulls `/api/agent/context` and decides a scan tier:
 
 | Condition | Tier | What runs |
 |---|---|---|

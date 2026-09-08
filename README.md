@@ -54,8 +54,19 @@ npm run exercises:enrich:garmin # build Garmin exercise enrichment data
 npm run deploy              # deploy Pages app
 npm run deploy:cron         # deploy scheduled worker
 npm run agent -- --once     # run the local AI agent once
+npm run agent               # local AI agent loop in the foreground (every 10 minutes)
 npm run agent:dry           # local AI agent dry run (no submissions)
+scripts/install-agent.sh    # install the background launchd scheduler
 ```
+
+## Running The Local Agent On A Schedule
+
+`npm run agent -- --once` runs a single tick and exits. Two options run it on a schedule:
+
+- `npm run agent` without `--once` keeps one Node process in the foreground and ticks every 10 minutes. Use it for a test session. It stops when the terminal closes and does not reload code between ticks.
+- `scripts/install-agent.sh` installs a macOS launchd agent that runs `--once` cycles in the background on a fixed interval, from a dedicated worktree that tracks `origin/main`. Use this for the always-on setup.
+
+See [Running on a schedule](docs/local-agent.md#running-on-a-schedule) for the interval setting, logs, manual trigger, stop, and uninstall commands.
 
 ## Deployment Rule
 
