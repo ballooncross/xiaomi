@@ -8,6 +8,16 @@ RADAR_USER_DOMAIN="gui/$(id -u)"
 # Repository the runtime worktree is created from. Defaults to this checkout.
 RADAR_SOURCE_ROOT="${RADAR_SOURCE_ROOT:-${0:A:h:h}}"
 
+# A foreground `npm run agent` loop beside the scheduler duplicates work and
+# races for development requests. Warn rather than kill: a `--once` run may be
+# mid-submission and finishes on its own.
+RADAR_STRAY="$(ps -axo pid=,command= | grep -E 'scripts/agent\.ts' | grep -v -E 'grep|--once')"
+if [ -n "$RADAR_STRAY" ]; then
+  echo "WARNING: an agent loop is already running outside the scheduler:"
+  print -r -- "$RADAR_STRAY" | sed 's/^/  /'
+  echo "Stop it (Ctrl-C in its terminal, or kill <pid>) so it does not race the scheduled cycles."
+fi
+
 mkdir -p "$RADAR_INSTALL_DIR" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 cp -X "${0:A:h}/run-agent.sh" "$RADAR_INSTALL_DIR/run-agent.sh"
 chmod 755 "$RADAR_INSTALL_DIR/run-agent.sh"

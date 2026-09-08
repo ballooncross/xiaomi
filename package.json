@@ -31,7 +31,8 @@
     "secrets:sync:pages": "node scripts/sync-secrets.mjs pages",
     "secrets:sync:cron": "node scripts/sync-secrets.mjs cron",
     "agent": "npx tsx scripts/agent.ts",
-    "agent:dry": "npx tsx scripts/agent.ts --dry-run"
+    "agent:dry": "npx tsx scripts/agent.ts --dry-run",
+    "agent:status": "zsh scripts/agent-status.sh"
   },
   "devDependencies": {
     "@cloudflare/puppeteer": "^1.1.0",

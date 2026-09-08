@@ -32,6 +32,19 @@ Without `--once`, the process stays alive and ticks every 10 minutes
 closes or the Mac sleeps, and it does not reload code or `scripts/.env`
 between ticks. Use it for a test session, not as the production runner.
 
+Loop mode checks for other runners first. If the launchd scheduler is
+installed, or another `agent.ts` or `run-agent.sh` process is running, it
+prints what it found and exits with code 1 instead of starting a second
+runner. Pass `--force` to start anyway:
+
+```bash
+npm run agent -- --force
+```
+
+`--once` runs are never blocked. They only log a warning when another agent
+process is mid-cycle, because a short manual tick beside a scheduled cycle is
+harmless apart from possible duplicate submissions.
+
 ### Option 2: launchd scheduler (recommended)
 
 ```bash
@@ -80,7 +93,36 @@ also remove `~/Library/LaunchAgents/com.personalradar.agent.plist` and
 in the source checkout.
 
 Do not run a separate continuous `caffeinate` or `nohup` process alongside the
-installed scheduler. Multiple legacy runners can race for requests.
+installed scheduler. Multiple legacy runners can race for requests. The
+installer warns when it finds a foreground loop already running, but it does
+not kill it; stop that process yourself.
+
+### Checking what is running
+
+```bash
+npm run agent:status
+```
+
+The status script is read-only and prints three things:
+
+1. **Scheduler:** whether `com.personalradar.agent` is loaded in launchd, its
+   run count, last exit code, and the configured interval. `state = not
+   running` with `last exit code = 0` is the healthy idle state between
+   cycles.
+2. **Processes:** any `agent.ts` or `run-agent.sh` process alive right now,
+   with its elapsed time. A scheduled cycle lives for seconds to a few
+   minutes, so an empty list is normal. A process without `--once` is a
+   foreground loop and gets a warning.
+3. **Log tail:** the last lines of `~/Library/Logs/personal-radar-agent.log`.
+   Set `RADAR_STATUS_LOG_LINES=30` for more.
+
+The same checks by hand:
+
+```bash
+launchctl print gui/$(id -u)/com.personalradar.agent | grep -E "state|last exit|runs"
+pgrep -fl "agent.ts|run-agent.sh"
+tail -n 20 ~/Library/Logs/personal-radar-agent.log
+```
 
 Each tick also reports `running`, `ok`, or `error` to the radar. Admins can see the latest tick time and detail under 我的 > 工具 > 定时任务状态 > 本地 AI Agent. If the process stops reporting, the last timestamp remains visible so a stale agent is easy to spot.
 

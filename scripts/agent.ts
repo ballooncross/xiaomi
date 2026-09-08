@@ -11,6 +11,12 @@
  *   npx tsx scripts/agent.ts             # loop every 10 minutes
  *   npx tsx scripts/agent.ts --once      # single tick
  *   npx tsx scripts/agent.ts --dry-run   # search but do not submit
+ *   npx tsx scripts/agent.ts --force     # loop even if the launchd scheduler is installed
+ *
+ * Loop mode refuses to start while the launchd scheduler from
+ * scripts/install-agent.sh is installed or another agent process is running,
+ * because two runners submit duplicate items and race for development
+ * requests. Use `npm run agent:status` to see what is running.
  *
  * Config lives in scripts/.env (see .env.example).
  */
@@ -25,6 +31,7 @@ import { fetchContext, reportAgentStatus, submitFeeds, submitSignals } from './l
 import { scoreRelevance } from './lib/scoring';
 import { buildQueries, mergeLearnedSources, seedSources, sourcesForTier } from './lib/sources';
 import { decideScanTier, loadState, saveState, updateStateAfterScan } from './lib/state';
+import { describeProcesses, LAUNCH_AGENT_LABEL, launchAgentInstalled, otherAgentProcesses } from './lib/runtime-guard';
 import { log } from './lib/utils';
 import type { AgentContext, AgentSignal, DiscoveredItem, ScanTier } from './lib/types';
 import type { ScanDecision } from './lib/state';
@@ -35,6 +42,10 @@ async function main() {
   log(`  Mode: ${config.dryRun ? 'dry-run' : 'live'}, ${config.once ? 'single run' : `loop every ${config.pollIntervalMs / 60000}min`}`);
   log(`  AI backend: ${config.aiBackend}`);
   if (!config.radarToken) log('WARNING: No RADAR_TOKEN set. API calls may fail with 401.');
+
+  if (!guardAgainstOtherRunners()) {
+    process.exit(1);
+  }
 
   // Development requests have their own durable lease, phase history, and
   // timeouts. Keep them outside the scan watchdog so a valid implementation
@@ -64,6 +75,37 @@ async function main() {
       log(`Next check in ${config.pollIntervalMs / 60000} minutes...`);
     }, config.pollIntervalMs);
   }
+}
+
+/**
+ * Refuse loop mode when another runner would overlap with it. Single runs only
+ * warn: a manual `--once` beside a scheduled cycle is short-lived, and the
+ * scheduled cycle itself runs with `--once`.
+ */
+function guardAgainstOtherRunners(): boolean {
+  const others = otherAgentProcesses();
+  const scheduled = launchAgentInstalled();
+
+  if (others.length > 0) {
+    log(`WARNING: ${others.length} other agent process(es) running:\n${describeProcesses(others)}`);
+  }
+  if (config.once) return true;
+
+  if (scheduled) {
+    log(`The launchd scheduler ${LAUNCH_AGENT_LABEL} is installed and already runs cycles on a schedule.`);
+  }
+  if ((scheduled || others.length > 0) && !config.force) {
+    log('Refusing to start loop mode beside another runner. Options:');
+    log('  npm run agent:status                                    # see what is running');
+    log('  npm run agent -- --once                                 # single tick instead');
+    log(`  launchctl bootout gui/$(id -u)/${LAUNCH_AGENT_LABEL}  # stop the scheduler first`);
+    log('  npm run agent -- --force                                # run both anyway');
+    return false;
+  }
+  if (scheduled || others.length > 0) {
+    log('--force given: starting loop mode beside another runner.');
+  }
+  return true;
 }
 
 let tickCount = 0;
