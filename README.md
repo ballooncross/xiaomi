@@ -28,10 +28,14 @@ Persistence is D1-first. `npm run dev` uses in-memory demo data for the fastest 
 ## Quick Start
 
 ```bash
+nvm use                     # Node 22, see .nvmrc
 npm install
 cp .env.example .env.local
 npm run dev
 ```
+
+Node 22.12 or newer is required: Wrangler needs Node 22, and Vite 7 needs
+22.12 within that line. GitHub Actions reads the same `.nvmrc`.
 
 Open the local URL printed by Vite. Without Cloudflare bindings, the app uses in-memory demo data so the UI works immediately.
 Leave `.env.local` values blank until you want Telegram, source APIs, or optional AI locally.
