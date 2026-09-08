@@ -40,6 +40,8 @@ export const config = {
 
   dryRun: process.argv.includes('--dry-run'),
   once: process.argv.includes('--once'),
+  // Start loop mode even when the launchd scheduler or another runner exists.
+  force: process.argv.includes('--force'),
 
   pollIntervalMs: 10 * 60 * 1000,
   tickBudgetMs: 18 * 60 * 1000,
