@@ -1,9 +1,41 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { lookupWithProvider, parseDexiXml, parseMh56Html, parseYxdRows } from './providers';
+import { lookupWithProvider, parseDexiXml, parseLsgjwlResponse, parseMh56Html, parseYxdRows } from './providers';
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+const lsgjwlFixture = {
+  status: 1,
+  info: '',
+  action: '',
+  show_time: 1,
+  data: {
+    shipment: {
+      shipment_id: '550907129993',
+      client_reference: 'YD61839978',
+      ext_number: '',
+      outer_carrier_code: '',
+      outer_carrier_tracking_number: '',
+      status: 'in_transit',
+      country: '新加坡',
+      postcode: '440063',
+      traces: [
+        { time: '2026-09-09 09:16:52', info: '航班已抵达目的地 待清关' },
+        { time: '2026-09-08 12:20:09', info: 'info_recv' },
+        { time: '2026-09-08 10:41:36', info: 'Expected to depart today（预计今天起飞）' },
+        { time: '2026-09-07 18:39:22', info: '航班预计起飞到达：2026/9/8，ETD08:00-ETA12:00' },
+        { time: '2026-09-07 18:39:11', info: 'Shipment Outbound Forecast(出境预报)' },
+        { time: '2026-09-07 09:24:16', info: '深圳集散中心 已收货 , *,CN' },
+        { time: '2026-09-07 08:58:45', info: '已下单' }
+      ],
+      parcel_count: 1
+    }
+  },
+  cost_time: 0.597759,
+  grid_view_reload: 0,
+  request_time: '2026-09-09 11:58:25'
+};
 
 describe('package provider parsers', () => {
   it('parses the MH56 timeline', () => {
@@ -85,6 +117,68 @@ describe('package provider parsers', () => {
       message: '预计航班到达时间 · 03/08/2026',
       eventAt: '2026-08-01T04:00:00.000Z'
     });
+  });
+
+  it('parses the LSGJWL shipment payload returned by its tracking endpoint', () => {
+    const events = parseLsgjwlResponse(lsgjwlFixture);
+    expect(events).toHaveLength(7);
+    expect(events[0]).toMatchObject({
+      status: 'info_received',
+      providerStatus: '已下单',
+      eventAt: '2026-09-07T00:58:45.000Z',
+      location: undefined
+    });
+    expect(events[6]).toMatchObject({
+      status: 'in_transit',
+      providerStatus: '航班已抵达目的地 待清关',
+      eventAt: '2026-09-09T01:16:52.000Z',
+      location: '新加坡'
+    });
+  });
+
+  it('uses the LSGJWL shipment status when the newest trace wording is unrecognized', () => {
+    const events = parseLsgjwlResponse({
+      status: 1,
+      data: {
+        shipment: {
+          status: 'delivered',
+          country: '新加坡',
+          traces: [
+            { time: '2026-09-10 14:00:00', info: 'Handed over to recipient' },
+            { time: '2026-09-09 09:16:52', info: '航班已抵达目的地 待清关' }
+          ]
+        }
+      }
+    });
+    expect(events[1]).toMatchObject({ status: 'delivered', providerStatus: 'Handed over to recipient' });
+  });
+
+  it('treats a failed LSGJWL lookup as no data instead of an error', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
+      status: 0,
+      info: '抱歉！操作失败，请重新操作。',
+      action: '',
+      show_time: 3
+    })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await lookupWithProvider({} as never, 'lsgjwl', 'YD00000000');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      'https://lsgjwl.nextsls.com/tracking/app?inajax=1&tracking_number=YD00000000'
+    );
+    expect(result).toMatchObject({ providerId: 'lsgjwl', found: false, events: [] });
+  });
+
+  it('looks up a YD number on LSGJWL and derives the flight ETA', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(lsgjwlFixture))));
+
+    const result = await lookupWithProvider({} as never, 'lsgjwl', 'YD61839978');
+
+    expect(result.found).toBe(true);
+    expect(result.sourceUrl).toBe('https://lsgjwl.nextsls.com/tracking/app#/tracking?numbers=YD61839978');
+    expect(result.events).toHaveLength(7);
+    expect(result.estimatedDeliveryAt).toBe('2026-09-08T04:00:00.000Z');
   });
 
   it('performs the D-EXI field update before loading its result details', async () => {

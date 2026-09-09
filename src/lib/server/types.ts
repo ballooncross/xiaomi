@@ -8,7 +8,7 @@ export type FeedbackAction = 'save' | 'track' | 'unsave' | 'not_relevant' | 'mor
 export type CalendarType = 'gregorian' | 'lunar';
 export type ReminderRepeat = 'none' | 'annual';
 export type DateCategory = 'birthday' | 'child_birthday' | 'anniversary' | 'memorial' | 'other';
-export type PackageProviderId = 'yxd' | 'dexi' | 'mh56';
+export type PackageProviderId = 'yxd' | 'dexi' | 'mh56' | 'lsgjwl';
 export type PackageTrackingState = 'awaiting_tracking_data' | 'active' | 'needs_attention' | 'archived';
 export type PackageStatus =
   | 'awaiting_tracking_data'

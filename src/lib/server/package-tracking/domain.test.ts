@@ -16,9 +16,9 @@ describe('package tracking domain', () => {
 
   it('routes known formats first', () => {
     expect(providerCandidates('ADN99972')[0]).toBe('yxd');
-    expect(providerCandidates('YD51821898')[0]).toBe('mh56');
+    expect(providerCandidates('YD51821898')).toEqual(['mh56', 'lsgjwl']);
     expect(providerCandidates('LX22203349875')).toEqual(['dexi']);
-    expect(providerCandidates('TRACK123')).toEqual(['mh56', 'yxd', 'dexi']);
+    expect(providerCandidates('TRACK123')).toEqual(['mh56', 'lsgjwl', 'yxd', 'dexi']);
   });
 
   it('normalizes provider statuses', () => {
@@ -31,6 +31,12 @@ describe('package tracking domain', () => {
     expect(normalizePackageStatus('收货人已签收')).toBe('delivered');
     expect(normalizePackageStatus('签收失败')).toBe('delivery_attempted');
     expect(normalizePackageStatus('等待签收')).toBe('out_for_delivery');
+    expect(normalizePackageStatus('已下单')).toBe('info_received');
+    expect(normalizePackageStatus('info_recv')).toBe('info_received');
+    expect(normalizePackageStatus('Shipment Outbound Forecast(出境预报)')).toBe('info_received');
+    expect(normalizePackageStatus('深圳集散中心 已收货 , *,CN')).toBe('in_transit');
+    expect(normalizePackageStatus('Expected to depart today（预计今天起飞）')).toBe('in_transit');
+    expect(normalizePackageStatus('航班已抵达目的地 待清关')).toBe('in_transit');
     expect(normalizePackageStatus('Custom carrier wording')).toBe('unknown');
   });
 

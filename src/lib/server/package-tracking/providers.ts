@@ -1,6 +1,6 @@
 import puppeteer from '@cloudflare/puppeteer';
 import { load } from 'cheerio';
-import type { Env, PackageProviderId } from '../types';
+import type { Env, PackageProviderId, PackageStatus } from '../types';
 import {
   normalizePackageStatus,
   parseProviderTimestamp,
@@ -23,7 +23,57 @@ export async function lookupWithProvider(
 ): Promise<ProviderLookupResult> {
   if (providerId === 'yxd') return lookupYxd(env, trackingNumber);
   if (providerId === 'dexi') return lookupDexi(trackingNumber);
+  if (providerId === 'lsgjwl') return lookupLsgjwl(trackingNumber);
   return lookupMh56(trackingNumber);
+}
+
+type LsgjwlTrace = { time?: string; info?: string };
+type LsgjwlShipment = {
+  shipment_id?: string | null;
+  client_reference?: string | null;
+  ext_number?: string | null;
+  status?: string | null;
+  country?: string | null;
+  traces?: LsgjwlTrace[] | null;
+};
+export type LsgjwlResponse = {
+  status?: number;
+  info?: string;
+  data?: { shipment?: LsgjwlShipment | null } | null;
+};
+
+const LSGJWL_SHIPMENT_STATUSES: Record<string, PackageStatus> = {
+  ready: 'info_received',
+  picked: 'in_transit',
+  in_transit: 'in_transit',
+  delivered: 'delivered',
+  returned: 'returned',
+  cancelled: 'exception'
+};
+
+export function parseLsgjwlResponse(payload: LsgjwlResponse): ProviderEvent[] {
+  if (payload.status !== 1) return [];
+  const shipment = payload.data?.shipment;
+  if (!shipment) return [];
+  const country = shipment.country?.trim() || undefined;
+  const events = sortEvents(
+    (shipment.traces ?? [])
+      .map((trace) => ({ time: trace.time?.trim() ?? '', info: trace.info?.replace(/\s+/g, ' ').trim() ?? '' }))
+      .filter((trace) => trace.time && trace.info)
+      .map((trace) => ({
+        status: normalizePackageStatus(trace.info),
+        providerStatus: trace.info,
+        message: trace.info,
+        eventAt: parseProviderTimestamp(trace.time),
+        location: country && /目的地|destination/i.test(trace.info) ? country : undefined
+      }))
+  );
+  const shipmentStatus = LSGJWL_SHIPMENT_STATUSES[shipment.status?.trim().toLowerCase() ?? ''];
+  const newest = events[events.length - 1];
+  if (newest && shipmentStatus && (newest.status === 'unknown' || shipmentStatus === 'delivered' || shipmentStatus === 'returned')) {
+    newest.status = shipmentStatus;
+  }
+  return events;
 }
 
 export function parseMh56Html(html: string): ProviderEvent[] {
@@ -129,6 +179,44 @@ async function lookupMh56(trackingNumber: string): Promise<ProviderLookupResult>
     events,
     estimatedDeliveryAt: estimatedDeliveryFromEvents(events)
   };
+}
+
+async function lookupLsgjwl(trackingNumber: string): Promise<ProviderLookupResult> {
+  const sourceUrl = `https://lsgjwl.nextsls.com/tracking/app#/tracking?numbers=${encodeURIComponent(trackingNumber)}`;
+  const apiUrl = new URL('https://lsgjwl.nextsls.com/tracking/app');
+  apiUrl.search = new URLSearchParams({ inajax: '1', tracking_number: trackingNumber }).toString();
+  const response = await providerFetch(apiUrl.toString(), {
+    headers: { accept: 'application/json, text/plain, */*', 'x-requested-with': 'XMLHttpRequest' }
+  });
+  const text = await readBoundedText(response);
+  let payload: LsgjwlResponse;
+  try {
+    payload = JSON.parse(text) as LsgjwlResponse;
+  } catch {
+    throw new Error('LSGJWL returned a non-JSON response');
+  }
+  const events = parseLsgjwlResponse(payload);
+  return {
+    providerId: 'lsgjwl',
+    sourceUrl,
+    found: events.length > 0,
+    events,
+    estimatedDeliveryAt: estimatedDeliveryFromLsgjwlEvents(events)
+  };
+}
+
+function estimatedDeliveryFromLsgjwlEvents(events: ProviderEvent[]): string | undefined {
+  for (const event of [...events].reverse()) {
+    const match = event.message.match(
+      /(?:到达|arriv\w*)[^\d]{0,10}(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})(?:.*?ETA\s*(\d{1,2}):(\d{2}))?/i
+    );
+    if (!match) continue;
+    const [, year, month, day, hour = '12', minute = '00'] = match;
+    const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute}:00+08:00`;
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return undefined;
 }
 
 async function lookupYxd(env: Env, trackingNumber: string): Promise<ProviderLookupResult> {

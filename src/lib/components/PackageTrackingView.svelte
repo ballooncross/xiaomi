@@ -22,7 +22,7 @@
     unknown: '状态未知'
   };
 
-  const providerLabels = { yxd: 'YXD', dexi: 'D-EXI', mh56: 'MH56' } as const;
+  const providerLabels = { yxd: 'YXD', dexi: 'D-EXI', mh56: 'MH56', lsgjwl: 'LSGJWL' } as const;
   const activePackages = $derived(packages.filter((item) => item.state !== 'archived'));
   const archivedPackages = $derived(packages.filter((item) => item.state === 'archived'));
   const visiblePackages = $derived(view === 'active' ? activePackages : archivedPackages);
