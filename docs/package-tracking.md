@@ -26,8 +26,9 @@ Provider selection starts with known number formats, then tries the configured a
 | YXD | Cloudflare Browser rendering, with direct HTML fallback | `ADN...` |
 | D-EXI | Stateful form search followed by its detail endpoint | `LX...` |
 | MH56 | Server-rendered tracking page | `YD...` |
+| LSGJWL | JSON endpoint behind its nextsls.com tracking portal | `YD...` (tried after MH56) |
 
-The provider list is maintained in code. There is no provider-management UI. D-EXI requires its tracking-field update and result-row selection requests before loading full details. It uses day-first timestamps in Singapore time and requires a browser-compatible user agent.
+The provider list is maintained in code. There is no provider-management UI. `YD...` numbers are shared by MH56 and LSGJWL, so the worker asks MH56 first and falls back to LSGJWL when MH56 reports no data. The `package_trackings.provider_id` column has no CHECK list since migration `0028`; valid ids live in `PackageProviderId`. D-EXI requires its tracking-field update and result-row selection requests before loading full details. It uses day-first timestamps in Singapore time and requires a browser-compatible user agent.
 
 ## Storage and scheduling
 

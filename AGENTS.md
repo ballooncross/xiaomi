@@ -47,6 +47,7 @@
 - Provider additions are code changes. Keep provider parsing behind adapters and retain provider fixture tests.
 - YXD requires browser rendering for reliable results. MH56 is server rendered. D-EXI `LX...` lookups require the tracking-field update and result-row selection requests, the Chinese search-button value, day-first timestamps in Singapore time, and a browser-compatible user agent for full details. Preserve non-empty cells after a D-EXI status because they contain supplemental values such as the estimated-arrival date.
 
+- `YD...` numbers are not unique to MH56. LSGJWL (`lsgjwl.nextsls.com`) also issues them, so route `YD` to MH56 first and LSGJWL second, and never lock a provider onto a package until a lookup returns events. LSGJWL is a JSON endpoint: `GET /tracking/app?inajax=1&tracking_number=...` returns `status: 1` with `data.shipment.traces`, or `status: 0` when the number is unknown. Its trace times are UTC+8.
 - Once an event confirms arrival or customs processing in Singapore, persist priority checking even if later provider wording changes. Priority packages run at 08:30, 12:30, 16:30, and 20:30 Singapore time.
 - Derive D-EXI package status from its newest detail event. Keep the manual delivered action as a fallback for unrecognized provider wording, and archive that acknowledged update without a redundant notification.
 

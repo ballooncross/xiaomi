@@ -19,7 +19,8 @@ export type ProviderLookupResult = {
 export const PACKAGE_PROVIDER_LABELS: Record<PackageProviderId, string> = {
   yxd: 'YXD',
   dexi: 'D-EXI',
-  mh56: 'MH56'
+  mh56: 'MH56',
+  lsgjwl: 'LSGJWL'
 };
 
 export const PACKAGE_STATUS_LABELS: Record<PackageStatus, string> = {
@@ -47,9 +48,9 @@ export function normalizeTrackingNumber(value: string): string {
 
 export function providerCandidates(trackingNumber: string): PackageProviderId[] {
   if (/^ADN\d+/i.test(trackingNumber)) return ['yxd'];
-  if (/^YD\d+/i.test(trackingNumber)) return ['mh56'];
+  if (/^YD\d+/i.test(trackingNumber)) return ['mh56', 'lsgjwl'];
   if (/^LX\d+/i.test(trackingNumber)) return ['dexi'];
-  return ['mh56', 'yxd', 'dexi'];
+  return ['mh56', 'lsgjwl', 'yxd', 'dexi'];
 }
 
 export function normalizePackageStatus(value: string): PackageStatus {
@@ -86,7 +87,7 @@ export function normalizePackageStatus(value: string): PackageStatus {
     'export declaration',
     'declaration complete',
     'declaration complate',
-    'departed',
+    'depart',
     'arrived',
     'customs',
     'dispatched',
@@ -96,6 +97,9 @@ export function normalizePackageStatus(value: string): PackageStatus {
     '报关完成',
     '已开船',
     '开船',
+    '起飞',
+    '已收货',
+    '已抵达',
     '预计航班到达时间',
     '正在中转',
     '货物到仓',
@@ -103,7 +107,17 @@ export function normalizePackageStatus(value: string): PackageStatus {
     '到达',
     '离开'
   ])) return 'in_transit';
-  if (matches(text, ['information received', 'info received', 'label created', '电子信息', '预报信息', '数据已接收'])) {
+  if (matches(text, [
+    'information received',
+    'info received',
+    'info_recv',
+    'label created',
+    '电子信息',
+    '预报信息',
+    '出境预报',
+    '数据已接收',
+    '已下单'
+  ])) {
     return 'info_received';
   }
   return 'unknown';
