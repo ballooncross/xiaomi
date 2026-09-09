@@ -35,7 +35,7 @@ export function formatSgd(value: number): string {
 	return `S$${amount}`;
 }
 
-export function formatCoeTelegramMessage(round: CoeBiddingRound, sourceUrl?: string): string {
+export function formatCoeTelegramMessage(round: CoeBiddingRound, radarUrl?: string): string {
 	const catA = round.categories.find((c) => c.category === 'A');
 	const catB = round.categories.find((c) => c.category === 'B');
 	const lines = [
@@ -47,8 +47,8 @@ export function formatCoeTelegramMessage(round: CoeBiddingRound, sourceUrl?: str
 		'打开雷达查看完整类别与历史。'
 	].filter((line): line is string => line != null);
 
-	if (sourceUrl) {
-		lines.push(sourceUrl);
+	if (radarUrl) {
+		lines.push(radarUrl);
 	}
 
 	return lines.join('\n');

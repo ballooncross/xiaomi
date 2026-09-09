@@ -17,6 +17,7 @@ const COE_LATEST_API_URL =
 	`${COE_API_BASE}?resource_id=${COE_RESOURCE_ID}&limit=10&sort=${encodeURIComponent('month desc,bidding_no desc')}`;
 const COE_SOURCE = 'LTA · data.gov.sg';
 const COE_SOURCE_URL = `https://data.gov.sg/datasets/${COE_RESOURCE_ID}/view`;
+export const COE_RADAR_URL = 'https://personal-radar.pages.dev/coe';
 
 type CoeStore = Pick<
 	ReturnType<typeof getDb>,
@@ -244,7 +245,7 @@ export async function runCoeCheckJob(env: Env): Promise<JobResult> {
 			return { inserted: 0, updated: 1, considered: 1, notified: 0, detail };
 		}
 
-		const message = formatCoeTelegramMessage(latest, payload.sourceUrl);
+		const message = formatCoeTelegramMessage(latest, COE_RADAR_URL);
 		const telegram = await sendTelegramToSubscribers(env, message, 'coe');
 		await db.logNotification({
 			itemId: latest.id,

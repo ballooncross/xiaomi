@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatCoeTelegramMessage, formatSgd } from '$lib/coe';
-import { fetchCoePayload, loadCoePayload } from './coe';
+import { COE_RADAR_URL, fetchCoePayload, loadCoePayload } from './coe';
 
 describe('coe helpers', () => {
 	it('formats SGD without cents', () => {
@@ -34,13 +34,14 @@ describe('coe helpers', () => {
 					}
 				]
 			},
-			'https://data.gov.sg/example'
+			COE_RADAR_URL
 		);
 
 		expect(message).toContain('Jul 2026 1st');
 		expect(message).toContain('Cat A：S$129,000');
 		expect(message).toContain('Cat B：S$130,889');
-		expect(message).toContain('https://data.gov.sg/example');
+		expect(message).toContain('https://personal-radar.pages.dev/coe');
+		expect(message).not.toContain('data.gov.sg');
 	});
 
 	it('groups bidding rounds and sorts latest first', async () => {
