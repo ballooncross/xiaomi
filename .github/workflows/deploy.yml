@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +13,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to Cloudflare
-    if: github.ref_name == 'main'
+    if: github.ref_name == 'master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Needed so the post-deploy version bump can push back to main.
+          # Needed so the post-deploy version bump can push back to master.
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
@@ -60,7 +60,7 @@ jobs:
         run: >
           npx wrangler pages deploy .svelte-kit/cloudflare
           --project-name personal-radar
-          --branch main
+          --branch master
           --commit-hash "${GITHUB_SHA}"
 
       - name: Deploy cron Worker
@@ -77,4 +77,4 @@ jobs:
             exit 0
           fi
           git commit -m "chore: bump version to ${VERSION} [skip ci]"
-          git push origin HEAD:main
+          git push origin HEAD:master

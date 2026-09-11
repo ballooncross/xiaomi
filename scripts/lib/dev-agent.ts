@@ -85,8 +85,8 @@ async function fetchPendingRequests(): Promise<{ requests: DevRequest[]; runs: A
 
 async function handleRequest(request: DevRequest, priorRuns: PriorRun[]): Promise<void> {
   log(`Processing dev request ${request.id}: "${request.text.slice(0, 80)}"`);
-  git(projectRoot, ['fetch', 'origin', 'main']);
-  const baseSha = git(projectRoot, ['rev-parse', 'origin/main']);
+  git(projectRoot, ['fetch', 'origin', 'master']);
+  const baseSha = git(projectRoot, ['rev-parse', 'origin/master']);
   const runId = crypto.randomUUID();
   const claimed = await postAgentAction({
     action: 'claim',
@@ -226,15 +226,15 @@ async function implementInWorktree(
       throw new Error('Verified files changed, but no result commit was created.');
     }
 
-    git(worktreeDir, ['fetch', 'origin', 'main']);
-    const currentMain = git(worktreeDir, ['rev-parse', 'origin/main']);
+    git(worktreeDir, ['fetch', 'origin', 'master']);
+    const currentMain = git(worktreeDir, ['rev-parse', 'origin/master']);
     if (currentMain !== baseSha) {
       try {
-        git(worktreeDir, ['rebase', 'origin/main']);
+        git(worktreeDir, ['rebase', 'origin/master']);
       } catch (error) {
         try { git(worktreeDir, ['rebase', '--abort']); } catch { /* best effort */ }
         git(worktreeDir, ['push', 'origin', `HEAD:refs/heads/${branch}`]);
-        await event(context, 'publishing', 'conflict_branch_saved', 'Saved the verified result branch after a main rebase conflict.', {
+        await event(context, 'publishing', 'conflict_branch_saved', 'Saved the verified result branch after a master rebase conflict.', {
           branch,
           resultSha
         }, 'warning');
@@ -242,7 +242,7 @@ async function implementInWorktree(
           status: 'replied',
           runStatus: 'needs_input',
           phase: 'waiting_for_input',
-          response: `实现已保存在 ${branch}，但 main 在运行期间发生变化，自动变基冲突。需要人工处理后再发布。`,
+          response: `实现已保存在 ${branch}，但 master 在运行期间发生变化，自动变基冲突。需要人工处理后再发布。`,
           branch,
           resultSha,
           errorCategory: 'main_conflict'
@@ -258,11 +258,11 @@ async function implementInWorktree(
       changedFiles
     });
     git(worktreeDir, ['push', 'origin', `HEAD:refs/heads/${branch}`]);
-    await event(context, 'publishing', 'main_push_started', 'Publishing the verified commit to main.', {
+    await event(context, 'publishing', 'main_push_started', 'Publishing the verified commit to master.', {
       branch,
       resultSha: publishSha
     });
-    git(worktreeDir, ['push', 'origin', 'HEAD:main']);
+    git(worktreeDir, ['push', 'origin', 'HEAD:master']);
 
     await event(context, 'deploying', 'deployment_started', 'Waiting for the GitHub production deployment.', {
       resultSha: publishSha
@@ -283,7 +283,7 @@ async function implementInWorktree(
         status: 'replied',
         runStatus: 'needs_input',
         phase: 'waiting_for_input',
-        response: `代码已发布到 main (${publishSha.slice(0, 8)})，但生产验证未完成：${deployment.detail}${workflowLine}${logLine}`,
+        response: `代码已发布到 master (${publishSha.slice(0, 8)})，但生产验证未完成：${deployment.detail}${workflowLine}${logLine}`,
         branch,
         resultSha: publishSha,
         errorCategory: 'deployment_unverified'
@@ -301,7 +301,7 @@ async function implementInWorktree(
       phase: 'completed',
       branch,
       resultSha: publishSha,
-      response: `${agentOutcome.summary}\n已合并到 main 并完成生产部署。修改 ${changedFiles.length} 个文件，提交 ${publishSha.slice(0, 8)}。`
+      response: `${agentOutcome.summary}\n已合并到 master 并完成生产部署。修改 ${changedFiles.length} 个文件，提交 ${publishSha.slice(0, 8)}。`
     };
   } finally {
     cleanupWorktree(worktreeDir, branch);

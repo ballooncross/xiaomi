@@ -26,7 +26,7 @@
     "exercises:seed:garmin:remote": "wrangler d1 execute personal-radar --remote --yes --file ./scripts/seed-garmin-exercises.sql",
     "exercises:seed:enrichment:local": "wrangler d1 execute personal-radar --local --yes --file ./scripts/seed-garmin-enrichment.sql",
     "exercises:seed:enrichment:remote": "wrangler d1 execute personal-radar --remote --yes --file ./scripts/seed-garmin-enrichment.sql",
-    "deploy": "npm version patch --no-git-tag-version && npm run build && wrangler pages deploy .svelte-kit/cloudflare --project-name personal-radar --branch main",
+    "deploy": "npm version patch --no-git-tag-version && npm run build && wrangler pages deploy .svelte-kit/cloudflare --project-name personal-radar --branch master",
     "deploy:cron": "wrangler deploy --config wrangler.cron.toml",
     "secrets:sync:pages": "node scripts/sync-secrets.mjs pages",
     "secrets:sync:cron": "node scripts/sync-secrets.mjs cron",
