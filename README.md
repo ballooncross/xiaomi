@@ -65,7 +65,7 @@ npm run agent:status        # is the agent scheduled, running, and what did the 
 `npm run agent -- --once` runs a single tick and exits. Two options run it on a schedule:
 
 - `npm run agent` without `--once` keeps one Node process in the foreground and ticks every 10 minutes. Use it for a test session. It stops when the terminal closes and does not reload code between ticks.
-- `scripts/install-agent.sh` installs a macOS launchd agent that runs `--once` cycles in the background on a fixed interval, from a dedicated worktree that tracks `origin/main`. Use this for the always-on setup.
+- `scripts/install-agent.sh` installs a macOS launchd agent that runs `--once` cycles in the background on a fixed interval, from a dedicated worktree that tracks `origin/master`. Use this for the always-on setup.
 
 Run `npm run agent:status` before starting anything to see whether the scheduler is installed and whether a cycle is executing. Loop mode refuses to start beside the scheduler unless you pass `--force`.
 
@@ -73,7 +73,7 @@ See [Running on a schedule](docs/local-agent.md#running-on-a-schedule) for the i
 
 ## Deployment Rule
 
-Production deployment is tied to the repository's canonical branch. After deploying, or as part of the deployment workflow, always make sure the deployed code has been merged into `main` or `master` so production matches the source of record.
+Production deployment is tied to the repository's canonical branch. After deploying, or as part of the deployment workflow, always make sure the deployed code has been merged into `master` so production matches the source of record.
 
 Run `npm run db:migrate:local` after pulling schema changes. The birthday notebook uses the `date_reminders` D1 table and stores lunar dates for annual reminders.
 

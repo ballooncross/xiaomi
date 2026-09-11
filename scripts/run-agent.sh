@@ -19,14 +19,14 @@ radar_log() { print -r -- "[$(date -u '+%H:%M:%S')] run-agent: $*" }
 # A failed fetch must not cost the whole cycle. The runtime worktree already
 # holds a working checkout, and one cycle on slightly older code beats no cycle
 # at all, so report the failure and carry on with the last revision fetched.
-if ! git -C "$RADAR_SOURCE_ROOT" fetch origin main; then
+if ! git -C "$RADAR_SOURCE_ROOT" fetch origin master; then
   radar_log "git fetch failed; continuing with the revision already fetched"
 fi
 
 mkdir -p "${RADAR_AGENT_RUNTIME:h}"
 if [ ! -e "$RADAR_AGENT_RUNTIME/.git" ]; then
   # Nothing to fall back on before the worktree exists, so this stays fatal.
-  if ! git -C "$RADAR_SOURCE_ROOT" worktree add --detach "$RADAR_AGENT_RUNTIME" origin/main; then
+  if ! git -C "$RADAR_SOURCE_ROOT" worktree add --detach "$RADAR_AGENT_RUNTIME" origin/master; then
     radar_log "could not create the runtime worktree"
     exit 1
   fi
@@ -35,10 +35,10 @@ else
     radar_log "runtime worktree is dirty; refusing to overwrite it"
     exit 1
   fi
-  # A no-op when the fetch failed, because origin/main still points at the
+  # A no-op when the fetch failed, because origin/master still points at the
   # last revision that was fetched successfully.
-  if ! git -C "$RADAR_AGENT_RUNTIME" checkout --detach origin/main; then
-    radar_log "could not check out origin/main in the runtime worktree"
+  if ! git -C "$RADAR_AGENT_RUNTIME" checkout --detach origin/master; then
+    radar_log "could not check out origin/master in the runtime worktree"
     exit 1
   fi
 fi
