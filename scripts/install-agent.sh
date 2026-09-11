@@ -11,7 +11,9 @@ RADAR_SOURCE_ROOT="${RADAR_SOURCE_ROOT:-${0:A:h:h}}"
 # A foreground `npm run agent` loop beside the scheduler duplicates work and
 # races for development requests. Warn rather than kill: a `--once` run may be
 # mid-submission and finishes on its own.
-RADAR_STRAY="$(ps -axo pid=,command= | grep -E 'scripts/agent\.ts' | grep -v -E 'grep|--once')"
+# grep exits 1 when nothing matches, which under set -e -o pipefail would abort
+# the installer in the normal case (no stray loop), so swallow that status.
+RADAR_STRAY="$(ps -axo pid=,command= | grep -E 'scripts/agent\.ts' | grep -v -E 'grep|--once' || true)"
 if [ -n "$RADAR_STRAY" ]; then
   echo "WARNING: an agent loop is already running outside the scheduler:"
   print -r -- "$RADAR_STRAY" | sed 's/^/  /'
