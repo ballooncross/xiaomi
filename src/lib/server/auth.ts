@@ -63,14 +63,33 @@ async function verifyPayload(token: string, secret: string): Promise<Session | n
 	if (parts.length !== 2) return null;
 
 	const key = await getSigningKey(secret);
-	const data = fromBase64Url(parts[0]);
-	const signature = fromBase64Url(parts[1]);
+	let data: ArrayBuffer;
+	let signature: ArrayBuffer;
+	try {
+		data = fromBase64Url(parts[0]);
+		signature = fromBase64Url(parts[1]);
+	} catch {
+		// Old or corrupted browser cookies must not prevent reaching sign-in.
+		return null;
+	}
 
 	const valid = await crypto.subtle.verify('HMAC', key, signature, new Uint8Array(data));
 	if (!valid) return null;
 
-	const session: Session = JSON.parse(new TextDecoder().decode(new Uint8Array(data)));
-	if (session.exp < Date.now() / 1000) return null;
+	let session: Session;
+	try {
+		session = JSON.parse(new TextDecoder().decode(new Uint8Array(data)));
+	} catch {
+		return null;
+	}
+	if (
+		!session ||
+		typeof session.email !== 'string' || !session.email.trim() ||
+		typeof session.name !== 'string' ||
+		typeof session.picture !== 'string' ||
+		typeof session.exp !== 'number' || !Number.isFinite(session.exp) ||
+		session.exp <= Date.now() / 1000
+	) return null;
 
 	return session;
 }
@@ -99,7 +118,9 @@ export async function createSessionCookie(
 export async function getSession(cookies: Cookies, secret: string): Promise<Session | null> {
 	const token = cookies.get(SESSION_COOKIE);
 	if (!token) return null;
-	return verifyPayload(token, secret);
+	const session = await verifyPayload(token, secret);
+	if (!session) clearSessionCookie(cookies);
+	return session;
 }
 
 export function clearSessionCookie(cookies: Cookies) {
