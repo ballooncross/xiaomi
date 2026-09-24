@@ -21,7 +21,7 @@
  * Config lives in scripts/.env (see .env.example).
  */
 
-import { runAiSearch } from './lib/ai/index';
+import { runAiSearch, takeAiFailure } from './lib/ai/index';
 import { config } from './lib/config';
 import { processDevRequests } from './lib/dev-agent';
 import { optimizeInterests } from './lib/optimize-interests';
@@ -210,6 +210,8 @@ async function tick(): Promise<TickOutcome> {
 }
 
 function finishTick(detail: string, errors: string[]): TickOutcome {
+  const aiFailure = takeAiFailure();
+  if (aiFailure) errors.push(`AI 调用失败：${aiFailure}`);
   if (errors.length === 0) return { status: 'ok', detail };
   return { status: 'error', detail: `${detail} 错误：${errors.join('；')}` };
 }

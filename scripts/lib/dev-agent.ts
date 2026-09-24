@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { codexExecArgs, summarizeCliFailure } from './codex';
 import { config, radarHeaders } from './config';
 import {
   changedFilesFromGit,
@@ -347,7 +348,7 @@ ${RESULT_MARKER}{"outcome":"implemented|needs_input|no_change|failed","summary":
   try {
     const cli = config.aiBackend === 'claude-code' ? 'claude' : 'codex';
     const args = cli === 'codex'
-      ? ['exec', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-c', 'model_reasoning_effort=medium', '-C', cwd, prompt]
+      ? [...codexExecArgs({ effort: 'medium', model: config.codexModel, sandbox: 'workspace-write', cwd }), prompt]
       : ['-p', '--dangerously-skip-permissions', prompt];
     const result = execFileSync(cli, args, {
       cwd,
@@ -358,10 +359,14 @@ ${RESULT_MARKER}{"outcome":"implemented|needs_input|no_change|failed","summary":
     return { success: true, output: result.toString() };
   } catch (error) {
     const detail = childError(error);
+    const raw = detail.stderr || detail.stdout || detail.message;
+    // Lead with the one-line reason so the request response and status card
+    // show the cause before the captured CLI transcript.
+    const reason = summarizeCliFailure(`${detail.stderr}\n${detail.stdout}`, detail.message);
     return {
       success: false,
       output: detail.stdout,
-      error: (detail.stderr || detail.stdout || detail.message).slice(-4000),
+      error: `${reason}\n\n${raw.slice(-4000)}`,
       exitCode: detail.exitCode,
       timedOut: detail.timedOut
     };

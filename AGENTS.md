@@ -70,3 +70,5 @@
 - Run the required checks with `TZ=UTC` so they match the GitHub runner. Date logic and tests must derive "today" from `todayInSingapore()`, never from the local `Date` getters.
 - When the GitHub deployment fails or times out, record a `deployment_failed` event with the workflow URL and the failed-step log excerpt, and put both in the request response. Never leave the timeline at `deployment_started`.
 - Run the production local agent as scheduled single cycles from its dedicated `origin/master` worktree so code and configuration reload on every cycle.
+- Build Codex CLI arguments through `scripts/lib/codex.ts`. The runner must pass `--ignore-user-config` so `~/.codex/config.toml` cannot change the model or load MCP servers into scheduled runs; model pinning goes through `CODEX_MODEL` in `scripts/.env`.
+- Surface AI CLI failures as an `error` tick status with the one-line reason, not only as a local log line.
