@@ -29,6 +29,10 @@ export const config = {
   // codex (ChatGPT login, no API key) | claude-code (Claude login) |
   // chatgpt | deepseek | claude (API keys) | ollama (local) | none
   aiBackend: (process.env.AI_BACKEND || 'codex').toLowerCase(),
+  // Optional Codex model override. The runner ignores ~/.codex/config.toml so an
+  // interactive-only model choice cannot break scheduled cycles; leave empty for
+  // the CLI default.
+  codexModel: process.env.CODEX_MODEL || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   deepseekApiKey: process.env.DEEPSEEK_API_KEY || '',

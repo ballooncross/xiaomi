@@ -10,6 +10,6 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
   test: {
-    include: ['src/**/*.{test,spec}.{js,ts}']
+    include: ['src/**/*.{test,spec}.{js,ts}', 'scripts/**/*.{test,spec}.{js,ts}']
   }
 });

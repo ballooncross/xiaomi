@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { codexExecArgs, summarizeCliFailure } from '../codex';
 import { config } from '../config';
 import { log } from '../utils';
 import { buildTrendPrompt, parseAiResponse, type AiSearchResult } from './prompts';
@@ -32,7 +33,7 @@ export async function askAi(prompt: string): Promise<string | undefined> {
 
   try {
     if (backend === 'codex')
-      return await callCli('codex', ['exec', '--skip-git-repo-check', '-c', 'model_reasoning_effort=low', prompt]);
+      return await callCli('codex', [...codexExecArgs({ effort: 'low', model: config.codexModel }), prompt]);
     if (backend === 'claude-code') return await callCli('claude', ['-p', prompt]);
     if (backend === 'chatgpt') return await callOpenAiCompatible('https://api.openai.com/v1/chat/completions', config.openaiApiKey, config.openaiModel, prompt);
     if (backend === 'deepseek') return await callOpenAiCompatible('https://api.deepseek.com/chat/completions', config.deepseekApiKey, config.deepseekModel, prompt);
@@ -42,8 +43,26 @@ export async function askAi(prompt: string): Promise<string | undefined> {
     return undefined;
   } catch (error) {
     log(`AI call error (${backend}): ${error}`);
+    recordAiFailure(`${backend}: ${error instanceof Error ? error.message : String(error)}`);
     return undefined;
   }
+}
+
+let lastAiFailure: string | undefined;
+
+function recordAiFailure(detail: string): void {
+  lastAiFailure = detail.slice(0, 300);
+}
+
+/**
+ * Return and clear the most recent AI backend failure. The tick reports it as
+ * an `error` status so a broken CLI shows up on the admin status card instead
+ * of only in the local log.
+ */
+export function takeAiFailure(): string | undefined {
+  const failure = lastAiFailure;
+  lastAiFailure = undefined;
+  return failure;
 }
 
 /** Run a logged-in CLI (codex / claude) non-interactively and capture stdout. */
@@ -53,9 +72,11 @@ function callCli(command: string, args: string[], timeoutMs = 300000): Promise<s
       command,
       args,
       { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 },
-      (error, stdout) => {
+      (error, stdout, stderr) => {
         if (error) {
-          log(`${command} CLI failed: ${String(error).split('\n')[0]}`);
+          const reason = summarizeCliFailure(`${stderr ?? ''}\n${stdout ?? ''}`, String(error).split('\n')[0]);
+          log(`${command} CLI failed: ${reason}`);
+          recordAiFailure(`${command} CLI: ${reason}`);
           resolve(undefined);
           return;
         }

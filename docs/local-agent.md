@@ -156,6 +156,16 @@ State lives in `scripts/.agent-state.json` (gitignored); delete it to force a fu
 | `ollama` | none | local model, free |
 | `none` | - | disable AI search |
 
+Both CLI backends run non-interactively. The Codex backend passes
+`--ignore-user-config`, so `~/.codex/config.toml` (model, MCP servers,
+features) does not affect scheduled cycles or development requests. Set
+`CODEX_MODEL` in `scripts/.env` to pin a model; leave it unset for the CLI
+default. A CLI failure is logged as `codex CLI failed: <reason>` and reported
+as an `error` tick on the 本地 AI Agent status card. Keep the CLI current with
+`npm i -g @openai/codex@latest --registry=https://registry.npmjs.org` (and
+`brew upgrade codex` if Homebrew also has it): the API rejects newer models
+on an old CLI.
+
 The AI is given interests, context, and constraints — not told where to look — and asked for trends from its own knowledge plus source suggestions. AI item confidence is capped at 0.55 and URLs are only kept when the model is confident they are real.
 
 ## Agent APIs (server side)
