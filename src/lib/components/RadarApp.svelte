@@ -118,6 +118,8 @@
   let editWatchOptimize = $state(true);
   let preferenceQuery = $state('');
   let preferenceView = $state<PreferenceView>('trends');
+  const PREFERENCE_PAGE_SIZE = 24;
+  let preferenceLimit = $state(PREFERENCE_PAGE_SIZE);
   let feedbackPending = $state<string | null>(null);
   let addWatchPending = $state(false);
 
@@ -620,7 +622,9 @@
   const watchTopics = $derived(topics.filter((topic) => topic.feed === 'concerts' && topic.mode !== 'blacklist'));
   const interestTopics = $derived(topics.filter((topic) => topic.feed === 'trends' && topic.mode !== 'blacklist'));
   const blacklistTopics = $derived(topics.filter((topic) => topic.mode === 'blacklist'));
-  const filteredPreferenceTopics = $derived(filterPreferenceTopics(topics, preferenceQuery, preferenceView));
+  const filteredPreferenceTopics = $derived(
+    filterPreferenceTopics(topics, preferenceQuery, preferenceView, preferenceLimit)
+  );
   const preferenceMatchCount = $derived(countPreferenceTopics(topics, preferenceQuery, preferenceView));
   const followedTopicCount = $derived(topics.filter((topic) => topic.mode !== 'blacklist').length);
   const needsOnboarding = $derived(
@@ -1594,11 +1598,24 @@
     return 'error';
   }
 
-  function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
+  function filterPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView, limit: number) {
     return sourceTopics
       .filter((topic) => matchesPreferenceTopic(topic, query, view))
       .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name))
-      .slice(0, 24);
+      .slice(0, limit);
+  }
+
+  function setPreferenceView(view: PreferenceView) {
+    preferenceView = view;
+    preferenceLimit = PREFERENCE_PAGE_SIZE;
+  }
+
+  function resetPreferenceLimit() {
+    preferenceLimit = PREFERENCE_PAGE_SIZE;
+  }
+
+  function showMorePreferences() {
+    preferenceLimit += PREFERENCE_PAGE_SIZE;
   }
 
   function countPreferenceTopics(sourceTopics: WatchTopic[], query: string, view: PreferenceView) {
@@ -1768,7 +1785,7 @@
       <circle cx="11" cy="11" r="6.2"></circle>
       <path d="m16 16 4.2 4.2"></path>
     </svg>
-    <input bind:value={preferenceQuery} placeholder="搜索演出追踪或趋势兴趣..." />
+    <input bind:value={preferenceQuery} oninput={resetPreferenceLimit} placeholder="搜索演出追踪或趋势兴趣..." />
   </div>
 
   <div class="preference-tabs" aria-label="偏好筛选">
@@ -1776,7 +1793,7 @@
       <button
         class:active={preferenceView === tab.id}
         type="button"
-        onclick={() => (preferenceView = tab.id)}
+        onclick={() => setPreferenceView(tab.id)}
       >
         {tab.label}
       </button>
@@ -1820,6 +1837,11 @@
       <p class="quiet-copy">没有匹配的偏好。你可以添加演出追踪、趋势兴趣或屏蔽规则。</p>
     {/each}
   </div>
+  {#if preferenceMatchCount > filteredPreferenceTopics.length}
+    <button class="small-button preference-more" type="button" onclick={showMorePreferences}>
+      显示更多（还有 {preferenceMatchCount - filteredPreferenceTopics.length} 个）
+    </button>
+  {/if}
 {/snippet}
 
 <main class="app-shell">
@@ -2149,15 +2171,15 @@
             </section>
           {/if}
           <div class="settings-grid compact">
-            <button class:active={preferenceView === 'concerts'} type="button" onclick={() => (preferenceView = 'concerts')}>
+            <button class:active={preferenceView === 'concerts'} type="button" onclick={() => setPreferenceView('concerts')}>
               <strong>{watchTopics.length}</strong>
               <span>演出追踪</span>
             </button>
-            <button class:active={preferenceView === 'trends'} type="button" onclick={() => (preferenceView = 'trends')}>
+            <button class:active={preferenceView === 'trends'} type="button" onclick={() => setPreferenceView('trends')}>
               <strong>{interestTopics.length}</strong>
               <span>趋势兴趣</span>
             </button>
-            <button class:active={preferenceView === 'blacklist'} type="button" onclick={() => (preferenceView = 'blacklist')}>
+            <button class:active={preferenceView === 'blacklist'} type="button" onclick={() => setPreferenceView('blacklist')}>
               <strong>{blacklistTopics.length}</strong>
               <span>屏蔽规则</span>
             </button>
@@ -5739,27 +5761,28 @@
 
   .preference-tabs {
     display: flex;
-    gap: 6px;
-    margin-top: 10px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-  }
-
-  .preference-tabs::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
   }
 
   .preference-tabs button {
+    flex: 0 0 auto;
     border: 1px solid var(--line);
     border-radius: 999px;
-    min-height: 28px;
-    padding: 0 9px;
+    min-height: 36px;
+    padding: 0 14px;
     background: var(--surface);
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 950;
     white-space: nowrap;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .preference-tabs button:active {
+    background: color-mix(in srgb, var(--mint) 55%, var(--surface));
   }
 
   .preference-tabs button.active {
@@ -5781,9 +5804,12 @@
   .preference-list {
     display: grid;
     gap: 8px;
-    max-height: 430px;
-    overflow: auto;
-    padding-right: 2px;
+  }
+
+  .preference-more {
+    display: block;
+    width: fit-content;
+    margin: 12px auto 0;
   }
 
   .preference-row {
