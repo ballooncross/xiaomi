@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
+  import NutritionView from '$lib/components/NutritionView.svelte';
   import CoePriceView from '$lib/components/CoePriceView.svelte';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
   import PackageTrackingView from '$lib/components/PackageTrackingView.svelte';
@@ -63,6 +64,7 @@
     dates: '/dates',
     packages: '/packages',
     gym: '/gym',
+    nutrition: '/nutrition',
     coe: '/coe',
     interests: '/interests',
     me: '/me',
@@ -558,6 +560,7 @@
   const hideSidePanel = $derived(
     activeView === 'dates' ||
       activeView === 'gym' ||
+      activeView === 'nutrition' ||
       activeView === 'packages' ||
       activeView === 'coe' ||
       activeView === 'interests' ||
@@ -590,7 +593,7 @@
         if (activeView === 'concerts') return item.kind === 'concert' && (searching || !hidden);
         if (activeView === 'trends') return item.kind !== 'concert' && (searching || !hidden);
         if (activeView === 'dates') return false;
-        if (activeView === 'gym') return false;
+        if (activeView === 'gym' || activeView === 'nutrition') return false;
         if (activeView === 'coe') return false;
         if (activeView === 'interests') return false;
         if (activeView === 'me' || activeView === 'settings' || activeView === 'saved') return false;
@@ -2280,6 +2283,8 @@
         </section>
       {:else if activeView === 'packages'}
         <PackageTrackingView initialPackages={data.packages} />
+      {:else if activeView === 'nutrition'}
+        <NutritionView />
       {:else if activeView === 'gym'}
         <section class="gym">
           <header class="gym-head">
