@@ -34,10 +34,22 @@
         Authentication is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET environment variables.
       </div>
     {/if}
+    <a href="/guest" class="btn guest-btn">Continue as guest · Workout calculator</a>
+    <p class="quiet-copy guest-note">No account needed for guest tools. Sign in for your personal dashboard.</p>
   </div>
 </div>
 
 <style>
+  .guest-btn {
+    margin-top: var(--space-4);
+    white-space: normal;
+  }
+
+  .guest-note {
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-sm);
+  }
+
   .login-page {
     min-height: 100vh;
     display: flex;

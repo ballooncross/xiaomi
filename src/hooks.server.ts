@@ -13,6 +13,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const env = mergeLocalEnv(event.platform?.env as Env | undefined, privateEnv);
 	const secret = env.SESSION_SECRET;
 
+	// Guest tools are self-contained pages with no personal data or API access.
+	// Match explicitly: adding another guest tool requires reviewing its data needs.
+	if (event.url.pathname === '/guest' && ['GET', 'HEAD'].includes(event.request.method)) {
+		return resolve(event);
+	}
+
 	if (!secret || !env.GOOGLE_CLIENT_ID) {
 		return resolve(event);
 	}
