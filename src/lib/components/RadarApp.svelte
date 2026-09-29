@@ -1850,7 +1850,7 @@
       <img class="logo" src="/brand/personal-radar-logo.svg" alt="" />
       <div>
         <strong>个人雷达</strong>
-        <span>凡人咖啡馆</span>
+        <span>咖啡 · 青梅酒 · 凡人修仙传</span>
       </div>
     </button>
     <div
