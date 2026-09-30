@@ -21,7 +21,7 @@ export async function loadRadarPageData(
 		fallbackConfigured: false
 	};
 	const db = getDb(env, user?.id);
-	const features = await getFeatureAccess(db, Boolean(user?.isAdmin));
+	const features = await getFeatureAccess(db, user?.isAdmin);
 
 	const showAdminOps = features.admin_ops?.allowed ?? false;
 	const showIca = features.ica_check?.allowed ?? false;

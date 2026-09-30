@@ -36,8 +36,8 @@ export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
 	if (typeof body.enabled !== 'boolean') {
 		return json({ error: 'enabled must be a boolean' }, { status: 400 });
 	}
-	if (body.minRole !== 'member' && body.minRole !== 'admin') {
-		return json({ error: 'minRole must be member or admin' }, { status: 400 });
+	if (body.minRole !== 'guest' && body.minRole !== 'member' && body.minRole !== 'admin') {
+		return json({ error: 'minRole must be guest, member or admin' }, { status: 400 });
 	}
 
 	const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);

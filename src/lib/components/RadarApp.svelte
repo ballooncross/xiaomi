@@ -23,7 +23,7 @@
   import { onMount } from 'svelte';
   import 'vanillajs-datepicker/css/datepicker.css';
   import type { RadarPageData } from '$lib/server/radar-page-load';
-  import type { FeatureId } from '$lib/server/features';
+  import type { FeatureId, FeatureRole } from '$lib/server/features';
   import type { NotifyPrefs } from '$lib/notify-prefs';
   import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
   import {
@@ -397,7 +397,7 @@
     label: string;
     description: string;
     enabled: boolean;
-    minRole: 'member' | 'admin';
+    minRole: FeatureRole;
   }>>([]);
   let featurePendingId = $state<string | null>(null);
   let featureMessage = $state('');
@@ -839,7 +839,7 @@
     }
   }
 
-  async function patchFeature(id: FeatureId, patch: { enabled?: boolean; minRole?: 'member' | 'admin' }) {
+  async function patchFeature(id: FeatureId, patch: { enabled?: boolean; minRole?: FeatureRole }) {
     featurePendingId = id;
     featureMessage = '';
     const current = featureRows.find((f) => f.id === id);
@@ -2591,7 +2591,7 @@
             <div class="job-run-copy">
               <span>配置</span>
               <strong>功能开关</strong>
-              <p>开关控制页面是否展示，以及对应 cron 是否运行。权限决定普通用户或仅管理员可用。</p>
+              <p>开关控制页面是否展示，以及对应 cron 是否运行。权限设置最低用户级别：访客、注册用户或管理员。需要登录的页面和个人数据接口仍须登录。</p>
             </div>
             {#if featureMessage}
               <p style="font-size:12px;color:var(--muted);padding:0 14px">{featureMessage}</p>
@@ -2621,9 +2621,10 @@
                         disabled={featurePendingId === feat.id}
                         onchange={(e) =>
                           patchFeature(feat.id, {
-                            minRole: e.currentTarget.value as 'member' | 'admin'
+                            minRole: e.currentTarget.value as FeatureRole
                           })}
                       >
+                        <option value="guest">所有用户（含访客 Guest）</option>
                         <option value="member">所有登录用户</option>
                         <option value="admin">仅管理员</option>
                       </select>

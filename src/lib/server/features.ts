@@ -1,7 +1,7 @@
 import type { RadarDb } from './db';
 import type { Env } from './types';
 
-export type FeatureRole = 'member' | 'admin';
+export type FeatureRole = 'guest' | 'member' | 'admin';
 
 export type FeatureId =
 	| 'ica_check'
@@ -103,9 +103,11 @@ export type FeatureAccess = FeatureState & {
 	allowed: boolean;
 };
 
-function roleAtLeast(userIsAdmin: boolean, minRole: FeatureRole): boolean {
-	if (minRole === 'member') return true;
-	return userIsAdmin;
+// true = admin, false = signed-in member, null/undefined = guest.
+function roleAtLeast(userIsAdmin: boolean | null | undefined, minRole: FeatureRole): boolean {
+	if (minRole === 'guest') return true;
+	if (minRole === 'member') return typeof userIsAdmin === 'boolean';
+	return minRole === 'admin' && userIsAdmin === true;
 }
 
 export async function listFeatureStates(db: RadarDb): Promise<FeatureState[]> {
@@ -127,7 +129,7 @@ export async function listFeatureStates(db: RadarDb): Promise<FeatureState[]> {
 
 export async function getFeatureAccess(
 	db: RadarDb,
-	userIsAdmin: boolean
+	userIsAdmin: boolean | null | undefined
 ): Promise<Record<FeatureId, FeatureAccess>> {
 	const states = await listFeatureStates(db);
 	const out = {} as Record<FeatureId, FeatureAccess>;
@@ -143,7 +145,7 @@ export async function getFeatureAccess(
 export async function isFeatureAllowed(
 	db: RadarDb,
 	featureId: FeatureId,
-	userIsAdmin: boolean
+	userIsAdmin: boolean | null | undefined
 ): Promise<boolean> {
 	const access = await getFeatureAccess(db, userIsAdmin);
 	return access[featureId]?.allowed ?? false;

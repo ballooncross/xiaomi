@@ -1,3 +1,4 @@
+import type { FeatureRole } from './features';
 import type { DedupExisting, MergeAction } from './dedup';
 import type { CoeBiddingRound, CoeCategory } from '$lib/coe';
 import { DEFAULT_NOTIFY_PREFS, parseNotifyPrefs, type NotifyPrefs } from '$lib/notify-prefs';
@@ -227,7 +228,7 @@ const memory = {
     updatedAt: string;
   }>,
   telegramLinkTokens: [] as Array<{ token: string; userId: string; expiresAt: string }>,
-  featureFlags: [] as Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>,
+  featureFlags: [] as Array<{ id: string; enabled: boolean; minRole: FeatureRole }>,
   allowedEmails: [] as Array<{ email: string; createdAt: string; createdBy?: string }>,
   topicsByUser: new Map<string, WatchTopic[]>(),
   items: [...demoItems],
@@ -357,11 +358,11 @@ export abstract class RadarDb {
   /** Returns user id if token is valid and not expired; consumes the token. */
   abstract consumeTelegramLinkToken(token: string): Promise<string | null>;
 
-  abstract listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>>;
+  abstract listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: FeatureRole }>>;
   abstract upsertFeatureFlag(
     id: string,
     enabled: boolean,
-    minRole: 'member' | 'admin',
+    minRole: FeatureRole,
     updatedBy?: string
   ): Promise<void>;
 
@@ -707,14 +708,14 @@ class MemoryRadarDb extends RadarDb {
     return entry.userId;
   }
 
-  async listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>> {
+  async listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: FeatureRole }>> {
     return [...memory.featureFlags];
   }
 
   async upsertFeatureFlag(
     id: string,
     enabled: boolean,
-    minRole: 'member' | 'admin',
+    minRole: FeatureRole,
     _updatedBy?: string
   ): Promise<void> {
     const index = memory.featureFlags.findIndex((f) => f.id === id);
@@ -1739,11 +1740,11 @@ class D1RadarDb extends RadarDb {
     }
   }
 
-  async listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: 'member' | 'admin' }>> {
+  async listFeatureFlags(): Promise<Array<{ id: string; enabled: boolean; minRole: FeatureRole }>> {
     try {
       const { results } = await this.db
         .prepare('SELECT id, enabled, min_role FROM feature_flags ORDER BY id ASC')
-        .all<{ id: string; enabled: number; min_role: 'member' | 'admin' }>();
+        .all<{ id: string; enabled: number; min_role: FeatureRole }>();
       return (results ?? []).map((row) => ({
         id: row.id,
         enabled: Boolean(row.enabled),
@@ -1758,7 +1759,7 @@ class D1RadarDb extends RadarDb {
   async upsertFeatureFlag(
     id: string,
     enabled: boolean,
-    minRole: 'member' | 'admin',
+    minRole: FeatureRole,
     updatedBy?: string
   ): Promise<void> {
     try {

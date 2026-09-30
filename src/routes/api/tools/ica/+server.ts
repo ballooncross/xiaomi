@@ -10,7 +10,7 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ platform, locals }) => {
   const env = mergeLocalEnv(platform?.env as Env | undefined, privateEnv);
-  const allowed = await isFeatureAllowed(getDb(env), 'ica_check', Boolean(locals.user?.isAdmin));
+  const allowed = await isFeatureAllowed(getDb(env), 'ica_check', locals.user?.isAdmin);
   if (!allowed) return json({ error: 'Feature disabled' }, { status: 403 });
   return json(await getIcaToolStatus(env));
 };

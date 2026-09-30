@@ -38,6 +38,19 @@ describe('feature gates', () => {
 		expect(await isCronJobFeatureEnabled(db, 'fetch-trends')).toBe(true);
 	});
 
+	it.each(['guest', 'member', 'admin'] as const)('enforces the %s minimum role for every audience', async (minRole) => {
+		const db = getDb();
+		await db.upsertFeatureFlag('gym_page', true, minRole);
+		for (const user of [undefined, null, false, true]) {
+			const expected = minRole === 'guest' || user === true || (minRole === 'member' && user === false);
+			expect(await isFeatureAllowed(db, 'gym_page', user)).toBe(expected);
+		}
+		await db.upsertFeatureFlag('gym_page', false, minRole);
+		for (const user of [undefined, null, false, true]) {
+			expect(await isFeatureAllowed(db, 'gym_page', user)).toBe(false);
+		}
+	});
+
 	it('exposes allowed map for page load', async () => {
 		const access = await getFeatureAccess(getDb(), false);
 		expect(access.gym_page.allowed).toBe(true);
