@@ -2991,7 +2991,11 @@
 
       <div class="section-title">
         <h2>{activeView === 'trends' ? '趋势流' : activeView === 'concerts' ? '演出流' : '重点推荐'}</h2>
-        <span>记录反馈状态</span>
+        {#if activeView === 'home'}
+          <a class="source-link" href={viewPaths.trends}>查看全部趋势 →</a>
+        {:else}
+          <span>记录反馈状态</span>
+        {/if}
       </div>
 
       {#if topItem}
@@ -3269,12 +3273,12 @@
               <span>包含新加坡音乐活动广泛发现，以及在 Ticketmaster 和 Bandsintown 上按音乐人跟踪。</span>
             </div>
           </div>
-          <div class="brew">
+          <a class="brew trend-overview-link" href={viewPaths.trends}>
             <div>
               <strong>趋势主题</strong>
               <span>新加坡科技岗位、东南亚融资、中美 AI 政策、比亚迪和电动车市场信号。</span>
             </div>
-          </div>
+          </a>
           <div class="brew">
             <div>
               <strong>AI 模式</strong>
@@ -5901,6 +5905,22 @@
     height: 36px;
     border-radius: 999px;
     background: var(--accent);
+  }
+
+  .trend-overview-link {
+    color: inherit;
+    text-decoration: none;
+    border-radius: 4px;
+  }
+
+  .trend-overview-link:hover strong,
+  .trend-overview-link:focus-visible strong {
+    text-decoration: underline;
+  }
+
+  .trend-overview-link:focus-visible {
+    outline: 2px solid var(--jade);
+    outline-offset: 4px;
   }
 
   .brew strong {
