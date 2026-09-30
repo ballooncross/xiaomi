@@ -1,4 +1,4 @@
-import type { PackageProviderId, PackageStatus, PackageTrackingEvent } from '../types';
+import type { PackageProviderId, PackageStatus, PackageTracking, PackageTrackingEvent } from '../types';
 
 export type ProviderEvent = {
   status: PackageStatus;
@@ -56,10 +56,16 @@ export function providerCandidates(trackingNumber: string): PackageProviderId[] 
 export function normalizePackageStatus(value: string): PackageStatus {
   const text = value.trim().toLowerCase();
   if (!text) return 'unknown';
+  if (/^(?:completed?|已完成|完成)[.!。！]?$/.test(text)) return 'delivered';
   if (matches(text, ['returned', 'return to sender', '退回', '退件'])) return 'returned';
   if (matches(text, [
     'delivery attempted',
     'unsuccessful delivery',
+    'not delivered',
+    'undelivered',
+    'delivery incomplete',
+    '未送达',
+    '未完成派送',
     '派送未成功',
     '投递失败',
     '签收失败',
@@ -70,6 +76,12 @@ export function normalizePackageStatus(value: string): PackageStatus {
     return 'out_for_delivery';
   }
   if (matches(text, [
+    'delivery completed',
+    'delivery complete',
+    'completed delivery',
+    'handed over to recipient',
+    '已收妥',
+    '已完成派送',
     'signed for',
     'delivered',
     '已签收',
@@ -142,6 +154,34 @@ export async function eventFingerprint(event: ProviderEvent): Promise<string> {
 
 export function latestProviderEvent(events: ProviderEvent[]): ProviderEvent | undefined {
   return [...events].sort((a, b) => b.eventAt.localeCompare(a.eventAt))[0];
+}
+
+// Reinterpret previously unknown wording without discarding structured provider statuses.
+export function resolveEventStatus(event: ProviderEvent): ProviderEvent {
+  if (event.status !== 'unknown') return event;
+  const status = normalizePackageStatus(event.providerStatus);
+  return { ...event, status: status === 'unknown' ? normalizePackageStatus(event.message) : status };
+}
+
+export function reconcilePackageProgress(item: PackageTracking): PackageTracking {
+  const events = item.events?.map((event) => ({ ...event, status: resolveEventStatus(event).status }));
+  const latest = latestProviderEvent(events ?? []);
+  if (latest && (!item.latestEventAt || latest.eventAt >= item.latestEventAt)) {
+    return {
+      ...item,
+      events,
+      status: latest.status,
+      providerStatus: latest.providerStatus,
+      latestEventAt: latest.eventAt,
+      latestLocation: latest.location,
+      deliveredAt: latest.status === 'delivered' ? latest.eventAt : item.deliveredAt
+    };
+  }
+  return {
+    ...item,
+    events,
+    status: item.status === 'unknown' ? normalizePackageStatus(item.providerStatus ?? '') : item.status
+  };
 }
 
 export function isSingaporeArrivalOrCustomsEvent(

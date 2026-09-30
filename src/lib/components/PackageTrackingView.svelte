@@ -215,9 +215,9 @@
                 {pendingId === item.id ? '刷新中…' : '手动刷新'}
               </button>
             {/if}
-            {#if item.providerId === 'dexi' && item.state !== 'archived' && item.status !== 'delivered'}
+            {#if item.state !== 'archived'}
               <button class="delivered" type="button" disabled={pendingId === item.id} onclick={() => markDelivered(item)}>
-                标记已送达
+                完成（标记已送达）
               </button>
             {/if}
             <button class="danger" type="button" disabled={pendingId === item.id} onclick={() => removePackage(item)}>删除</button>

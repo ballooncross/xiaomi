@@ -70,7 +70,7 @@ export function parseLsgjwlResponse(payload: LsgjwlResponse): ProviderEvent[] {
   );
   const shipmentStatus = LSGJWL_SHIPMENT_STATUSES[shipment.status?.trim().toLowerCase() ?? ''];
   const newest = events[events.length - 1];
-  if (newest && shipmentStatus && (newest.status === 'unknown' || shipmentStatus === 'delivered' || shipmentStatus === 'returned')) {
+  if (newest && shipmentStatus && newest.status === 'unknown') {
     newest.status = shipmentStatus;
   }
   return events;

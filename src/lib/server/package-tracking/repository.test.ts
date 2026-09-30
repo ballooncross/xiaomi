@@ -101,11 +101,11 @@ describe('package tracking repository state transitions', () => {
     expect((await listDuePackageTrackings({}, true)).map((candidate) => candidate.id)).toContain(item.id);
   });
 
-  it('manually marks a D-EXI package delivered and archives the acknowledged event', async () => {
+  it.each(['dexi', 'mh56', 'yxd', 'lsgjwl'] as const)('manually completes a %s package and archives the acknowledged event', async (providerId) => {
     const userId = crypto.randomUUID();
     const { item } = await createPackageTracking({}, userId, 'LX987654321');
     await recordPackageLookup({}, item, {
-      providerId: 'dexi',
+      providerId,
       sourceUrl: 'http://www.d-exi.com/querytracks?tracknow=new',
       found: true,
       events: [{
@@ -125,5 +125,44 @@ describe('package tracking repository state transitions', () => {
     });
     expect(delivered?.events?.[0].notifiedAt).toBeDefined();
     expect(await listPendingPackageNotifications({}, userId)).toHaveLength(0);
+    expect(await markPackageDelivered({}, 'another-user', item.id)).toBeNull();
+    expect((await markPackageDelivered({}, userId, item.id))?.events).toHaveLength(delivered!.events!.length);
+    expect((await listDuePackageTrackings({})).map((candidate) => candidate.id)).not.toContain(item.id);
+  });
+
+  it('corrects existing unknown completion and persists it on refresh without duplicate notification', async () => {
+    const userId = crypto.randomUUID();
+    const { item } = await createPackageTracking({}, userId, 'YD999111');
+    const result = {
+      providerId: 'mh56' as const, sourceUrl: 'https://example.test', found: true,
+      events: [{ status: 'unknown' as const, providerStatus: 'Completed', message: 'Completed', eventAt: '2026-09-20T02:00:00.000Z' }]
+    };
+    await recordPackageLookup({}, item, result);
+    // Simulate a row stored under the previous normalizer, whose update was already sent.
+    item.status = 'unknown';
+    item.events![0].status = 'unknown';
+    await markPackageNotificationsSent({}, userId, [item.id]);
+    expect((await listPackageTrackings({}, userId))[0]).toMatchObject({ status: 'delivered', state: 'active' });
+    await recordPackageLookup({}, item, result);
+    expect(item).toMatchObject({ status: 'delivered', state: 'archived' });
+    expect(item.events).toHaveLength(1);
+    expect(item.events![0].status).toBe('delivered');
+    expect(await listPendingPackageNotifications({}, userId)).toHaveLength(0);
+  });
+
+  it('keeps the newest stored progress when a provider returns only older events', async () => {
+    const { item } = await createPackageTracking({}, crypto.randomUUID(), 'YD999222');
+    const result = {
+      providerId: 'mh56' as const, sourceUrl: 'https://example.test', found: true,
+      events: [{ status: 'delivered' as const, providerStatus: 'Delivered', message: 'Delivered', eventAt: '2026-09-20T02:00:00.000Z' }]
+    };
+    await recordPackageLookup({}, item, result);
+    await recordPackageLookup({}, item, { ...result, events: [{
+      status: 'in_transit', providerStatus: 'Shipped', message: 'Shipped', eventAt: '2026-09-19T02:00:00.000Z'
+    }] });
+    expect(item.status).toBe('delivered');
+    expect(item.providerStatus).toBe(item.events![0].providerStatus);
+    expect(item.latestEventAt).toBe(item.events![0].eventAt);
+    expect(item.state).toBe('active');
   });
 });

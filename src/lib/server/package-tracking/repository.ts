@@ -11,6 +11,8 @@ import {
   eventFromStored,
   isSingaporeArrivalOrCustomsEvent,
   latestProviderEvent,
+  reconcilePackageProgress,
+  resolveEventStatus,
   type ProviderLookupResult
 } from './domain';
 
@@ -57,7 +59,7 @@ const unresolvedLimitMs = 7 * 24 * 60 * 60 * 1000;
 const memoryPackagesByUser = new Map<string, PackageTracking[]>();
 
 export async function listPackageTrackings(env: Env, userId: string): Promise<PackageTracking[]> {
-  if (!env.DB) return [...getMemoryPackages(userId)].sort(sortPackages);
+  if (!env.DB) return getMemoryPackages(userId).map(reconcilePackageProgress).sort(sortPackages);
   const { results } = await env.DB
     .prepare('SELECT * FROM package_trackings WHERE user_id = ? ORDER BY archived_at IS NOT NULL, updated_at DESC')
     .bind(userId)
@@ -70,7 +72,7 @@ export async function listPackageTrackings(env: Env, userId: string): Promise<Pa
     .bind(...packages.map((item) => item.id))
     .all<EventRow>();
   attachEvents(packages, eventRows.results ?? []);
-  return packages;
+  return packages.map(reconcilePackageProgress);
 }
 
 export async function getPackageTracking(
@@ -78,7 +80,10 @@ export async function getPackageTracking(
   userId: string,
   packageId: string
 ): Promise<PackageTracking | null> {
-  if (!env.DB) return getMemoryPackages(userId).find((item) => item.id === packageId) ?? null;
+  if (!env.DB) {
+    const item = getMemoryPackages(userId).find((item) => item.id === packageId);
+    return item ? Object.assign(item, reconcilePackageProgress(item)) : null;
+  }
   const row = await env.DB
     .prepare('SELECT * FROM package_trackings WHERE user_id = ? AND id = ?')
     .bind(userId, packageId)
@@ -90,7 +95,7 @@ export async function getPackageTracking(
     .bind(packageId)
     .all<EventRow>();
   item.events = (results ?? []).map(eventFromRow);
-  return item;
+  return reconcilePackageProgress(item);
 }
 
 export async function getPackageTrackingByNumber(
@@ -186,14 +191,16 @@ export async function recordPackageLookup(
   item: PackageTracking,
   result: ProviderLookupResult
 ): Promise<PackageTracking> {
+  if (item.state === 'archived') return item;
   if (!result.found || result.events.length === 0) return recordPackageNoData(env, item);
   const now = new Date().toISOString();
-  const latest = latestProviderEvent(result.events)!;
+  const events = result.events.map(resolveEventStatus);
+  const latest = latestProviderEvent([...events, ...(item.events ?? []).map(eventFromStored).map(resolveEventStatus)])!;
   const deliveredAt = latest.status === 'delivered' ? latest.eventAt : item.deliveredAt;
   const frequentCheckAt = item.frequentCheckAt ?? [...result.events, ...(item.events ?? []).map(eventFromStored)]
     .find(isSingaporeArrivalOrCustomsEvent)?.eventAt;
   const storedEvents = await Promise.all(
-    result.events.map(async (event): Promise<PackageTrackingEvent> => ({
+    events.map(async (event): Promise<PackageTrackingEvent> => ({
       id: crypto.randomUUID(),
       packageId: item.id,
       fingerprint: await eventFingerprint(event),
@@ -207,6 +214,7 @@ export async function recordPackageLookup(
   );
 
   if (!env.DB) {
+    const incomingStatuses = new Map(storedEvents.map((event) => [event.fingerprint, event.status]));
     const existingFingerprints = new Set((item.events ?? []).map((event) => event.fingerprint));
     const newEvents = storedEvents.filter((event) => !existingFingerprints.has(event.fingerprint));
     Object.assign(item, {
@@ -224,16 +232,21 @@ export async function recordPackageLookup(
       frequentCheckAt,
       deliveredAt,
       updatedAt: now,
-      events: [...newEvents, ...(item.events ?? [])].sort((a, b) => b.eventAt.localeCompare(a.eventAt))
+      events: [...newEvents, ...(item.events ?? []).map((event) => ({ ...event, status: incomingStatuses.get(event.fingerprint) ?? resolveEventStatus(event).status }))].sort((a, b) => b.eventAt.localeCompare(a.eventAt))
     });
+    if (latest.status === 'delivered' && item.events?.every((event) => event.notifiedAt)) {
+      item.state = 'archived';
+      item.archivedAt = now;
+    }
     return item;
   }
 
   const statements = storedEvents.map((event) =>
     env.DB!.prepare(
-      `INSERT OR IGNORE INTO package_tracking_events
+      `INSERT INTO package_tracking_events
        (id, package_id, fingerprint, status, provider_status, message, event_at, location, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(package_id, fingerprint) DO UPDATE SET status = excluded.status`
     ).bind(
       event.id,
       event.packageId,
@@ -270,6 +283,13 @@ export async function recordPackageLookup(
       item.userId
     )
   );
+  // A corrected status can belong to an event already acknowledged on a previous run.
+  // Archive it without generating another notification for the same provider event.
+  statements.push(env.DB.prepare(
+    `UPDATE package_trackings SET state = 'archived', archived_at = ?
+     WHERE id = ? AND user_id = ? AND status = 'delivered'
+       AND NOT EXISTS (SELECT 1 FROM package_tracking_events WHERE package_id = ? AND notified_at IS NULL)`
+  ).bind(now, item.id, item.userId, item.id));
   await env.DB.batch(statements);
   return (await getPackageTracking(env, item.userId, item.id))!;
 }

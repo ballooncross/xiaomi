@@ -17,6 +17,10 @@ New tracking numbers can temporarily have no provider data. The worker retries t
 
 Tracking records are isolated by Personal Radar user. The Telegram chat must already be linked to that user before package commands are accepted.
 
+Package status and latest progress use the newest event across incoming and stored history. Previously unknown completion wording is reinterpreted when reading existing entries and saved on refresh, without duplicating provider notifications. Completion of intermediate steps (such as customs clearance) does not mean delivery.
+
+Every unarchived package has a 完成（标记已送达） button, including packages with no resolved provider. Confirming it records an acknowledged manual delivery event, archives the package, and stops scheduled checks without sending a redundant notification.
+
 ## Provider adapters
 
 Provider selection starts with known number formats, then tries the configured adapters when the format is unknown.

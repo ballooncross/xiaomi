@@ -64,6 +64,7 @@ export async function triggerPackageRefresh(env: Env, userId: string, packageId:
 export async function refreshPackageLocally(env: Env, userId: string, packageId: string): Promise<PackageTracking> {
   const item = await getPackageTracking(env, userId, packageId);
   if (!item) throw new Error('Package tracking item was not found.');
+  if (item.state === 'archived') return item;
   const candidates = item.providerId ? [item.providerId] : providerCandidates(item.trackingNumber);
   const errors: string[] = [];
   let hadNoData = false;

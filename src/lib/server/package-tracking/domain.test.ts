@@ -40,6 +40,24 @@ describe('package tracking domain', () => {
     expect(normalizePackageStatus('Custom carrier wording')).toBe('unknown');
   });
 
+  it.each(['Completed', 'Complete', '已完成', 'Delivery completed', 'Handed over to recipient'])(
+    'recognizes completed delivery wording: %s', (message) => {
+      expect(normalizePackageStatus(message)).toBe('delivered');
+    }
+  );
+
+  it.each(['Customs clearance completed', 'Export declaration complete', '清关完成'])(
+    'does not mistake an intermediate completion for delivery: %s', (message) => {
+      expect(normalizePackageStatus(message)).toBe('in_transit');
+    }
+  );
+
+  it.each(['Not delivered', 'Undelivered', 'Delivery incomplete', '未完成派送'])(
+    'does not mistake unsuccessful delivery for completion: %s', (message) => {
+      expect(normalizePackageStatus(message)).toBe('delivery_attempted');
+    }
+  );
+
   it('detects confirmed Singapore arrival and customs milestones without treating an ETA as arrival', () => {
     expect(isSingaporeArrivalOrCustomsEvent({
       providerStatus: '货物已到港',

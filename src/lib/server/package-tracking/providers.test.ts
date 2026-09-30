@@ -153,6 +153,17 @@ describe('package provider parsers', () => {
     expect(events[1]).toMatchObject({ status: 'delivered', providerStatus: 'Handed over to recipient' });
   });
 
+  it('prefers the newest LSGJWL progress over a conflicting shipment summary', () => {
+    const events = parseLsgjwlResponse({
+      status: 1,
+      data: { shipment: { status: 'returned', traces: [
+        { time: '2026-09-20 14:00:00', info: 'Completed' },
+        { time: '2026-09-19 14:00:00', info: 'In transit' }
+      ] } }
+    });
+    expect(events[1]).toMatchObject({ status: 'delivered', providerStatus: 'Completed' });
+  });
+
   it('treats a failed LSGJWL lookup as no data instead of an error', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
       status: 0,
