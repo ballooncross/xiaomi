@@ -1,5 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getDb } from '$lib/server/db';
 
 vi.mock('$env/dynamic/private', () => ({
 	env: { SESSION_SECRET: 'test-secret', GOOGLE_CLIENT_ID: 'test-client' }
@@ -8,6 +9,41 @@ vi.mock('$env/dynamic/private', () => ({
 import { handle } from './hooks.server';
 
 describe('guest access boundaries', () => {
+	beforeEach(async () => {
+		await getDb().upsertFeatureFlag('gym_page', true, 'member');
+	});
+
+	it.each(['GET', 'HEAD'])('serves the exercise catalog for guests only when configured (%s)', async (method) => {
+		await getDb().upsertFeatureFlag('gym_page', true, 'guest');
+		const url = new URL('https://radar.example/api/exercises?q=squat');
+		const event = {
+			url, request: new Request(url, { method }),
+			cookies: { get: vi.fn() }, locals: {}
+		} as unknown as RequestEvent;
+		const response = new Response('{"exercises":[]}');
+		const resolve = vi.fn().mockResolvedValue(response);
+		expect(await handle({ event, resolve })).toBe(response);
+		expect(event.cookies.get).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['/api/exercises', 'GET', false, 'guest'],
+		['/api/exercises', 'GET', true, 'admin'],
+		['/api/exercises', 'POST', true, 'guest'],
+		['/api/exercises/private', 'GET', true, 'guest'],
+		['/api/packages', 'GET', true, 'guest'],
+		['/gym', 'GET', true, 'guest']
+	] as const)('keeps %s %s protected with enabled=%s role=%s', async (path, method, enabled, role) => {
+		await getDb().upsertFeatureFlag('gym_page', enabled, role);
+		const url = new URL(path, 'https://radar.example');
+		const event = {
+			url, request: new Request(url, { method }),
+			cookies: { get: vi.fn(), delete: vi.fn() }, locals: {}
+		} as unknown as RequestEvent;
+		const resolve = vi.fn();
+		await expect(handle({ event, resolve })).rejects.toMatchObject({ status: 303, location: '/login' });
+		expect(resolve).not.toHaveBeenCalled();
+	});
 	it.each(['GET', 'HEAD'])('serves guest tools for %s without reading a session', async (method) => {
 		const event = {
 			url: new URL('https://radar.example/guest'),

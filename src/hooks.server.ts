@@ -2,6 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { getSession } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
+import { isFeatureAllowed } from '$lib/server/features';
 import { mergeLocalEnv } from '$lib/server/env';
 import { ensureUser, isEmailAllowed } from '$lib/server/users';
 import { env as privateEnv } from '$env/dynamic/private';
@@ -13,9 +14,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const env = mergeLocalEnv(event.platform?.env as Env | undefined, privateEnv);
 	const secret = env.SESSION_SECRET;
 
-	// Guest tools are self-contained pages with no personal data or API access.
-	// Match explicitly: adding another guest tool requires reviewing its data needs.
+	// Guest tools never load the personal dashboard. Only the read-only exercise
+	// catalog can bypass login, when explicitly enabled for guests.
 	if (event.url.pathname === '/guest' && ['GET', 'HEAD'].includes(event.request.method)) {
+		return resolve(event);
+	}
+	if (
+		event.url.pathname === '/api/exercises' &&
+		['GET', 'HEAD'].includes(event.request.method) &&
+		await isFeatureAllowed(getDb(env), 'gym_page', null)
+	) {
 		return resolve(event);
 	}
 
