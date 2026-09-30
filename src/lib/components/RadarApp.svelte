@@ -2290,7 +2290,7 @@
           <header class="gym-head">
             <h1>健身动作库</h1>
             <p>搜索 3,000+ 训练动作 · Garmin 动作名称、目标肌群与所需器械</p>
-            <a href="/guest">训练量计算器 · 无需登录</a>
+            <a href="/guest">热量与营养计算 · 无需登录</a>
           </header>
           <div class="gym-search">
             <input

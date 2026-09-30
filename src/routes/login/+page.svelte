@@ -34,7 +34,7 @@
         Authentication is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET environment variables.
       </div>
     {/if}
-    <a href="/guest" class="btn guest-btn">Continue as guest · Workout calculator</a>
+    <a href="/guest" class="btn guest-btn">Continue as guest · 热量与营养计算</a>
     <p class="quiet-copy guest-note">No account needed for guest tools. Sign in for your personal dashboard.</p>
   </div>
 </div>
