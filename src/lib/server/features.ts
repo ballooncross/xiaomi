@@ -83,7 +83,7 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
 	{
 		id: 'dev_requests',
 		label: '功能/Bug 请求',
-		description: 'Me 里的开发请求面板。',
+		description: '管理中心里的开发请求面板。',
 		defaultEnabled: true,
 		defaultMinRole: 'admin'
 	}

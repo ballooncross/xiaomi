@@ -26,7 +26,7 @@
 
 <svelte:head><title>使用统计 · 个人雷达</title></svelte:head>
 <main>
-  <a href="/settings">← 返回设置</a>
+  <a href="/admin">← 管理中心</a>
   <header><div><h1>使用统计</h1><p>Radar performance · 访客与登录用户的访问和工具使用量</p></div>
     <button class="btn" onclick={refresh} disabled={refreshing}>{refreshing ? '刷新中…' : '刷新'}</button>
   </header>

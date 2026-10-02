@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ITEMS, RADAR_VIEW_IDS, normalizeMiddleNav } from './navigation';
+import { NAV_ITEMS, RADAR_VIEW_IDS, FEATURE_GROUPS, VIEW_PATHS, normalizeMiddleNav } from './navigation';
 
 describe('navigation configuration', () => {
 	it('accepts every configurable navigation item', () => {
@@ -19,4 +19,12 @@ describe('navigation configuration', () => {
 			)
 		).toEqual(['packages', 'coe', 'settings']);
 	});
+});
+
+
+it('keeps the directory complete without duplicating personal destinations', () => {
+ const ids = FEATURE_GROUPS.flatMap((group) => [...group.ids]);
+ expect(new Set(ids).size).toBe(ids.length);
+ for (const id of [...NAV_ITEMS.map((item) => item.id), 'saved']) expect(ids).toContain(id);
+ for (const id of ids) expect(VIEW_PATHS[id]).toBe(`/${id}`);
 });

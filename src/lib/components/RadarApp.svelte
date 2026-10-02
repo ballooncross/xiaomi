@@ -29,6 +29,7 @@
   import { DEFAULT_NOTIFY_PREFS } from '$lib/notify-prefs';
   import GymView from './GymView.svelte';
   import {
+    ADMIN_PAGES, ADMIN_PATHS, VIEW_PATHS, FEATURE_GROUPS, FEATURE_DESCRIPTIONS, type AdminView,
     DEFAULT_MIDDLE_NAV,
     NAV_ITEMS,
     normalizeMiddleNav,
@@ -36,7 +37,7 @@
     type RadarView
   } from '$lib/navigation';
 
-  type View = RadarView;
+  type View = RadarView | AdminView;
 
   function featureAllowed(id: FeatureId): boolean {
     return Boolean(data.features?.[id]?.allowed);
@@ -54,32 +55,18 @@
   };
   type IcaToolStatus = RadarPageData['icaTool'];
 
-  const viewPaths: Record<View, string> = {
-    home: '/home',
-    concerts: '/concerts',
-    trends: '/trends',
-    dates: '/dates',
-    packages: '/packages',
-    gym: '/gym',
-    nutrition: '/nutrition',
-    coe: '/coe',
-    interests: '/interests',
-    me: '/me',
-    settings: '/settings',
-    saved: '/saved'
-  };
-
+  const viewPaths: Record<View, string> = { ...VIEW_PATHS, ...ADMIN_PATHS };
   const NAV_STORAGE_KEY = 'personal-radar-middle-nav';
   const ALL_NAV_OPTIONS = NAV_ITEMS;
-  const MORE_MENU_ITEMS: Array<{ id: View; label: string; hint: string }> = [
-    { id: 'me', label: '我的', hint: '资料、工具与收藏' },
-    { id: 'concerts', label: '演出', hint: '演出流与时间线' },
-    { id: 'packages', label: '包裹', hint: '物流状态与历史' },
-    { id: 'coe', label: 'COE', hint: '新加坡官方报价' },
-    { id: 'interests', label: '兴趣', hint: '关注主题与屏蔽' },
-    { id: 'settings', label: '设置', hint: '导航与偏好配置' }
-  ];
-
+  let directorySearch = $state('');
+  const adminPages = $derived(ADMIN_PAGES.filter((item) => !('feature' in item) || featureAllowed(item.feature)));
+  function directoryLabel(id: RadarView) {
+    return NAV_ITEMS.find((item) => item.id === id)?.label ?? (id === 'saved' ? '收藏' : id);
+  }
+  function directoryVisible(id: RadarView) {
+    if (id !== 'saved' && !visibleNavOptions.some((item) => item.id === id)) return false;
+    return `${directoryLabel(id)} ${FEATURE_DESCRIPTIONS[id] ?? ''} ${id}`.toLowerCase().includes(directorySearch.trim().toLowerCase());
+  }
   function readStoredMiddleNav(): NavSlotId[] {
     if (typeof window === 'undefined') return [...DEFAULT_MIDDLE_NAV];
     try {
@@ -99,7 +86,7 @@
   let activeView = $state<View>(viewFromPath(page.url.pathname));
   let activeFilter = $state('for-you');
   let searchQuery = $state('');
-  $effect(() => { trackUsage('visit', activeView); });
+  $effect(() => { if (!(activeView in ADMIN_PATHS)) trackUsage('visit', activeView); });
   $effect(() => {
     const query = searchQuery.trim();
     const view = activeView;
@@ -136,7 +123,6 @@
   let coeError = $state('');
   const initialMiddleNav = readStoredMiddleNav();
   let middleNav = $state<NavSlotId[]>(initialMiddleNav);
-  let moreMenuOpen = $state(false);
   let draftMiddleNav = $state<NavSlotId[]>([...initialMiddleNav]);
 
   async function loadCoe(force = false) {
@@ -300,27 +286,29 @@
     if (activeView !== routeView) activeView = routeView;
   });
 
+  $effect(() => {
+    if (!data.user?.isAdmin) return;
+    if (activeView === 'requests') void loadDevRequests();
+    if (activeView === 'access') void loadAllowlist();
+    if (activeView === 'features') void loadFeatures();
+  });
+
   onMount(() => {
     manualJobToken = window.localStorage.getItem('personal-radar-admin-token') ?? '';
     applyServerOrLocalNav(data.middleNav);
-    if (data.user?.isAdmin) {
-      loadDevRequests();
-      loadAllowlist();
-      loadFeatures();
-    }
 
     const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     const timer = setInterval(() => {
       if (!document.hidden) invalidateAll();
     }, REFRESH_INTERVAL_MS);
     const devRequestTimer = setInterval(() => {
-      if (!document.hidden && data.user?.isAdmin) loadDevRequests();
+      if (!document.hidden && data.user?.isAdmin && activeView === 'requests') loadDevRequests();
     }, 15000);
 
     const onVisible = () => {
       if (!document.hidden) {
         invalidateAll();
-        if (data.user?.isAdmin) loadDevRequests();
+        if (data.user?.isAdmin && activeView === 'requests') loadDevRequests();
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -393,24 +381,8 @@
         const option = visibleNavOptions.find((item) => item.id === id);
         return { id, label: option?.label ?? id };
       }),
-    { id: 'more' as const, label: '更多' }
+    { id: 'more' as const, label: '全部功能' }
   ]);
-  const moreMenuItems = $derived.by(() => {
-    const fixedIds = new Set(MORE_MENU_ITEMS.map((item) => item.id));
-    const base = MORE_MENU_ITEMS.filter((item) => {
-      if (item.id === 'coe') return featureAllowed('coe_page');
-      if (item.id === 'packages') return featureAllowed('package_tracking');
-      return true;
-    });
-    const extras = visibleNavOptions
-      .filter((option) => !middleNav.includes(option.id) && !fixedIds.has(option.id))
-      .map((option) => ({
-        id: option.id as View,
-        label: option.label,
-        hint: '未固定在导航栏'
-      }));
-    return [...base, ...extras];
-  });
   const navigationView = $derived.by(() => {
     if (activeView === 'home') return 'home';
     if (middleNav.includes(activeView as NavSlotId)) return activeView;
@@ -423,6 +395,7 @@
     )
   );
   const hideSidePanel = $derived(
+    activeView in ADMIN_PATHS || activeView === 'explore' || activeView === 'notifications' ||
     activeView === 'dates' ||
       activeView === 'gym' ||
       activeView === 'nutrition' ||
@@ -1056,16 +1029,6 @@
     addWatchOpen = false;
     editingTopicId = null;
     reminderFormOpen = false;
-    moreMenuOpen = false;
-  }
-
-  function toggleMoreMenu() {
-    moreMenuOpen = !moreMenuOpen;
-  }
-
-  async function selectMoreItem(view: View) {
-    moreMenuOpen = false;
-    await setView(view);
   }
 
   function toggleSearch() {
@@ -1089,10 +1052,9 @@
 
   async function onBarNavClick(id: string) {
     if (id === 'more') {
-      toggleMoreMenu();
+      await setView('explore');
       return;
     }
-    moreMenuOpen = false;
     await setView(id as View);
   }
 
@@ -1107,7 +1069,7 @@
   async function syncViewPath(view: View) {
     const nextPath = viewPaths[view];
     if (page.url.pathname !== nextPath) {
-      await goto(nextPath, { keepFocus: true, noScroll: true, invalidateAll: false });
+      await goto(nextPath, { invalidateAll: false });
     }
   }
 
@@ -1638,8 +1600,409 @@
   }
 </script>
 
+{#snippet notificationsPanel()}
+          {#if featureAllowed('telegram_digest') || featureAllowed('package_tracking') || featureAllowed('coe_notify') || featureAllowed('coe_page')}
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>通知</span>
+              <strong>Telegram</strong>
+              <p>
+                {#if telegramLinked}
+                  已连接。摘要、日期提醒和包裹更新会按各自规则发送。
+                {:else if data.telegramBotConfigured}
+                  连接后，通知会发到你自己的聊天（不再共用一个群）。
+                {:else}
+                  管理员尚未配置 Telegram Bot（TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME）。
+                {/if}
+              </p>
+            </div>
+            <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
+              {#if telegramLinked}
+                <button
+                  class="small-button"
+                  type="button"
+                  disabled={telegramLinkPending}
+                  onclick={disconnectTelegram}
+                >
+                  {telegramLinkPending ? '…' : '断开连接'}
+                </button>
+                <button
+                  class="small-button"
+                  type="button"
+                  disabled={telegramLinkPending}
+                  onclick={async () => {
+                    await invalidateAll();
+                    telegramLinkMessage = telegramLinked ? '仍为已连接' : '尚未连接，请完成 Telegram Start';
+                  }}
+                >
+                  刷新状态
+                </button>
+              {:else}
+                <button
+                  class="small-button primary"
+                  type="button"
+                  disabled={telegramLinkPending || !data.telegramBotConfigured}
+                  onclick={startTelegramLink}
+                >
+                  {telegramLinkPending ? '…' : '连接 Telegram'}
+                </button>
+              {/if}
+            </div>
+            {#if telegramLinkMessage}
+              <p style="font-size:12px;color:var(--muted);padding:0 14px 12px">{telegramLinkMessage}</p>
+            {/if}
+            {#if telegramDeepLink}
+              <p style="font-size:12px;padding:0 14px 12px;word-break:break-all">
+                <a href={telegramDeepLink} target="_blank" rel="noopener">打开绑定链接</a>
+              </p>
+            {/if}
+            <div style="padding:0 14px 14px;display:grid;gap:8px">
+              {#if featureAllowed('telegram_digest')}
+                <label class="check-row" style="font-size:12px">
+                  <input
+                    type="checkbox"
+                    checked={notifyPrefs.digestTrends}
+                    disabled={notifyPrefsPending || !telegramLinked}
+                    onchange={(event) =>
+                      saveNotifyPrefs({ digestTrends: (event.currentTarget as HTMLInputElement).checked })
+                    }
+                  />
+                  趋势与演出摘要（单独一条消息）
+                </label>
+                <label class="check-row" style="font-size:12px">
+                  <input
+                    type="checkbox"
+                    checked={notifyPrefs.digestDates}
+                    disabled={notifyPrefsPending || !telegramLinked}
+                    onchange={(event) =>
+                      saveNotifyPrefs({ digestDates: (event.currentTarget as HTMLInputElement).checked })
+                    }
+                  />
+                  日期提醒（生日 / 纪念日 / 里程碑，单独一条消息）
+                </label>
+              {/if}
+              {#if featureAllowed('coe_notify') || featureAllowed('coe_page')}
+                <label class="check-row" style="font-size:12px">
+                  <input
+                    type="checkbox"
+                    checked={notifyPrefs.coe}
+                    disabled={notifyPrefsPending || !telegramLinked}
+                    onchange={(event) =>
+                      saveNotifyPrefs({ coe: (event.currentTarget as HTMLInputElement).checked })
+                    }
+                  />
+                  COE 新结果通知（默认关闭，需订阅）
+                </label>
+              {/if}
+              {#if notifyPrefsMessage}
+                <p style="font-size:12px;color:var(--muted);margin:0">{notifyPrefsMessage}</p>
+              {/if}
+            </div>
+          </section>
+          {/if}
+
+{/snippet}
+
+{#snippet featuresPanel()}
+          {#if data.user?.isAdmin}
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>配置</span>
+              <strong>功能开关</strong>
+              <p>开关控制页面是否展示，以及对应 cron 是否运行。权限设置最低用户级别：访客、注册用户或管理员。需要登录的页面和个人数据接口仍须登录。</p>
+            </div>
+            {#if featureMessage}
+              <p style="font-size:12px;color:var(--muted);padding:0 14px">{featureMessage}</p>
+            {/if}
+            <div style="padding:8px 14px 14px;display:grid;gap:10px">
+              {#each featureRows as feat}
+                <div style="border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px">
+                  <div>
+                    <strong style="font-size:13px">{feat.label}</strong>
+                    <p style="font-size:12px;color:var(--muted);margin:4px 0 0">{feat.description}</p>
+                    <p style="font-size:11px;color:var(--muted);margin:4px 0 0"><code>{feat.id}</code></p>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                    <label class="check-row" style="font-size:12px">
+                      <input
+                        type="checkbox"
+                        checked={feat.enabled}
+                        disabled={featurePendingId === feat.id}
+                        onchange={(e) => patchFeature(feat.id, { enabled: e.currentTarget.checked })}
+                      />
+                      启用
+                    </label>
+                    <label style="font-size:12px;display:flex;gap:6px;align-items:center">
+                      权限
+                      <select
+                        value={feat.minRole}
+                        disabled={featurePendingId === feat.id}
+                        onchange={(e) =>
+                          patchFeature(feat.id, {
+                            minRole: e.currentTarget.value as FeatureRole
+                          })}
+                      >
+                        <option value="guest">所有用户（含访客 Guest）</option>
+                        <option value="member">所有登录用户</option>
+                        <option value="admin">仅管理员</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              {:else}
+                <p style="font-size:12px;color:var(--muted)">加载中或暂无配置…</p>
+              {/each}
+            </div>
+          </section>
+          {/if}
+
+{/snippet}
+
+{#snippet accessPanel()}
+          {#if featureAllowed('admin_ops')}
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>访问控制</span>
+              <strong>允许登录的邮箱</strong>
+              <p>
+                添加朋友的 Google 邮箱后即可登录。对方会看到自己的基础兴趣包；日期、收藏、Telegram
+                需自行设置，与你的数据互不影响。
+              </p>
+            </div>
+            <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
+              <input
+                bind:value={allowlistNewEmail}
+                type="email"
+                placeholder="friend@gmail.com"
+                style="flex:1;min-width:180px"
+              />
+              <button
+                class="small-button primary"
+                type="button"
+                disabled={allowlistPending || !allowlistNewEmail.trim()}
+                onclick={addAllowlistEmail}
+              >
+                {allowlistPending ? '…' : '添加'}
+              </button>
+            </div>
+            {#if allowlistMessage}
+              <p style="font-size:12px;color:var(--muted);padding:0 14px">{allowlistMessage}</p>
+            {/if}
+            <div style="padding:8px 14px 14px;display:grid;gap:6px">
+              {#each allowlistEmails as email}
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+                  <span>{email}</span>
+                  <button
+                    class="small-button"
+                    type="button"
+                    disabled={allowlistPending || email.toLowerCase() === data.user?.email?.toLowerCase()}
+                    onclick={() => removeAllowlistEmail(email)}
+                  >
+                    移除
+                  </button>
+                </div>
+              {:else}
+                <p style="font-size:12px;color:var(--muted)">暂无记录</p>
+              {/each}
+            </div>
+          </section>
+
+          {/if}
+{/snippet}
+
+{#snippet monitoringPanel()}
+          {#if featureAllowed('admin_ops')}
+          <section class="tools-panel">
+            <div class="notebook-head">
+              <div>
+                <h2>工具</h2>
+                <span>手动运行后台任务，查看预约检查状态。</span>
+              </div>
+            </div>
+
+            <section class="cron-status-card">
+              <div class="notebook-head compact-head">
+                <div>
+                  <h2>定时任务状态</h2>
+                  <span>Cloudflare Cron 与本地 Agent 的启用状态和最近一次运行结果。</span>
+                </div>
+              </div>
+              <div class="cron-job-list">
+                {#each cronJobs as job}
+                  <article class={`cron-job-row ${jobStatusClass(job)}`}>
+                    <div class="cron-job-main">
+                      <span class="cron-dot"></span>
+                      <div>
+                        <strong>{job.label}</strong>
+                        <p>{job.description}</p>
+                      </div>
+                    </div>
+                    <div class="cron-job-meta">
+                      <span>{job.schedule}</span>
+                      <strong>{job.enabled ? '已启用' : '已停用'}</strong>
+                    </div>
+                    <div class="cron-job-meta">
+                      <span>上次运行</span>
+                      <strong>{formatStatusTime(job.lastRun?.finishedAt ?? job.lastRun?.startedAt)}</strong>
+                    </div>
+                    <div class="cron-job-meta wide">
+                      <span>{jobStatusLabel(job.lastRun?.status)}</span>
+                      <strong>{job.lastRun?.detail ?? '暂无记录'}</strong>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            </section>
+
+            {#if featureAllowed('ica_check')}
+            <section class:running={icaJobStatus === 'running'} class={`job-run-card ica-tool-card ${icaJobStatus}`}>
+              <div class="job-run-copy">
+                <span>ICA 预约检查</span>
+                <strong>{icaTool.enabled ? icaStatusLabel(icaTool.lastJob?.status) : 'Cloudflare 定时已停用'}</strong>
+                <p>
+                  目标：寻找 {icaTool.targetBefore} 之前的可选日期。ICA 搜索接口会拒绝 Cloudflare Browser Run，定时检查已停止。
+                </p>
+              </div>
+              <div class="job-run-controls">
+                <label>
+                  <span>ADMIN_TOKEN</span>
+                  <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
+                </label>
+                <button
+                  class="small-button primary"
+                  type="button"
+                  disabled={icaJobPending || !icaTool.enabled || !icaTool.checkerUrlConfigured}
+                  onclick={triggerIcaCheck}
+                >
+                  {icaJobPending ? '检查中...' : icaTool.enabled ? '立即检查' : '已停用'}
+                </button>
+              </div>
+              <div class="tool-status-grid">
+                <div>
+                  <span>定时检查</span>
+                  <strong>{icaTool.enabled ? '已启用' : '已停用'}</strong>
+                </div>
+                <div>
+                  <span>远程触发</span>
+                  <strong>{icaTool.checkerUrlConfigured ? '已配置' : '未配置'}</strong>
+                </div>
+                <div>
+                  <span>失败备用</span>
+                  <strong>{icaTool.fallbackConfigured ? '自动' : '未配置'}</strong>
+                </div>
+                <div>
+                  <span>上次运行</span>
+                  <strong>{formatStatusTime(icaTool.lastJob?.finishedAt ?? icaTool.lastJob?.startedAt)}</strong>
+                </div>
+                <div>
+                  <span>最近结果</span>
+                  <strong>{icaTool.lastItem?.startsAt ?? icaTool.lastItem?.summary ?? '暂无'}</strong>
+                </div>
+              </div>
+              <div class="job-run-status" aria-live="polite">
+                <span></span>
+                <p>
+                  {icaJobMessage}
+                  {#if icaTool.lastJob?.detail}
+                    · {icaTool.lastJob.detail}
+                  {/if}
+                  {#if !icaTool.checkerUrlConfigured}
+                    · 需要配置 CRON_WORKER 服务绑定或 ICA_CHECKER_URL 后才能从网页手动触发。
+                  {/if}
+                  {#if !icaTool.enabled}
+                    · Cloudflare 定时任务已停用，后续改用 GCP / 持久浏览器方案。
+                  {/if}
+                </p>
+              </div>
+            </section>
+            {/if}
+
+            <section class:running={manualJobStatus === 'running'} class={`job-run-card ${manualJobStatus}`}>
+              <div class="job-run-copy">
+                <span>手动刷新</span>
+                <strong>立即抓取最新数据</strong>
+                <p>运行演出和趋势抓取任务，完成后会自动刷新当前页面数据。</p>
+              </div>
+              <div class="job-run-controls">
+                <label>
+                  <span>ADMIN_TOKEN</span>
+                  <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
+                </label>
+                <button class="small-button primary" type="button" disabled={manualJobPending} onclick={runManualFetchJob}>
+                  {manualJobPending ? '运行中...' : '立即刷新'}
+                </button>
+              </div>
+              <div class="job-run-status" aria-live="polite">
+                <span></span>
+                <p>{manualJobMessage}{manualJobLastRun ? ` · ${manualJobLastRun}` : ''}</p>
+              </div>
+            </section>
+          </section>
+          {/if}
+
+{/snippet}
+
+{#snippet requestsPanel()}
+          {#if featureAllowed('dev_requests')}
+          <section class="job-run-card">
+            <div class="job-run-copy">
+              <span>开发请求</span>
+              <strong>功能/Bug 请求</strong>
+              <p>提交后 Agent 会记录分析、实现、验证和部署全过程。只有生产验证通过才会标记完成。</p>
+              <small style="color:var(--muted)">{runnerHealthLabel()}</small>
+            </div>
+            <div class="job-run-controls">
+              {#if devRequestParentId}
+                <span style="font-size:12px;color:var(--muted)">此内容会作为上一个请求的补充上下文提交。</span>
+              {/if}
+              <textarea bind:value={devRequestText} rows="3" placeholder="描述功能需求或 Bug..."></textarea>
+              <button class="small-button primary" type="button"
+                disabled={devRequestPending || devRequestText.trim().length < 4}
+                onclick={submitDevRequest}>
+                {devRequestPending ? '提交中...' : '提交请求'}
+              </button>
+              {#if devRequestMessage}<span style="font-size:12px;color:var(--jade)">{devRequestMessage}</span>{/if}
+            </div>
+            {#if devRequests.length > 0}
+              <div style="padding:12px 14px 0;display:grid;gap:8px">
+                {#each devRequests.slice(0, 5) as req}
+                  <div style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:left;display:block;width:100%;box-sizing:border-box">
+                    <button type="button" style="all:unset;cursor:pointer;display:block;width:100%" onclick={() => toggleDevRequest(req.id)}>
+                      <strong style="color:var(--ink)">{expandedDevRequest === req.id ? req.text : req.text.slice(0, 80)}{expandedDevRequest !== req.id && req.text.length > 80 ? '…' : ''}</strong>
+                      <div style="margin-top:4px;color:var(--muted)">{req.status}{runsForRequest(req.id)[0] ? ` · ${runsForRequest(req.id)[0].phase}` : ''}{req.response ? ` · ${expandedDevRequest === req.id ? req.response : req.response.slice(0, 100)}${expandedDevRequest !== req.id && req.response.length > 100 ? '…' : ''}` : ''}</div>
+                    </button>
+                    {#if expandedDevRequest === req.id}
+                      <div style="display:grid;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+                        {#each runsForRequest(req.id) as run}
+                          <div style="color:var(--muted)">
+                            第 {run.attempt} 次 · {run.status} · {run.phase}{run.resultSha ? ` · ${run.resultSha.slice(0, 8)}` : ''}
+                            {#if run.summary}<div style="margin-top:2px;white-space:pre-wrap">{run.summary}</div>{/if}
+                          </div>
+                        {/each}
+                        {#each devRequestEvents.filter((event) => event.requestId === req.id) as event}
+                          <div style="color:var(--muted)">{event.phase} · {event.message.slice(0, 240)}</div>
+                        {/each}
+                        {#if req.status !== 'pending' && req.status !== 'in_progress'}
+                          <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            <button class="small-button" type="button" disabled={devRequestRetrying === req.id} onclick={() => retryDevRequest(req.id)}>
+                              {devRequestRetrying === req.id ? '重新排队中...' : '重试此请求'}
+                            </button>
+                            <button class="small-button" type="button" onclick={() => continueDevRequest(req)}>补充信息</button>
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </section>
+          {/if}
+
+{/snippet}
+
 <svelte:head>
-  <title>个人雷达</title>
+  <title>{activeView === 'admin' ? '管理中心' : activeView in ADMIN_PATHS ? ADMIN_PAGES.find((item) => item.id === activeView)?.label : activeView === 'explore' ? '全部功能' : directoryLabel(activeView as RadarView)} · 个人雷达</title>
   <link rel="icon" href="/brand/personal-radar-logo.svg" />
   <meta
     name="description"
@@ -1731,6 +2094,7 @@
       {#each barNavItems as item}
         <button
           class:active={navigationView === item.id}
+          aria-current={navigationView === item.id ? 'page' : undefined}
           type="button"
           onclick={() => onBarNavClick(item.id)}
         >
@@ -2059,14 +2423,14 @@
       {:else if activeView === 'settings'}
         <section class="settings-workspace">
           {#if data.user?.isAdmin}
-            <a class="small-button" href="/admin/performance">使用统计 / Radar performance</a>
+            <a class="small-button" href="/admin">管理中心 · 监控与配置</a>
           {/if}
 
           <div class="interests-head">
             <div>
               <div class="eyebrow">设置</div>
               <h1>导航与配置</h1>
-              <p>首页和「更多」固定；中间 3 个菜单可自选并调整顺序。</p>
+              <p>首页和「全部功能」固定；中间 3 个菜单可自选并调整顺序。</p>
             </div>
           </div>
 
@@ -2074,7 +2438,7 @@
             <div class="notebook-head">
               <div>
                 <h2>底部导航中间项</h2>
-                <span>选择 1–3 个入口，顺序即显示顺序。未选中的功能仍可从「更多」进入。</span>
+                <span>选择 1–3 个入口，顺序即显示顺序。未选中的功能仍可从「全部功能」进入。</span>
               </div>
             </div>
             <div class="nav-config-list">
@@ -2243,8 +2607,44 @@
             </section>
           {/if}
         </section>
+      {:else if activeView === 'explore'}
+        <section class="settings-workspace">
+          <div class="interests-head"><div><div class="eyebrow">功能目录</div><h1>全部功能</h1><p>常用功能可在设置中固定到导航栏。</p></div><a class="small-button" href="/settings">编辑快捷入口</a></div>
+          <label class="directory-search">查找功能<input type="search" bind:value={directorySearch} placeholder="搜索功能名称，如包裹、通知…" /></label>
+          {#each FEATURE_GROUPS as group}
+            {@const ids = group.ids.filter(directoryVisible)}
+            {#if ids.length}<section><h2>{group.label}</h2><div class="directory-grid">
+              {#each ids as id}<a href={viewPaths[id]}><strong>{directoryLabel(id)}</strong><span>{FEATURE_DESCRIPTIONS[id]}</span></a>{/each}
+            </div></section>{/if}
+          {/each}
+          {#if !FEATURE_GROUPS.some((group) => group.ids.some(directoryVisible))}<p role="status">没有匹配的功能，请换个关键词。</p>{/if}
+          {#if data.user?.isAdmin}<section><h2>管理员</h2><div class="directory-grid">
+            <a href="/admin"><strong>管理中心</strong><span>监控、开发请求与系统配置</span></a>
+            <a href="/admin/performance"><strong>使用监控 / 统计</strong><span>访问与功能使用趋势</span></a>
+          </div></section>{/if}
+        </section>
+      {:else if activeView === 'notifications'}
+        <section class="settings-workspace"><a href="/me">← 我的</a><h1>通知设置</h1>
+          {#if featureAllowed('telegram_digest') || featureAllowed('package_tracking') || featureAllowed('coe_notify') || featureAllowed('coe_page')}
+            {@render notificationsPanel()}
+          {:else}<p>当前没有可用的通知功能。</p>{/if}
+        </section>
+      {:else if activeView in ADMIN_PATHS && data.user?.isAdmin}
+        <section class="settings-workspace">
+          <a href={activeView === 'admin' ? '/explore' : '/admin'}>← {activeView === 'admin' ? '全部功能' : '管理中心'}</a>
+          <h1>{activeView === 'admin' ? '管理中心' : ADMIN_PAGES.find((item) => item.id === activeView)?.label}</h1>
+          {#if activeView === 'admin'}
+            <p>查看运行状况，处理开发请求，管理系统配置。</p>
+            <div class="directory-grid">{#each adminPages as item}<a href={ADMIN_PATHS[item.id]}><strong>{item.label}</strong><span>{item.hint}</span></a>{/each}</div>
+          {:else if !adminPages.some((item) => item.id === activeView)}<p role="status">此功能当前未启用。可在管理中心查看可用功能。</p>
+          {:else if activeView === 'features'}{@render featuresPanel()}
+          {:else if activeView === 'access'}{@render accessPanel()}
+          {:else if activeView === 'monitoring'}{@render monitoringPanel()}
+          {:else if activeView === 'requests'}{@render requestsPanel()}{/if}
+        </section>
       {:else if activeView === 'me'}
         <section class="me-workspace">
+          <h1>我的</h1>
           <div class="settings-grid">
             <article class="settings-card">
               <span>资料</span>
@@ -2270,390 +2670,11 @@
             </button>
           </div>
 
-          {#if featureAllowed('telegram_digest') || featureAllowed('package_tracking') || featureAllowed('coe_notify') || featureAllowed('coe_page')}
-          <section class="job-run-card">
-            <div class="job-run-copy">
-              <span>通知</span>
-              <strong>Telegram</strong>
-              <p>
-                {#if telegramLinked}
-                  已连接。摘要、日期提醒和包裹更新会按各自规则发送。
-                {:else if data.telegramBotConfigured}
-                  连接后，通知会发到你自己的聊天（不再共用一个群）。
-                {:else}
-                  管理员尚未配置 Telegram Bot（TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME）。
-                {/if}
-              </p>
-            </div>
-            <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
-              {#if telegramLinked}
-                <button
-                  class="small-button"
-                  type="button"
-                  disabled={telegramLinkPending}
-                  onclick={disconnectTelegram}
-                >
-                  {telegramLinkPending ? '…' : '断开连接'}
-                </button>
-                <button
-                  class="small-button"
-                  type="button"
-                  disabled={telegramLinkPending}
-                  onclick={async () => {
-                    await invalidateAll();
-                    telegramLinkMessage = telegramLinked ? '仍为已连接' : '尚未连接，请完成 Telegram Start';
-                  }}
-                >
-                  刷新状态
-                </button>
-              {:else}
-                <button
-                  class="small-button primary"
-                  type="button"
-                  disabled={telegramLinkPending || !data.telegramBotConfigured}
-                  onclick={startTelegramLink}
-                >
-                  {telegramLinkPending ? '…' : '连接 Telegram'}
-                </button>
-              {/if}
-            </div>
-            {#if telegramLinkMessage}
-              <p style="font-size:12px;color:var(--muted);padding:0 14px 12px">{telegramLinkMessage}</p>
-            {/if}
-            {#if telegramDeepLink}
-              <p style="font-size:12px;padding:0 14px 12px;word-break:break-all">
-                <a href={telegramDeepLink} target="_blank" rel="noopener">打开绑定链接</a>
-              </p>
-            {/if}
-            <div style="padding:0 14px 14px;display:grid;gap:8px">
-              {#if featureAllowed('telegram_digest')}
-                <label class="check-row" style="font-size:12px">
-                  <input
-                    type="checkbox"
-                    checked={notifyPrefs.digestTrends}
-                    disabled={notifyPrefsPending || !telegramLinked}
-                    onchange={(event) =>
-                      saveNotifyPrefs({ digestTrends: (event.currentTarget as HTMLInputElement).checked })
-                    }
-                  />
-                  趋势与演出摘要（单独一条消息）
-                </label>
-                <label class="check-row" style="font-size:12px">
-                  <input
-                    type="checkbox"
-                    checked={notifyPrefs.digestDates}
-                    disabled={notifyPrefsPending || !telegramLinked}
-                    onchange={(event) =>
-                      saveNotifyPrefs({ digestDates: (event.currentTarget as HTMLInputElement).checked })
-                    }
-                  />
-                  日期提醒（生日 / 纪念日 / 里程碑，单独一条消息）
-                </label>
-              {/if}
-              {#if featureAllowed('coe_notify') || featureAllowed('coe_page')}
-                <label class="check-row" style="font-size:12px">
-                  <input
-                    type="checkbox"
-                    checked={notifyPrefs.coe}
-                    disabled={notifyPrefsPending || !telegramLinked}
-                    onchange={(event) =>
-                      saveNotifyPrefs({ coe: (event.currentTarget as HTMLInputElement).checked })
-                    }
-                  />
-                  COE 新结果通知（默认关闭，需订阅）
-                </label>
-              {/if}
-              {#if notifyPrefsMessage}
-                <p style="font-size:12px;color:var(--muted);margin:0">{notifyPrefsMessage}</p>
-              {/if}
-            </div>
-          </section>
-          {/if}
-
-          {#if data.user?.isAdmin}
-          <section class="job-run-card">
-            <div class="job-run-copy">
-              <span>配置</span>
-              <strong>功能开关</strong>
-              <p>开关控制页面是否展示，以及对应 cron 是否运行。权限设置最低用户级别：访客、注册用户或管理员。需要登录的页面和个人数据接口仍须登录。</p>
-            </div>
-            {#if featureMessage}
-              <p style="font-size:12px;color:var(--muted);padding:0 14px">{featureMessage}</p>
-            {/if}
-            <div style="padding:8px 14px 14px;display:grid;gap:10px">
-              {#each featureRows as feat}
-                <div style="border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px">
-                  <div>
-                    <strong style="font-size:13px">{feat.label}</strong>
-                    <p style="font-size:12px;color:var(--muted);margin:4px 0 0">{feat.description}</p>
-                    <p style="font-size:11px;color:var(--muted);margin:4px 0 0"><code>{feat.id}</code></p>
-                  </div>
-                  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-                    <label class="check-row" style="font-size:12px">
-                      <input
-                        type="checkbox"
-                        checked={feat.enabled}
-                        disabled={featurePendingId === feat.id}
-                        onchange={(e) => patchFeature(feat.id, { enabled: e.currentTarget.checked })}
-                      />
-                      启用
-                    </label>
-                    <label style="font-size:12px;display:flex;gap:6px;align-items:center">
-                      权限
-                      <select
-                        value={feat.minRole}
-                        disabled={featurePendingId === feat.id}
-                        onchange={(e) =>
-                          patchFeature(feat.id, {
-                            minRole: e.currentTarget.value as FeatureRole
-                          })}
-                      >
-                        <option value="guest">所有用户（含访客 Guest）</option>
-                        <option value="member">所有登录用户</option>
-                        <option value="admin">仅管理员</option>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-              {:else}
-                <p style="font-size:12px;color:var(--muted)">加载中或暂无配置…</p>
-              {/each}
-            </div>
-          </section>
-          {/if}
-
-          {#if featureAllowed('admin_ops')}
-          <section class="job-run-card">
-            <div class="job-run-copy">
-              <span>访问控制</span>
-              <strong>允许登录的邮箱</strong>
-              <p>
-                添加朋友的 Google 邮箱后即可登录。对方会看到自己的基础兴趣包；日期、收藏、Telegram
-                需自行设置，与你的数据互不影响。
-              </p>
-            </div>
-            <div class="job-run-controls" style="flex-wrap:wrap;gap:8px">
-              <input
-                bind:value={allowlistNewEmail}
-                type="email"
-                placeholder="friend@gmail.com"
-                style="flex:1;min-width:180px"
-              />
-              <button
-                class="small-button primary"
-                type="button"
-                disabled={allowlistPending || !allowlistNewEmail.trim()}
-                onclick={addAllowlistEmail}
-              >
-                {allowlistPending ? '…' : '添加'}
-              </button>
-            </div>
-            {#if allowlistMessage}
-              <p style="font-size:12px;color:var(--muted);padding:0 14px">{allowlistMessage}</p>
-            {/if}
-            <div style="padding:8px 14px 14px;display:grid;gap:6px">
-              {#each allowlistEmails as email}
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">
-                  <span>{email}</span>
-                  <button
-                    class="small-button"
-                    type="button"
-                    disabled={allowlistPending || email.toLowerCase() === data.user?.email?.toLowerCase()}
-                    onclick={() => removeAllowlistEmail(email)}
-                  >
-                    移除
-                  </button>
-                </div>
-              {:else}
-                <p style="font-size:12px;color:var(--muted)">暂无记录</p>
-              {/each}
-            </div>
-          </section>
-
-          <section class="tools-panel">
-            <div class="notebook-head">
-              <div>
-                <h2>工具</h2>
-                <span>手动运行后台任务，查看预约检查状态。</span>
-              </div>
-            </div>
-
-            <section class="cron-status-card">
-              <div class="notebook-head compact-head">
-                <div>
-                  <h2>定时任务状态</h2>
-                  <span>Cloudflare Cron 与本地 Agent 的启用状态和最近一次运行结果。</span>
-                </div>
-              </div>
-              <div class="cron-job-list">
-                {#each cronJobs as job}
-                  <article class={`cron-job-row ${jobStatusClass(job)}`}>
-                    <div class="cron-job-main">
-                      <span class="cron-dot"></span>
-                      <div>
-                        <strong>{job.label}</strong>
-                        <p>{job.description}</p>
-                      </div>
-                    </div>
-                    <div class="cron-job-meta">
-                      <span>{job.schedule}</span>
-                      <strong>{job.enabled ? '已启用' : '已停用'}</strong>
-                    </div>
-                    <div class="cron-job-meta">
-                      <span>上次运行</span>
-                      <strong>{formatStatusTime(job.lastRun?.finishedAt ?? job.lastRun?.startedAt)}</strong>
-                    </div>
-                    <div class="cron-job-meta wide">
-                      <span>{jobStatusLabel(job.lastRun?.status)}</span>
-                      <strong>{job.lastRun?.detail ?? '暂无记录'}</strong>
-                    </div>
-                  </article>
-                {/each}
-              </div>
-            </section>
-
-            {#if featureAllowed('ica_check')}
-            <section class:running={icaJobStatus === 'running'} class={`job-run-card ica-tool-card ${icaJobStatus}`}>
-              <div class="job-run-copy">
-                <span>ICA 预约检查</span>
-                <strong>{icaTool.enabled ? icaStatusLabel(icaTool.lastJob?.status) : 'Cloudflare 定时已停用'}</strong>
-                <p>
-                  目标：寻找 {icaTool.targetBefore} 之前的可选日期。ICA 搜索接口会拒绝 Cloudflare Browser Run，定时检查已停止。
-                </p>
-              </div>
-              <div class="job-run-controls">
-                <label>
-                  <span>ADMIN_TOKEN</span>
-                  <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
-                </label>
-                <button
-                  class="small-button primary"
-                  type="button"
-                  disabled={icaJobPending || !icaTool.enabled || !icaTool.checkerUrlConfigured}
-                  onclick={triggerIcaCheck}
-                >
-                  {icaJobPending ? '检查中...' : icaTool.enabled ? '立即检查' : '已停用'}
-                </button>
-              </div>
-              <div class="tool-status-grid">
-                <div>
-                  <span>定时检查</span>
-                  <strong>{icaTool.enabled ? '已启用' : '已停用'}</strong>
-                </div>
-                <div>
-                  <span>远程触发</span>
-                  <strong>{icaTool.checkerUrlConfigured ? '已配置' : '未配置'}</strong>
-                </div>
-                <div>
-                  <span>失败备用</span>
-                  <strong>{icaTool.fallbackConfigured ? '自动' : '未配置'}</strong>
-                </div>
-                <div>
-                  <span>上次运行</span>
-                  <strong>{formatStatusTime(icaTool.lastJob?.finishedAt ?? icaTool.lastJob?.startedAt)}</strong>
-                </div>
-                <div>
-                  <span>最近结果</span>
-                  <strong>{icaTool.lastItem?.startsAt ?? icaTool.lastItem?.summary ?? '暂无'}</strong>
-                </div>
-              </div>
-              <div class="job-run-status" aria-live="polite">
-                <span></span>
-                <p>
-                  {icaJobMessage}
-                  {#if icaTool.lastJob?.detail}
-                    · {icaTool.lastJob.detail}
-                  {/if}
-                  {#if !icaTool.checkerUrlConfigured}
-                    · 需要配置 CRON_WORKER 服务绑定或 ICA_CHECKER_URL 后才能从网页手动触发。
-                  {/if}
-                  {#if !icaTool.enabled}
-                    · Cloudflare 定时任务已停用，后续改用 GCP / 持久浏览器方案。
-                  {/if}
-                </p>
-              </div>
-            </section>
-            {/if}
-
-            <section class:running={manualJobStatus === 'running'} class={`job-run-card ${manualJobStatus}`}>
-              <div class="job-run-copy">
-                <span>手动刷新</span>
-                <strong>立即抓取最新数据</strong>
-                <p>运行演出和趋势抓取任务，完成后会自动刷新当前页面数据。</p>
-              </div>
-              <div class="job-run-controls">
-                <label>
-                  <span>ADMIN_TOKEN</span>
-                  <input bind:value={manualJobToken} type="password" autocomplete="off" placeholder="保存在当前浏览器" />
-                </label>
-                <button class="small-button primary" type="button" disabled={manualJobPending} onclick={runManualFetchJob}>
-                  {manualJobPending ? '运行中...' : '立即刷新'}
-                </button>
-              </div>
-              <div class="job-run-status" aria-live="polite">
-                <span></span>
-                <p>{manualJobMessage}{manualJobLastRun ? ` · ${manualJobLastRun}` : ''}</p>
-              </div>
-            </section>
-          </section>
-          {/if}
-
-          {#if featureAllowed('dev_requests')}
-          <section class="job-run-card">
-            <div class="job-run-copy">
-              <span>开发请求</span>
-              <strong>功能/Bug 请求</strong>
-              <p>提交后 Agent 会记录分析、实现、验证和部署全过程。只有生产验证通过才会标记完成。</p>
-              <small style="color:var(--muted)">{runnerHealthLabel()}</small>
-            </div>
-            <div class="job-run-controls">
-              {#if devRequestParentId}
-                <span style="font-size:12px;color:var(--muted)">此内容会作为上一个请求的补充上下文提交。</span>
-              {/if}
-              <textarea bind:value={devRequestText} rows="3" placeholder="描述功能需求或 Bug..."></textarea>
-              <button class="small-button primary" type="button"
-                disabled={devRequestPending || devRequestText.trim().length < 4}
-                onclick={submitDevRequest}>
-                {devRequestPending ? '提交中...' : '提交请求'}
-              </button>
-              {#if devRequestMessage}<span style="font-size:12px;color:var(--jade)">{devRequestMessage}</span>{/if}
-            </div>
-            {#if devRequests.length > 0}
-              <div style="padding:12px 14px 0;display:grid;gap:8px">
-                {#each devRequests.slice(0, 5) as req}
-                  <div style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:left;display:block;width:100%;box-sizing:border-box">
-                    <button type="button" style="all:unset;cursor:pointer;display:block;width:100%" onclick={() => toggleDevRequest(req.id)}>
-                      <strong style="color:var(--ink)">{expandedDevRequest === req.id ? req.text : req.text.slice(0, 80)}{expandedDevRequest !== req.id && req.text.length > 80 ? '…' : ''}</strong>
-                      <div style="margin-top:4px;color:var(--muted)">{req.status}{runsForRequest(req.id)[0] ? ` · ${runsForRequest(req.id)[0].phase}` : ''}{req.response ? ` · ${expandedDevRequest === req.id ? req.response : req.response.slice(0, 100)}${expandedDevRequest !== req.id && req.response.length > 100 ? '…' : ''}` : ''}</div>
-                    </button>
-                    {#if expandedDevRequest === req.id}
-                      <div style="display:grid;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
-                        {#each runsForRequest(req.id) as run}
-                          <div style="color:var(--muted)">
-                            第 {run.attempt} 次 · {run.status} · {run.phase}{run.resultSha ? ` · ${run.resultSha.slice(0, 8)}` : ''}
-                            {#if run.summary}<div style="margin-top:2px;white-space:pre-wrap">{run.summary}</div>{/if}
-                          </div>
-                        {/each}
-                        {#each devRequestEvents.filter((event) => event.requestId === req.id) as event}
-                          <div style="color:var(--muted)">{event.phase} · {event.message.slice(0, 240)}</div>
-                        {/each}
-                        {#if req.status !== 'pending' && req.status !== 'in_progress'}
-                          <div style="display:flex;gap:6px;flex-wrap:wrap">
-                            <button class="small-button" type="button" disabled={devRequestRetrying === req.id} onclick={() => retryDevRequest(req.id)}>
-                              {devRequestRetrying === req.id ? '重新排队中...' : '重试此请求'}
-                            </button>
-                            <button class="small-button" type="button" onclick={() => continueDevRequest(req)}>补充信息</button>
-                          </div>
-                        {/if}
-                      </div>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </section>
-          {/if}
-
+          <div class="directory-grid">
+            <a href="/notifications"><strong>通知设置</strong><span>Telegram 连接与推送偏好</span></a>
+            <a href="/explore"><strong>全部功能</strong><span>浏览生活工具与个人偏好</span></a>
+            {#if data.user?.isAdmin}<a href="/admin"><strong>管理中心</strong><span>监控、任务、开发与配置</span></a>{/if}
+          </div>
           <section class="notebook-card">
             <div class="notebook-head">
               <div>
@@ -2723,7 +2744,7 @@
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
               <span>{telegramLinked ? '✓' : '○'} 连接 Telegram 接收通知</span>
               {#if !telegramLinked}
-                <button class="small-button" type="button" onclick={() => setView('me')}>去连接</button>
+                <button class="small-button" type="button" onclick={() => setView('notifications')}>去连接</button>
               {/if}
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
@@ -3278,37 +3299,6 @@
   </div>
 {/if}
 
-{#if moreMenuOpen}
-  <div
-    class="more-menu-backdrop"
-    role="presentation"
-    tabindex="-1"
-    onkeydown={(event) => event.key === 'Escape' && (moreMenuOpen = false)}
-    onclick={(event) => event.target === event.currentTarget && (moreMenuOpen = false)}
-  >
-    <div class="more-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="more-menu-title">
-      <div class="more-menu-head">
-        <div>
-          <h2 id="more-menu-title">更多</h2>
-          <p>我的、演出、COE、兴趣与设置</p>
-        </div>
-        <button class="close-button" type="button" aria-label="关闭更多菜单" onclick={() => (moreMenuOpen = false)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
-        </button>
-      </div>
-      <div class="more-menu-list">
-        {#each moreMenuItems as item}
-          <button type="button" onclick={() => selectMoreItem(item.id)}>
-            <strong>{item.label}</strong>
-            <span>{item.hint}</span>
-          </button>
-        {/each}
-      </div>
-    </div>
-  </div>
-{/if}
-
-
 <nav
   class="primary-nav mobile-nav"
   data-active={navigationView}
@@ -3319,6 +3309,7 @@
   {#each barNavItems as item}
     <button
       class:active={navigationView === item.id}
+          aria-current={navigationView === item.id ? 'page' : undefined}
       type="button"
       onclick={() => onBarNavClick(item.id)}
     >
@@ -3328,6 +3319,14 @@
 </nav>
 
 <style>
+  .directory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+  .directory-grid a { display: flex; flex-direction: column; gap: 8px; padding: 18px; min-height: 88px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--paper); text-decoration: none; overflow-wrap: anywhere; }
+  .directory-grid a:hover { border-color: var(--jade); }
+  .directory-grid a:focus-visible { outline: 2px solid var(--jade); outline-offset: 3px; }
+  .directory-grid span { color: var(--muted); font-size: 13px; }
+  .directory-search { display: grid; gap: 8px; }
+  .directory-search input { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); }
+
   .app-shell {
     min-height: 100vh;
     background: var(--paper);
@@ -4521,70 +4520,6 @@
     padding: 0 14px 14px;
   }
 
-  .more-menu-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    background: rgba(38, 29, 20, 0.28);
-    display: flex;
-    align-items: end;
-    justify-content: center;
-    padding: 16px;
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .more-menu-sheet {
-    width: min(420px, 100%);
-    border: 1px solid var(--line);
-    border-radius: 20px;
-    background: var(--surface);
-    box-shadow: 0 24px 50px var(--shadow-color);
-    padding: 16px;
-    display: grid;
-    gap: 12px;
-  }
-
-  .more-menu-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: start;
-  }
-
-  .more-menu-head h2 {
-    margin: 0 0 4px;
-    font-size: 18px;
-  }
-
-  .more-menu-head p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .more-menu-list {
-    display: grid;
-    gap: 8px;
-  }
-
-  .more-menu-list button {
-    text-align: left;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    background: var(--surface);
-    padding: 12px 14px;
-    display: grid;
-    gap: 2px;
-  }
-
-  .more-menu-list button strong {
-    font-size: 15px;
-  }
-
-  .more-menu-list button span {
-    color: var(--muted);
-    font-size: 12px;
-  }
 
   .saved-workspace {
     display: grid;

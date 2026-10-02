@@ -5,9 +5,8 @@ import { readUsage, usageDays, type UsageRow } from '$lib/server/usage';
 import type { Env } from '$lib/server/types';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, platform, url, setHeaders }) => {
+export const load: PageServerLoad = async ({ locals, platform, url }) => {
   requireAdminUser(locals);
-  setHeaders({ 'cache-control': 'private, no-store' });
   const requested = Number(url.searchParams.get('days') ?? 7);
   const period = [7, 30, 90].includes(requested) ? requested : 7;
   const days = usageDays(period);
