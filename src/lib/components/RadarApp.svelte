@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { trackUsage } from '$lib/usage';
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import NutritionView from '$lib/components/NutritionView.svelte';
@@ -98,6 +99,14 @@
   let activeView = $state<View>(viewFromPath(page.url.pathname));
   let activeFilter = $state('for-you');
   let searchQuery = $state('');
+  $effect(() => { trackUsage('visit', activeView); });
+  $effect(() => {
+    const query = searchQuery.trim();
+    const view = activeView;
+    if (!query || !['home', 'concerts', 'trends', 'saved'].includes(view)) return;
+    const timer = setTimeout(() => trackUsage('search', view), 600);
+    return () => clearTimeout(timer);
+  });
   let searchOpen = $state(false);
   let digestOpen = $state(false);
   let addWatchOpen = $state(false);
@@ -2049,6 +2058,10 @@
         </section>
       {:else if activeView === 'settings'}
         <section class="settings-workspace">
+          {#if data.user?.isAdmin}
+            <a class="small-button" href="/admin/performance">使用统计 / Radar performance</a>
+          {/if}
+
           <div class="interests-head">
             <div>
               <div class="eyebrow">设置</div>

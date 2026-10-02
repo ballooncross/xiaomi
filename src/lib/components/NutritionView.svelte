@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { trackUsage } from '$lib/usage';
   import { ACTIVITY_LEVELS, NUTRITION_GOALS, calculateNutrition } from '$lib/nutrition-calculator';
 
   let age = $state<number | undefined>();
@@ -11,6 +12,12 @@
   const goalDescription = $derived(NUTRITION_GOALS.find((item) => item.id === goal)?.description);
   const activityFactor = $derived(ACTIVITY_LEVELS.find((item) => item.id === activity)?.factor);
   const format = (value: number) => Math.round(value).toLocaleString('zh-CN');
+  $effect(() => {
+    // Count a valid result after editing settles, never individual keystrokes.
+    if (!result) return;
+    const timer = setTimeout(() => trackUsage('calculation', 'nutrition'), 800);
+    return () => clearTimeout(timer);
+  });
 </script>
 
 <svelte:head><title>热量与营养计算 · 个人雷达</title></svelte:head>

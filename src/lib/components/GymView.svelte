@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { trackUsage } from '$lib/usage';
   import { onMount } from 'svelte';
   import {
     addGymRecentSearch,
@@ -101,6 +102,7 @@
       const response = await fetch(`/api/exercises?${params.toString()}`);
       const data = (await response.json()) as { exercises?: GymExercise[] };
       gymResults = data.exercises ?? [];
+      if (response.ok && options?.recordSearch && query) trackUsage('search', 'gym');
     } catch {
       gymResults = [];
     } finally {

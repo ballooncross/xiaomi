@@ -35,8 +35,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	// Token-gated machine routes: session optional (handlers check admin token / admin session)
+	// Optional-session routes: machine handlers enforce admin auth; usage accepts validated guest counters.
 	if (
+		event.url.pathname === '/api/usage' ||
 		event.url.pathname.startsWith('/api/admin/') ||
 		event.url.pathname.startsWith('/api/agent/') ||
 		event.url.pathname.startsWith('/api/dev-requests')

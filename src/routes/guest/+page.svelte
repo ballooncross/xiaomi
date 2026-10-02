@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { trackUsage } from '$lib/usage';
   import NutritionView from '$lib/components/NutritionView.svelte';
   import GymView from '$lib/components/GymView.svelte';
   import { NAV_ITEMS } from '$lib/navigation';
@@ -10,6 +11,7 @@
     item.id === 'nutrition' || (item.id === 'gym' && data.gymAllowed)
   ));
   const activeView = $derived(data.gymAllowed && page.url.searchParams.get('view') === 'gym' ? 'gym' : 'nutrition');
+  $effect(() => { trackUsage('visit', activeView); });
 </script>
 
 <svelte:head>
