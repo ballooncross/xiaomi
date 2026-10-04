@@ -77,6 +77,30 @@ Production deployment is tied to the repository's canonical branch. After deploy
 
 Run `npm run db:migrate:local` after pulling schema changes. The birthday notebook uses the `date_reminders` D1 table and stores lunar dates for annual reminders.
 
+## The Ride Side Promotion Watch
+
+`/promotions` tracks the store homepage daily at 08:30 Singapore time alongside
+other daily jobs. Migration `0031_promotion_tracking.sql` registers the source
+and enables the existing personal owner’s watch at 10% off. Other signed-in
+users can opt in, pause, and choose their own threshold. Telegram must be linked
+on `/notifications`; delivery is scoped to the subscribed account.
+
+The adapter reads homepage text, image alt text, and up to six banner images.
+Image transcription uses the existing enabled Gemini configuration, caches by
+image content, and reports partial coverage when images cannot be read. It does
+not use browser automation. Explicit boots/bindings discounts, storewide offers,
+and seasonal/preorder offers qualify; unclear gear eligibility is called out.
+Mixed discount rates and recognizable expired deadlines are skipped. This is a
+homepage watch, not a complete product-price or stock tracker.
+
+Observations have first/last-seen timestamps, not inferred publication dates,
+and remain separate from news/trend ingestion. Unchanged offers notify once per
+account; failed sends retry after a subsequent check confirms the offer is still
+present. A campaign that disappears during a complete check and later returns
+can notify again. Partial or failed checks retain history and never send offers
+that were not observed in that check. Admin job monitoring records check and
+delivery failures. The deployment workflow applies the additive migration.
+
 ## Docs
 
 - [Local development](docs/local-development.md)

@@ -25,7 +25,7 @@ function renderPage(path: string, isAdmin = true, enabled = true) {
 describe('feature directory and separated account pages', () => {
  it('makes every personal destination available even when pinned', () => {
   const html = renderPage('/explore');
-  for (const path of ['concerts', 'trends', 'dates', 'packages', 'coe', 'gym', 'nutrition', 'interests', 'saved', 'me', 'notifications', 'settings']) {
+  for (const path of ['concerts', 'trends', 'dates', 'packages', 'promotions', 'coe', 'gym', 'nutrition', 'interests', 'saved', 'me', 'notifications', 'settings']) {
    expect(html).toContain(`href="/${path}"`);
   }
   expect(html).toContain('href="/admin/performance"');

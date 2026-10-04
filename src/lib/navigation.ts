@@ -6,6 +6,7 @@ export const RADAR_VIEW_IDS = [
 	'trends',
 	'dates',
 	'packages',
+	'promotions',
 	'gym',
 	'nutrition',
 	'coe',
@@ -21,6 +22,7 @@ export const NAV_ITEMS = [
 	{ id: 'concerts', label: '演出' },
 	{ id: 'trends', label: '趋势' },
 	{ id: 'dates', label: '日期' },
+	{ id: 'promotions', label: '促销' },
 	{ id: 'packages', label: '包裹' },
 	{ id: 'gym', label: '健身' },
 	{ id: 'nutrition', label: '营养' },
@@ -57,13 +59,14 @@ export const VIEW_PATHS: Record<RadarView, string> = Object.fromEntries(
 
 export const FEATURE_GROUPS = [
 	{ label: '发现与关注', ids: ['concerts', 'trends', 'interests', 'saved'] },
-	{ label: '生活工具', ids: ['dates', 'packages', 'coe', 'gym', 'nutrition'] },
+	{ label: '生活工具', ids: ['dates', 'promotions', 'packages', 'coe', 'gym', 'nutrition'] },
 	{ label: '个人与偏好', ids: ['me', 'notifications', 'settings'] }
 ] as const;
 
 export const FEATURE_DESCRIPTIONS: Partial<Record<RadarView, string>> = {
 	concerts: '演出动态与开票提醒', trends: '职业、商业与生活信号',
 	interests: '关注主题与屏蔽规则', saved: '收藏与重点跟踪', dates: '生日、纪念日与提醒',
+	promotions: 'The Ride Side 雪鞋与固定器折扣',
 	packages: '物流状态与历史', coe: '新加坡官方报价', gym: '训练计划与动作搜索',
 	nutrition: '营养与热量计算', me: '账号资料与个人入口', notifications: 'Telegram 连接与推送偏好',
 	settings: '自定义常用导航'

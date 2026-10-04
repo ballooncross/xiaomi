@@ -5,6 +5,7 @@
   import NutritionView from '$lib/components/NutritionView.svelte';
   import CoePriceView from '$lib/components/CoePriceView.svelte';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
+  import PromotionsView from '$lib/components/PromotionsView.svelte';
   import PackageTrackingView from '$lib/components/PackageTrackingView.svelte';
   import type { CoePayload } from '$lib/coe';
   import type {
@@ -399,6 +400,7 @@
     activeView === 'dates' ||
       activeView === 'gym' ||
       activeView === 'nutrition' ||
+      activeView === 'promotions' ||
       activeView === 'packages' ||
       activeView === 'coe' ||
       activeView === 'interests' ||
@@ -2514,6 +2516,8 @@
             </div>
           </section>
         </section>
+      {:else if activeView === 'promotions'}
+        <PromotionsView {telegramLinked} />
       {:else if activeView === 'packages'}
         <PackageTrackingView initialPackages={data.packages} />
       {:else if activeView === 'nutrition'}

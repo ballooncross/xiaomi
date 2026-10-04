@@ -1,3 +1,4 @@
+import { runPromotionJob } from './lib/server/promotions/service';
 import { runIcaAppointmentCheckJob } from './lib/server/ica-appointment';
 import { runAllFetchJobs, runCoeCheckJob, runDailyDigestJob } from './lib/server/jobs';
 import { compileContext } from './lib/server/context-compiler';
@@ -12,6 +13,7 @@ export default {
     if (job === 'daily') {
       ctx.waitUntil(runDailyDigestJob(env));
       ctx.waitUntil(runPackageTrackingJob(env));
+      ctx.waitUntil(runPromotionJob(env));
       // Recompile AI context daily after digest
       ctx.waitUntil(compileContext(getDb(env)).catch(() => {}));
       return;

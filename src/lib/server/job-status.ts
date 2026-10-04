@@ -9,6 +9,11 @@ type CronJobDefinition = Omit<CronJobStatus, 'enabled' | 'lastRun'> & {
 
 const scheduledJobs: CronJobDefinition[] = [
   {
+    jobName: 'promotion-tracking', label: 'The Ride Side 促销',
+    description: '检查首页季节促销与横幅，按个人折扣门槛通知。',
+    schedule: '每天 08:30 · 新加坡', enabled: () => true
+  },
+  {
     jobName: LOCAL_AGENT_JOB_NAME,
     label: '本地 AI Agent',
     description: '本机 Agent 拉取上下文、处理开发请求并发现新内容。',
