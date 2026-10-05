@@ -3816,7 +3816,9 @@
 
   .calendar-choice button {
     min-height: 42px;
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    align-content: center;
     align-items: baseline;
     justify-content: center;
     gap: 8px;
