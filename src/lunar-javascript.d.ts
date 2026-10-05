@@ -6,12 +6,17 @@ declare module 'lunar-javascript' {
   };
   export const Solar: {
     fromYmd(year: number, month: number, day: number): {
+      getFestivals(): string[];
       getLunar(): {
         getYear(): number;
         getMonth(): number;
         getDay(): number;
         getMonthInChinese(): string;
         getDayInChinese(): string;
+        getYearInGanZhi(): string;
+        getYearShengXiao(): string;
+        getFestivals(): string[];
+        getJieQi(): string;
       };
     };
   };

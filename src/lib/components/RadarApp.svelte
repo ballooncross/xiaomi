@@ -5,6 +5,7 @@
   import NutritionView from '$lib/components/NutritionView.svelte';
   import CoePriceView from '$lib/components/CoePriceView.svelte';
   import DateRemindersView from '$lib/components/DateRemindersView.svelte';
+  import LunarDatePicker from '$lib/components/LunarDatePicker.svelte';
   import PromotionsView from '$lib/components/PromotionsView.svelte';
   import PackageTrackingView from '$lib/components/PackageTrackingView.svelte';
   import type { CoePayload } from '$lib/coe';
@@ -21,9 +22,8 @@
     RadarItem,
     WatchTopic
   } from '$lib/server/types';
-  import { Solar } from 'lunar-javascript';
   import { onMount } from 'svelte';
-  import 'vanillajs-datepicker/css/datepicker.css';
+  import { lunarDate, parseYmd, todayInSingaporeYmd } from '$lib/lunar-calendar';
   import type { RadarPageData } from '$lib/server/radar-page-load';
   import type { FeatureId, FeatureRole } from '$lib/server/features';
   import type { NotifyPrefs } from '$lib/notify-prefs';
@@ -273,7 +273,7 @@
   let reminderCalendarType = $state<DateReminder['calendarType']>('lunar');
   let reminderCategory = $state<DateCategory>('birthday');
   let reminderDateExact = $state(false);
-  let reminderDate = $state(todayInputValue());
+  let reminderDate = $state(todayInSingaporeYmd());
   let reminderRepeat = $state<DateReminder['repeat']>('annual');
   let reminderDay0 = $state(true);
   let reminderDay1 = $state(true);
@@ -486,27 +486,14 @@
   const upcomingReminders = $derived(
     reminders.filter((reminder) => reminder.daysLeft >= 0 && reminder.daysLeft <= 30).slice(0, 4)
   );
-
-  function datepicker(node: HTMLInputElement) {
-    let picker: { destroy: () => void } | undefined;
-    let cancelled = false;
-
-    void import('vanillajs-datepicker/Datepicker').then(({ default: Datepicker }) => {
-      if (cancelled) return;
-      picker = new Datepicker(node, {
-        autohide: true,
-        format: 'yyyy-mm-dd',
-        todayHighlight: true
-      });
-    });
-
-    return {
-      destroy() {
-        cancelled = true;
-        picker?.destroy();
-      }
-    };
-  }
+  const reminderDateParts = $derived(parseYmd(reminderDate) ?? parseYmd(todayInSingaporeYmd())!);
+  const reminderLunar = $derived(lunarDate(reminderDateParts));
+  const reminderLunarLabel = $derived(`${reminderLunar.monthLabel}${reminderLunar.dayLabel}`);
+  const reminderGregorianLabel = $derived(`${reminderDateParts.month}月${reminderDateParts.day}日`);
+  const reminderScheduleLabel = $derived.by(() => {
+    const date = reminderCalendarType === 'lunar' ? `农历${reminderLunarLabel}` : `公历${reminderGregorianLabel}`;
+    return reminderRepeat === 'annual' ? `每年按${date}提醒` : `按${date}提醒一次`;
+  });
 
   async function sendFeedback(itemId: string, action: FeedbackAction) {
     feedbackPending = `${itemId}:${action}`;
@@ -1254,7 +1241,7 @@
       reminderCalendarType = reminder.calendarType;
       reminderCategory = reminder.category;
       reminderDateExact = reminder.year != null;
-      reminderDate = reminder.nextDate;
+      reminderDate = reminder.originDate ?? reminder.nextDate;
       reminderRepeat = reminder.repeat;
       reminderDay0 = reminder.remindDaysBefore.includes(0);
       reminderDay1 = reminder.remindDaysBefore.includes(1);
@@ -1269,7 +1256,7 @@
     reminderCalendarType = 'lunar';
     reminderCategory = 'birthday';
     reminderDateExact = false;
-    reminderDate = todayInputValue();
+    reminderDate = todayInSingaporeYmd();
     reminderRepeat = 'annual';
     applyDefaultRemindDays('birthday');
     reminderPinned = false;
@@ -1293,16 +1280,16 @@
       return;
     }
     reminderPending = true;
-    const dateParts = reminderPayloadDate(reminderDate, reminderCalendarType);
+    const date = reminderCalendarType === 'lunar' ? reminderLunar : { ...reminderDateParts, isLeapMonth: false };
     const payload = {
       id: editingReminderId ?? undefined,
       title,
       calendarType: reminderCalendarType,
       category: reminderCategory,
-      year: reminderDateExact ? dateParts.year : undefined,
-      month: dateParts.month,
-      day: dateParts.day,
-      lunarIsLeapMonth: dateParts.lunarIsLeapMonth,
+      year: reminderDateExact ? date.year : undefined,
+      month: date.month,
+      day: date.day,
+      lunarIsLeapMonth: date.isLeapMonth,
       repeat: reminderRepeat,
       pinned: reminderPinned,
       note: '',
@@ -1551,47 +1538,6 @@
       title: `${count} 条信号值得查看。`,
       body: '根据你的关注列表筛选演出开票、主题热度和商业机会。'
     };
-  }
-
-  function todayInputValue() {
-    const now = new Date();
-    return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-  }
-
-  function reminderPayloadDate(value: string, calendarType: DateReminder['calendarType']) {
-    const [year, month, day] = value.split('-').map(Number);
-    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-      return { year: new Date().getFullYear(), month: 1, day: 1, lunarIsLeapMonth: false };
-    }
-    if (calendarType === 'gregorian') return { year, month, day, lunarIsLeapMonth: false };
-    const lunar = Solar.fromYmd(year, month, day).getLunar();
-    return {
-      year,
-      month: Math.abs(lunar.getMonth()),
-      day: lunar.getDay(),
-      lunarIsLeapMonth: lunar.getMonth() < 0
-    };
-  }
-
-  function selectedDateLabel(value: string, calendarType: DateReminder['calendarType']) {
-    const [year, month, day] = value.split('-').map(Number);
-    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '';
-    if (calendarType === 'gregorian') return `公历 ${year}-${pad2(month)}-${pad2(day)}`;
-    const lunar = Solar.fromYmd(year, month, day).getLunar();
-    const leap = lunar.getMonth() < 0 ? '闰' : '';
-    return `农历 ${leap}${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
-  }
-
-  function dualDateLabel(value: string) {
-    const [year, month, day] = value.split('-').map(Number);
-    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '';
-    const lunar = Solar.fromYmd(year, month, day).getLunar();
-    const leap = lunar.getMonth() < 0 ? '闰' : '';
-    return `公历 ${year}-${pad2(month)}-${pad2(day)} · 农历 ${leap}${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
-  }
-
-  function pad2(value: number) {
-    return String(value).padStart(2, '0');
   }
 
   function viewFromPath(pathname: string): View {
@@ -2294,63 +2240,6 @@
             </div>
           {/if}
 
-          {#if reminderFormOpen}
-            <div class="action-card">
-              <div class="action-card-head">
-                <div>
-                  <strong>{editingReminderId ? '编辑日期提醒' : '添加日期提醒'}</strong>
-                  <span>设置类型可自动追踪里程碑（满月、百天、千日纪念等）</span>
-                </div>
-                <button class="close-button" type="button" aria-label="关闭日期提醒" onclick={() => (reminderFormOpen = false)}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6 6 18"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="watch-form reminder-form">
-                <input bind:value={reminderTitle} placeholder="例如：老妈生日、结婚纪念日" />
-                <select value={reminderCategory} onchange={(e) => onCategoryChange(e.currentTarget.value as DateCategory)} aria-label="日期类型">
-                  <option value="birthday">生日</option>
-                  <option value="child_birthday">宝宝生日</option>
-                  <option value="anniversary">恋爱/婚姻</option>
-                  <option value="memorial">逝世纪念</option>
-                  <option value="other">其他</option>
-                </select>
-                <select bind:value={reminderCalendarType} aria-label="历法">
-                  <option value="lunar">农历</option>
-                  <option value="gregorian">公历</option>
-                </select>
-                <input use:datepicker bind:value={reminderDate} placeholder="选择日期" />
-                <div class="reminder-checks">
-                  <label class="check-row">
-                    <input type="checkbox" bind:checked={reminderDateExact} />
-                    日期准确
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" bind:checked={reminderPinned} />
-                    置顶
-                  </label>
-                </div>
-                {#if !reminderDateExact}
-                  <span class="date-hint">年份未知时只提醒周期，不计算天数和里程碑</span>
-                {/if}
-                <span class="date-preview">{selectedDateLabel(reminderDate, reminderCalendarType)}</span>
-                <span class="date-preview">{dualDateLabel(reminderDate)}</span>
-                <div class="reminder-checks remind-days-row">
-                  <span>提前提醒</span>
-                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay0} /> 当天</label>
-                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay1} /> 1天</label>
-                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay3} /> 3天</label>
-                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay7} /> 7天</label>
-                  <label class="check-row"><input type="checkbox" bind:checked={reminderDay30} /> 30天</label>
-                </div>
-                <button class="small-button primary" disabled={reminderPending} onclick={saveReminder}>
-                  {reminderPending ? '保存中...' : '保存提醒'}
-                </button>
-              </div>
-              {#if reminderError}<p class="form-error">{reminderError}</p>{/if}
-            </div>
-          {/if}
         </section>
       {/if}
 
@@ -3248,18 +3137,20 @@
 
         <div class="sheet-group">
           <div class="sheet-label">目标日</div>
-          <div class="date-picker-row">
-            <input use:datepicker bind:value={reminderDate} aria-label="目标日期" />
-            <select bind:value={reminderCalendarType} aria-label="历法">
-              <option value="lunar">农历</option>
-              <option value="gregorian">公历</option>
-            </select>
+          <div class="reminder-date-field">
+            <LunarDatePicker bind:value={reminderDate} />
+            <div class="calendar-choice" role="group" aria-label="按哪种历法提醒">
+              <button type="button" aria-pressed={reminderCalendarType === 'lunar'} onclick={() => (reminderCalendarType = 'lunar')}>
+                <span>农历</span>
+                <strong>{reminderLunarLabel}</strong>
+              </button>
+              <button type="button" aria-pressed={reminderCalendarType === 'gregorian'} onclick={() => (reminderCalendarType = 'gregorian')}>
+                <span>公历</span>
+                <strong>{reminderGregorianLabel}</strong>
+              </button>
+            </div>
           </div>
-          <p>
-            {dualDateLabel(reminderDate)} · 保存为{reminderCalendarType === 'lunar'
-              ? '农历每年提醒'
-              : '公历每年提醒'}
-          </p>
+          <p>{reminderScheduleLabel}</p>
         </div>
 
         <label class="sheet-row">
@@ -3695,28 +3586,6 @@
     padding: 0 10px;
   }
 
-  .reminder-checks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .remind-days-row > span {
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 900;
-    margin-right: 4px;
-  }
-
-  .date-hint {
-    display: block;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 700;
-    font-style: italic;
-  }
-
   .form-error {
     margin: 9px 0 0;
     color: var(--accent);
@@ -3927,23 +3796,47 @@
     grid-column: 2;
   }
 
-  .date-picker-row {
+  .reminder-date-field {
     grid-column: 2;
+    min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 110px;
     gap: 8px;
     margin-top: 8px;
   }
 
-  .date-picker-row input,
-  .date-picker-row select {
-    min-height: 46px;
+  .calendar-choice {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
     border: 1px solid rgba(130, 111, 91, 0.22);
-    border-radius: 12px;
-    background: var(--surface);
-    color: var(--ink);
-    padding: 0 12px;
+    border-radius: 14px;
+    background: var(--paper);
+    padding: 4px;
+  }
+
+  .calendar-choice button {
+    min-height: 42px;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
     font-weight: 850;
+  }
+
+  .calendar-choice button[aria-pressed='true'] {
+    background: var(--surface);
+    color: var(--sea);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .calendar-choice strong {
+    font-size: 16px;
+    font-weight: 900;
   }
 
   .sheet-group p {
@@ -3959,13 +3852,6 @@
     font-size: 12px;
     font-weight: 700;
     font-style: italic;
-  }
-
-  :global(.datepicker) {
-    border-color: var(--line);
-    border-radius: 14px;
-    box-shadow: 0 18px 48px var(--shadow-color);
-    font-family: inherit;
   }
 
   .app-main {
@@ -5371,7 +5257,6 @@
       padding: 16px;
     }
 
-    .date-picker-row,
     .watch-form,
     .search-row {
       grid-template-columns: 1fr;
@@ -5392,6 +5277,16 @@
     .sheet-group p {
       font-size: 13px;
       line-height: 1.35;
+    }
+
+    .sheet-group {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sheet-label,
+    .reminder-date-field,
+    .sheet-group p {
+      grid-column: 1;
     }
 
     .sheet-row > span {
