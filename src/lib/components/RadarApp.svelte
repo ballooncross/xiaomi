@@ -3307,7 +3307,6 @@
     margin-top: 3px;
   }
 
-  .primary-nav,
   .top-actions {
     gap: 9px;
   }
