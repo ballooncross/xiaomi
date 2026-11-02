@@ -2603,8 +2603,7 @@
           <div class="eyebrow">{greeting.eyebrow}</div>
           <h1>{greeting.title}</h1>
           <p>
-            {greeting.body} AI
-            {data.aiEnabled ? '已配置可用' : '已关闭'}；规则评分会一直启用。
+            {greeting.body} AI 由本地 Agent 提供；规则评分会一直启用。
           </p>
         </div>
         {#if featureAllowed('telegram_digest')}
@@ -2981,7 +2980,7 @@
           <div class="brew">
             <div>
               <strong>AI 模式</strong>
-              <span>可选：优先 Gemini，DeepSeek 兜底；不可用时使用规则评分。</span>
+              <span>只在本地 Agent 运行，使用其配置的 Codex、Claude 等后端；服务器端只用规则评分。</span>
             </div>
           </div>
         </div>

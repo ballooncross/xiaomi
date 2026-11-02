@@ -17,7 +17,7 @@ function renderPage(path: string, isAdmin = true, enabled = true) {
   features: Object.fromEntries(FEATURE_REGISTRY.map((feature) => [feature.id, { ...feature, enabled, minRole: feature.defaultMinRole, allowed: enabled && (feature.defaultMinRole !== 'admin' || isAdmin) }])) as unknown as RadarPageData['features'],
   icaTool: { enabled: false, targetBefore: '', checkerUrlConfigured: false, fallbackConfigured: false },
   middleNav: ['concerts', 'dates', 'gym'], notifyPrefs: DEFAULT_NOTIFY_PREFS,
-  telegramBotConfigured: false, telegramConfigured: false, telegramLinked: false, aiEnabled: false
+  telegramBotConfigured: false, telegramConfigured: false, telegramLinked: false
  };
  return render(RadarApp, { props: { data } }).body;
 }

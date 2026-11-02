@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { askCodexAboutImage } from './ai/index';
+import { askAiAboutImage, IMAGE_BACKENDS } from './ai/index';
 import { config } from './config';
 import { fetchQueuedBanners, submitBannerTranscriptions, type QueuedBanner } from './radar-api';
 import { log } from './utils';
@@ -11,7 +11,7 @@ import { log } from './utils';
  *
  * The Ride Side prints its discounts inside banner images with empty alt text.
  * The Workers check queues banners it has no cached text for; this reads them
- * with the local Codex login and posts the text back.
+ * with the configured AI backend and posts the text back.
  */
 
 const PROMPT =
@@ -23,8 +23,8 @@ const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': '
 export async function readPromotionBanners(): Promise<string | undefined> {
   const queued = await fetchQueuedBanners();
   if (queued.length === 0) return undefined;
-  if (config.aiBackend !== 'codex') {
-    throw new Error(`${queued.length} promotion banner(s) need AI_BACKEND=codex to be read`);
+  if (!IMAGE_BACKENDS.includes(config.aiBackend)) {
+    throw new Error(`${queued.length} promotion banner(s) need an image-capable AI_BACKEND (${IMAGE_BACKENDS.join(', ')}), not ${config.aiBackend}`);
   }
 
   const dir = await mkdtemp(join(tmpdir(), 'radar-banners-'));
@@ -54,15 +54,16 @@ export async function readPromotionBanners(): Promise<string | undefined> {
 async function readBanner(banner: QueuedBanner, dir: string): Promise<string> {
   const response = await fetch(banner.url, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const extension = EXTENSIONS[response.headers.get('content-type')?.split(';')[0] ?? ''];
+  const mimeType = response.headers.get('content-type')?.split(';')[0] ?? '';
+  const extension = EXTENSIONS[mimeType];
   if (!extension) throw new Error('unsupported image type');
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > 4_000_000) throw new Error('image too large');
 
   const path = join(dir, `${banner.hash}.${extension}`);
   await writeFile(path, bytes);
-  const output = await askCodexAboutImage(PROMPT, path);
-  if (!output) throw new Error('Codex returned no answer');
+  const output = await askAiAboutImage(PROMPT, { path, mimeType });
+  if (!output) throw new Error(`${config.aiBackend} returned no answer`);
   return parseBannerText(output);
 }
 

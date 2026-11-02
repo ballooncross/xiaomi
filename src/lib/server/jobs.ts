@@ -1,4 +1,3 @@
-import { enhanceItemWithAi, generateDigestWithAi } from './ai';
 import { runCoeCheckJob } from './coe';
 import { clusterForBackfill, dedupeBatch } from './dedup';
 import { buildReminderDigestMessage, buildTemplateDigest, renderTelegramDigest } from './digest';
@@ -7,7 +6,7 @@ import { fetchBandsintownConcerts } from './fetchers/bandsintown';
 import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
 import { buildTrendSearchItems } from './fetchers/trends';
 import { isCronJobFeatureEnabled } from './features';
-import { isStaleItem, scoreItem } from './scoring';
+import { fallbackSummary, isStaleItem, scoreItem } from './scoring';
 import { sendTelegramMessage } from './telegram';
 import type { Env, JobResult, RadarItem } from './types';
 
@@ -26,11 +25,9 @@ export async function runConcertFetchJob(env: Env): Promise<JobResult> {
 
   for (const item of fetched) {
     const scored = scoreItem(item, topics);
-    const enhanced = await maybeEnhance(env, scored);
     const result = await db.upsertItem({
       ...scored,
-      summary: enhanced.summary,
-      score: Math.max(scored.score, enhanced.relevance),
+      summary: scored.score >= 70 ? fallbackSummary(scored) : scored.summary,
       // Catalog is shared across users: ingest never carries a personal engagement state.
       status: 'new',
       savedAt: undefined,
@@ -167,7 +164,7 @@ async function sendDigestForUser(
   const details: string[] = [];
 
   if (wantTrends) {
-    const digest = env.AI_ENABLED ? await generateDigestWithAi(env, items) : buildTemplateDigest(items);
+    const digest = buildTemplateDigest(items);
     const trendMessage = renderTelegramDigest(digest);
     const telegram = await sendTelegramMessage(env, trendMessage, chatId);
     if (telegram.ok) notified += 1;
@@ -229,9 +226,4 @@ export async function runAllFetchJobs(env: Env): Promise<JobResult> {
     notified: concerts.notified + trends.notified + coe.notified,
     detail: `${concerts.detail}; ${trends.detail}; ${coe.detail}`
   };
-}
-
-async function maybeEnhance(env: Env, item: RadarItem) {
-  if (item.score < 70) return { summary: item.summary, relevance: item.score };
-  return enhanceItemWithAi(env, item);
 }

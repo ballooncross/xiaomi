@@ -7,8 +7,7 @@ The MVP is program-first and AI-assisted:
 - deterministic source fetching, matching, scoring, dedupe, and Telegram notifications
 - broad Singapore concert discovery, with manual follow and blacklist preferences
 - lunar birthday and notebook reminders imported from Days Matter-style lists
-- optional AI summaries via Gemini first and DeepSeek fallback
-- rule-based fallback when AI keys are missing, rate-limited, or disabled
+- rule-based summaries on the server; AI work runs only in the local agent with its configured backend
 - feedback buttons to learn what is useful over time
 - searchable gym exercises with Garmin identifiers, movement instructions, and media enrichment
 - package tracking through the web app and linked Telegram bot
@@ -85,10 +84,11 @@ and enables the existing personal owner’s watch at 10% off. Other signed-in
 users can opt in, pause, and choose their own threshold. Telegram must be linked
 on `/notifications`; delivery is scoped to the subscribed account.
 
-The adapter reads homepage text, image alt text, and up to six banner images.
-Image transcription uses the existing enabled Gemini configuration, caches by
-image content, and reports partial coverage when images cannot be read. It does
-not use browser automation. Explicit boots/bindings discounts, storewide offers,
+The adapter reads homepage text, image alt text, and up to ten banner images.
+The server never calls an AI service: banners without stored text are queued,
+the local agent reads them with its configured backend, and the stored text is
+cached by image content. Coverage is reported as partial until every banner has
+been read. It does not use browser automation. Explicit boots/bindings discounts, storewide offers,
 and seasonal/preorder offers qualify; unclear gear eligibility is called out.
 Mixed discount rates and recognizable expired deadlines are skipped. This is a
 homepage watch, not a complete product-price or stock tracker.

@@ -49,7 +49,6 @@ export async function loadRadarPageData(
 		reminders: sortReminders(reminders).map((reminder) => ({ ...reminder, note: '' })),
 		icaTool,
 		cronJobs,
-		aiEnabled: (env?.AI_ENABLED ?? 'auto') !== 'false',
 		telegramConfigured: telegramBotConfigured,
 		telegramBotConfigured,
 		telegramLinked: Boolean(telegramChatId),

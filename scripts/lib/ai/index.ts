@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { codexExecArgs, summarizeCliFailure } from '../codex';
 import { config } from '../config';
 import { log } from '../utils';
@@ -48,15 +50,46 @@ export async function askAi(prompt: string): Promise<string | undefined> {
   }
 }
 
+/** Backends that can read an image. DeepSeek has no image input and the default Ollama model is text-only. */
+export const IMAGE_BACKENDS = ['codex', 'claude-code', 'chatgpt', 'claude'];
+
 /**
- * Ask Codex about one local image file. The other backends cannot attach
- * images here, so callers must check `config.aiBackend` first.
+ * Ask the configured backend about one local image file. Callers check
+ * `IMAGE_BACKENDS` first; other backends return undefined.
  */
-export async function askCodexAboutImage(prompt: string, imagePath: string): Promise<string | undefined> {
-  return callCli('codex', [
-    ...codexExecArgs({ effort: 'low', model: config.codexModel, sandbox: 'read-only', images: [imagePath] }),
-    prompt
-  ]);
+export async function askAiAboutImage(prompt: string, image: { path: string; mimeType: string }): Promise<string | undefined> {
+  const backend = config.aiBackend;
+  try {
+    if (backend === 'codex') {
+      return await callCli('codex', [
+        ...codexExecArgs({ effort: 'low', model: config.codexModel, sandbox: 'read-only', images: [image.path] }),
+        prompt
+      ]);
+    }
+    if (backend === 'claude-code') {
+      // Run inside the image's directory with only the Read tool and no MCP servers.
+      return await callCli('claude', ['-p', `${prompt}\n\nImage file: ${image.path}`,
+        '--tools', 'Read', '--allowedTools', 'Read', '--strict-mcp-config'], 300000, dirname(image.path));
+    }
+    const data = (await readFile(image.path)).toString('base64');
+    if (backend === 'chatgpt') {
+      return await callOpenAiCompatible('https://api.openai.com/v1/chat/completions', config.openaiApiKey, config.openaiModel, [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${data}` } }
+      ]);
+    }
+    if (backend === 'claude') {
+      return await callClaude([
+        { type: 'image', source: { type: 'base64', media_type: image.mimeType, data } },
+        { type: 'text', text: prompt }
+      ]);
+    }
+    return undefined;
+  } catch (error) {
+    log(`AI image call error (${backend}): ${error}`);
+    recordAiFailure(`${backend}: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
 }
 
 let lastAiFailure: string | undefined;
@@ -77,12 +110,12 @@ export function takeAiFailure(): string | undefined {
 }
 
 /** Run a logged-in CLI (codex / claude) non-interactively and capture stdout. */
-function callCli(command: string, args: string[], timeoutMs = 300000): Promise<string | undefined> {
+function callCli(command: string, args: string[], timeoutMs = 300000, cwd?: string): Promise<string | undefined> {
   return new Promise((resolve) => {
     const child = execFile(
       command,
       args,
-      { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 },
+      { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024, cwd },
       (error, stdout, stderr) => {
         if (error) {
           const reason = summarizeCliFailure(`${stderr ?? ''}\n${stdout ?? ''}`, String(error).split('\n')[0]);
@@ -99,7 +132,7 @@ function callCli(command: string, args: string[], timeoutMs = 300000): Promise<s
   });
 }
 
-async function callOpenAiCompatible(url: string, apiKey: string, model: string, prompt: string): Promise<string | undefined> {
+async function callOpenAiCompatible(url: string, apiKey: string, model: string, prompt: string | unknown[]): Promise<string | undefined> {
   if (!apiKey) {
     log(`AI backend "${config.aiBackend}" has no API key configured, skipping AI search`);
     return undefined;
@@ -122,7 +155,7 @@ async function callOpenAiCompatible(url: string, apiKey: string, model: string, 
   return data.choices?.[0]?.message?.content;
 }
 
-async function callClaude(prompt: string): Promise<string | undefined> {
+async function callClaude(prompt: string | unknown[]): Promise<string | undefined> {
   if (!config.anthropicApiKey) {
     log('AI backend "claude" has no ANTHROPIC_API_KEY, skipping AI search');
     return undefined;
