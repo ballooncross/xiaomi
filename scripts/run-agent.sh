@@ -5,10 +5,9 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" >/dev/null 2>&1
 
-# Bound how long git waits on the network. A stalled connection otherwise
-# blocks for the operating system's full TCP timeout, which is longer than the
-# gap between scheduled cycles and so delays the following cycle too.
-export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o BatchMode=yes -o ConnectTimeout=10}"
+# Bound git's network waits: ConnectTimeout covers the connect, ServerAlive a
+# connection that goes silent later. launchd starts no new cycle while one hangs.
+export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4}"
 
 RADAR_SOURCE_ROOT="${RADAR_SOURCE_ROOT:-${0:A:h}/..}"
 RADAR_AGENT_RUNTIME="${RADAR_AGENT_RUNTIME:-$HOME/Library/Application Support/Personal Radar/agent-runtime}"

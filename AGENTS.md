@@ -31,6 +31,7 @@
 - The local agent reports every tick to `POST /api/agent/status` with `running`, `ok`, or `error`.
 - Keep the `local-agent` entry in the 定时任务状态 list aligned with that endpoint so stale runs and failures remain visible to admins.
 - Only one runner may be active per machine. Loop mode (`npm run agent` without `--once`) must refuse to start while the launchd scheduler is installed or another agent process is running, unless `--force` is given. Use `npm run agent:status` to inspect scheduler state, live processes, and the log before starting or installing anything.
+- Every network step in `scripts/run-agent.sh` must time out on a connection that goes silent after connecting, not only on the connect itself. launchd starts no new cycle while a run is alive, so one hung `git fetch` stops the agent until someone kills it.
 
 ## COE Notifications
 
