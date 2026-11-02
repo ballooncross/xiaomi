@@ -52,6 +52,11 @@
 - Once an event confirms arrival or customs processing in Singapore, persist priority checking even if later provider wording changes. Priority packages run at 08:30, 12:30, 16:30, and 20:30 Singapore time.
 - Derive D-EXI package status from its newest detail event. Keep the manual delivered action as a fallback for unrecognized provider wording, and archive that acknowledged update without a redundant notification.
 
+## Promotion Tracking
+
+- The Ride Side check runs in the cron Worker at 08:30 Singapore time. To verify a fix, run it now with `POST /api/admin/jobs` and `{"job":"promotions"}`, then read `promotion_checks` in D1. Pages forwards the job to the cron Worker's `/promotion-check` so it uses the cron Worker's Gemini configuration.
+- Workers reject `fetch` with `redirect: 'error'`. Use `redirect: 'manual'` and treat a 3xx status as a failure.
+
 ## Gym Exercise Search
 
 - Recent exercise queries are frontend-only and stored in local storage under `personal-radar-gym-recent-searches`.
