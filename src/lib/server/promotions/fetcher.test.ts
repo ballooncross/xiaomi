@@ -19,6 +19,7 @@ it('uses stored banner text and leaves unread banners for the local agent', asyn
     if (url.startsWith('https://cdn.shopify.com/')) {
       return new Response(url.includes('banner') ? 'read-bytes' : 'new-bytes', { headers: { 'content-type': 'image/jpeg' } });
     }
+    if (url.includes('/products.json')) return Response.json({ products: [] });
     throw new Error(`unexpected request to ${url}`);
   }));
   const result = await fetchPromotions(env);

@@ -90,8 +90,13 @@ the local agent reads them with its configured backend, and the stored text is
 cached by image content. Coverage is reported as partial until every banner has
 been read. It does not use browser automation. Explicit boots/bindings discounts, storewide offers,
 and seasonal/preorder offers qualify; unclear gear eligibility is called out.
-Mixed discount rates and recognizable expired deadlines are skipped. This is a
-homepage watch, not a complete product-price or stock tracker.
+Mixed discount rates and recognizable expired deadlines are skipped.
+
+The check also reads the boots and bindings collections' Shopify product JSON.
+The newest model year in titles or tags is the current season. A price-based
+offer needs at least three current-season products, and at least a fifth of
+them, marked below their compare-at price; past-season clearance never counts.
+It is not a stock tracker.
 
 Observations have first/last-seen timestamps, not inferred publication dates,
 and remain separate from news/trend ingestion. Unchanged offers notify once per

@@ -53,7 +53,7 @@ export async function deliverPromotions(env: Env, observedAt: string) {
       AND NOT EXISTS (SELECT 1 FROM promotion_deliveries d WHERE d.user_id = w.user_id AND d.observation_id = p.id)
       ORDER BY p.discount DESC LIMIT 10`).bind(user.id, observedAt).all<Promotion>();
     for (const offer of pending.results) {
-      const message = `The Ride Side · 促销雷达\n${/up to/i.test(offer.evidence) ? 'Up to ' : ''}${offer.discount}% off · ${offer.scope}\n${offer.evidence}\n\n首页观察时间：${observedAt}\n请核对 boots / bindings 的适用款式、库存与活动期限。\n${PROMOTION_URL}`;
+      const message = `The Ride Side · 促销雷达\n${/up to/i.test(offer.evidence) ? 'Up to ' : ''}${offer.discount}% off · ${offer.scope}\n${offer.evidence}\n\n观察时间：${observedAt}\n请核对 boots / bindings 的适用款式、库存与活动期限。\n${PROMOTION_URL}`;
       try {
         const result = await sendTelegramMessage(env, message, user.telegramChatId);
         if (result.ok) {
@@ -98,14 +98,14 @@ export async function runPromotionJob(env: Env) {
     .bind(new Date(Date.now() + 15 * 60 * 1000).toISOString(), PROMOTION_SOURCE, now).run();
   if (!lease.meta.changes) return;
   try {
-    const { offers, warning, unreadImages } = await fetchPromotions(env);
+    const { offers, warning, unreadImages, priceSummary } = await fetchPromotions(env);
     await replaceBannerQueue(env.DB, unreadImages);
     await recordPromotions(env.DB, offers, now, !warning);
     await env.DB.prepare('UPDATE promotion_checks SET checked_at = ?, success_at = ?, error = ? WHERE source_id = ?')
       .bind(now, now, warning, PROMOTION_SOURCE).run();
     const { notified, failed } = await deliverPromotions(env, now);
     await logger.logJob({ jobName: 'promotion-tracking', status: warning || failed ? 'partial' : 'ok',
-      detail: `offers=${offers.length}; notified=${notified}; delivery_failures=${failed}${warning ? `; ${warning}` : ''}` });
+      detail: `offers=${offers.length}; notified=${notified}; delivery_failures=${failed}${priceSummary ? `; ${priceSummary}` : ''}${warning ? `; ${warning}` : ''}` });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Promotion check failed';
     await env.DB.prepare('UPDATE promotion_checks SET checked_at = ?, error = ? WHERE source_id = ?').bind(now, message, PROMOTION_SOURCE).run();
