@@ -56,6 +56,7 @@
 
 - The Ride Side check runs in the cron Worker at 08:30 Singapore time. To verify a fix, run it now with `POST /api/admin/jobs` and `{"job":"promotions"}`, then read `promotion_checks` in D1. Pages forwards the job to the cron Worker's `/promotion-check` so it runs in the same environment as the daily check.
 - The store prints discounts inside banner images with empty alt text. A check queues banners without stored text in `promotion_image_queue`, the local agent reads them with its configured backend through `/api/agent/promotion-banners`, and storing the last one re-runs the check. Each check replaces the queue.
+- The price check reads the boots and bindings collections' `products.json`. The newest model year is the current season; past-season clearance never counts as a promotion, and a current-season sale needs at least three products and a fifth of the season marked down. Banner reading by the local agent stays the source for code-based or checkout-only offers.
 - Workers reject `fetch` with `redirect: 'error'`. Use `redirect: 'manual'` and treat a 3xx status as a failure.
 
 ## AI Usage

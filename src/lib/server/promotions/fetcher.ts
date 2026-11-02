@@ -2,6 +2,9 @@ import { Buffer } from 'node:buffer';
 import { PROMOTION_URL } from '$lib/promotions';
 import type { Env } from '../types';
 import { MAX_BANNER_IMAGES, extractOffers, homepageContent } from './parser';
+import { GEAR_COLLECTIONS, analyzeGearPrices, type ShopifyProduct } from './prices';
+
+const USER_AGENT = 'PersonalRadar/1.0 (daily promotion watch)';
 
 async function readBounded(response: Response, limit: number): Promise<Uint8Array> {
   if (!response.ok) throw new Error(`Source HTTP ${response.status}`);
@@ -33,10 +36,24 @@ async function fetchWithoutRedirect(url: string, init: RequestInit): Promise<Res
 
 export type UnreadImage = { hash: string; url: string };
 
+async function fetchGearProducts(): Promise<ShopifyProduct[]> {
+  const products: ShopifyProduct[] = [];
+  for (const collection of GEAR_COLLECTIONS) {
+    const response = await fetchWithoutRedirect(`${PROMOTION_URL}collections/${collection}/products.json?limit=250`, {
+      signal: AbortSignal.timeout(20000),
+      headers: { accept: 'application/json', 'user-agent': USER_AGENT }
+    });
+    const data = JSON.parse(new TextDecoder().decode(await readBounded(response, 5_000_000))) as { products?: ShopifyProduct[] };
+    if (!Array.isArray(data.products)) throw new Error(`Unexpected ${collection} product data`);
+    products.push(...data.products);
+  }
+  return products;
+}
+
 export async function fetchPromotions(env: Env) {
   const response = await fetchWithoutRedirect(PROMOTION_URL, {
     signal: AbortSignal.timeout(20000),
-    headers: { accept: 'text/html', 'user-agent': 'PersonalRadar/1.0 (daily promotion watch)' }
+    headers: { accept: 'text/html', 'user-agent': USER_AGENT }
   });
   const html = new TextDecoder().decode(await readBounded(response, 5_000_000));
   const { blocks, images, truncatedImages } = homepageContent(html);
@@ -59,5 +76,14 @@ export async function fetchPromotions(env: Env) {
     }
   }
   if (unreadImages.length) warnings.push(`Waiting for the local agent to read ${unreadImages.length} banner image(s)`);
-  return { offers: extractOffers(blocks), warning: [...new Set(warnings)].join('; ') || null, unreadImages };
+  const offers = extractOffers(blocks);
+  let priceSummary: string | null = null;
+  try {
+    const prices = analyzeGearPrices(await fetchGearProducts());
+    priceSummary = prices.summary;
+    if (prices.offer) offers.push(prices.offer);
+  } catch (error) {
+    warnings.push(`Price check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  return { offers, warning: [...new Set(warnings)].join('; ') || null, unreadImages, priceSummary };
 }
