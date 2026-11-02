@@ -25,6 +25,7 @@ import { runAiSearch, takeAiFailure } from './lib/ai/index';
 import { config } from './lib/config';
 import { processDevRequests } from './lib/dev-agent';
 import { optimizeInterests } from './lib/optimize-interests';
+import { readPromotionBanners } from './lib/promotion-banners';
 import { hydrateImageForUrl } from './lib/images';
 import { runSource } from './lib/fetch-engine';
 import { fetchContext, reportAgentStatus, submitFeeds, submitSignals } from './lib/radar-api';
@@ -160,6 +161,14 @@ async function tick(): Promise<TickOutcome> {
   } catch (error) {
     log(`Interest optimizer error: ${error}`);
     errors.push(`兴趣优化失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    const bannerSummary = await readPromotionBanners();
+    if (bannerSummary) log(bannerSummary);
+  } catch (error) {
+    log(`Promotion banner error: ${error}`);
+    errors.push(`促销横幅读取失败：${error instanceof Error ? error.message : String(error)}`);
   }
 
   const decision = decideScanTier(state, context);

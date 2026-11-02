@@ -2,7 +2,7 @@ import { PROMOTION_SOURCE, PROMOTION_URL, type Promotion, type PromotionData } f
 import { getDb } from '../db';
 import { sendTelegramMessage } from '../telegram';
 import type { Env } from '../types';
-import { fetchPromotions } from './fetcher';
+import { fetchPromotions, type UnreadImage } from './fetcher';
 import { fingerprint, type Offer } from './parser';
 
 export async function getPromotionData(env: Env, userId: string): Promise<PromotionData> {
@@ -98,7 +98,8 @@ export async function runPromotionJob(env: Env) {
     .bind(new Date(Date.now() + 15 * 60 * 1000).toISOString(), PROMOTION_SOURCE, now).run();
   if (!lease.meta.changes) return;
   try {
-    const { offers, warning } = await fetchPromotions(env);
+    const { offers, warning, unreadImages } = await fetchPromotions(env);
+    await replaceBannerQueue(env.DB, unreadImages);
     await recordPromotions(env.DB, offers, now, !warning);
     await env.DB.prepare('UPDATE promotion_checks SET checked_at = ?, success_at = ?, error = ? WHERE source_id = ?')
       .bind(now, now, warning, PROMOTION_SOURCE).run();
@@ -112,4 +113,31 @@ export async function runPromotionJob(env: Env) {
   } finally {
     await env.DB.prepare('UPDATE promotion_checks SET lease_until = NULL WHERE source_id = ?').bind(PROMOTION_SOURCE).run();
   }
+}
+
+// Each check replaces the queue, so a banner removed from the site stops waiting for the agent.
+async function replaceBannerQueue(db: D1Database, images: UnreadImage[]) {
+  await db.batch([
+    db.prepare('DELETE FROM promotion_image_queue'),
+    ...images.map(({ hash, url }) => db.prepare('INSERT OR IGNORE INTO promotion_image_queue(hash, url) VALUES (?, ?)').bind(hash, url))
+  ]);
+}
+
+export async function listQueuedBanners(db: D1Database): Promise<UnreadImage[]> {
+  return (await db.prepare('SELECT hash, url FROM promotion_image_queue ORDER BY queued_at LIMIT 10').all<UnreadImage>()).results;
+}
+
+/** Stores agent-read banner text for queued banners only. */
+export async function storeBannerTranscriptions(db: D1Database, transcriptions: { hash: string; text: string }[]) {
+  let stored = 0;
+  for (const { hash, text } of transcriptions) {
+    if (!await db.prepare('SELECT 1 AS found FROM promotion_image_queue WHERE hash = ?').bind(hash).first()) continue;
+    await db.batch([
+      db.prepare('INSERT OR IGNORE INTO promotion_image_text(hash, text) VALUES (?, ?)').bind(hash, text),
+      db.prepare('DELETE FROM promotion_image_queue WHERE hash = ?').bind(hash)
+    ]);
+    stored++;
+  }
+  const remaining = await db.prepare('SELECT COUNT(*) AS count FROM promotion_image_queue').first<{ count: number }>();
+  return { stored, remaining: remaining?.count ?? 0 };
 }

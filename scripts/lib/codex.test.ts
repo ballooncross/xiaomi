@@ -31,6 +31,12 @@ describe('codexExecArgs', () => {
   it('omits the model flag for an empty override', () => {
     expect(codexExecArgs({ effort: 'low', model: '' })).not.toContain('-m');
   });
+
+  it('ends image attachments with a separator so the prompt is not read as an image', () => {
+    expect(codexExecArgs({ effort: 'low', images: ['/tmp/a.png', '/tmp/b.jpg'] }).slice(-5)).toEqual([
+      '-i', '/tmp/a.png', '-i', '/tmp/b.jpg', '--'
+    ]);
+  });
 });
 
 describe('summarizeCliFailure', () => {
