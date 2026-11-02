@@ -55,8 +55,13 @@
 ## Promotion Tracking
 
 - The Ride Side check runs in the cron Worker at 08:30 Singapore time. To verify a fix, run it now with `POST /api/admin/jobs` and `{"job":"promotions"}`, then read `promotion_checks` in D1. Pages forwards the job to the cron Worker's `/promotion-check` so it runs in the same environment as the daily check.
-- The store prints discounts inside banner images with empty alt text. The Workers never call an AI service for them: a check queues banners without stored text in `promotion_image_queue`, the local agent reads them with Codex through `/api/agent/promotion-banners`, and storing the last one re-runs the check. Each check replaces the queue.
+- The store prints discounts inside banner images with empty alt text. A check queues banners without stored text in `promotion_image_queue`, the local agent reads them with its configured backend through `/api/agent/promotion-banners`, and storing the last one re-runs the check. Each check replaces the queue.
 - Workers reject `fetch` with `redirect: 'error'`. Use `redirect: 'manual'` and treat a 3xx status as a failure.
+
+## AI Usage
+
+- Pages and the cron Worker never call an AI service. Server-side summaries, scoring, and digests stay rule-based.
+- AI work belongs to the local agent and uses the backend configured by `AI_BACKEND` in `scripts/.env` (`codex`, `claude-code`, `chatgpt`, `claude`, `deepseek`, `ollama`). Do not hard-code one backend; image tasks must check `IMAGE_BACKENDS` and report an unsupported backend as a tick error.
 
 ## Gym Exercise Search
 
