@@ -4,6 +4,7 @@ import { PROMOTION_URL } from '$lib/promotions';
 
 export type Offer = { evidence: string; discount: number; scope: string };
 const clean = (text: string) => text.replace(/\s+/g, ' ').trim();
+export const MAX_BANNER_IMAGES = 10;
 
 // Keep evidence local to one banner/card: a footer discount must never inherit
 // "boots" from an unrelated navigation link.
@@ -40,7 +41,7 @@ export function homepageContent(html: string): { blocks: string[]; images: strin
       images.add(url.href);
     } catch { /* Ignore malformed image URLs. */ }
   });
-  return { blocks: [...blocks], images: [...images].slice(0, 6), truncatedImages: images.size > 6 };
+  return { blocks: [...blocks], images: [...images].slice(0, MAX_BANNER_IMAGES), truncatedImages: images.size > MAX_BANNER_IMAGES };
 }
 
 export function extractOffers(blocks: string[], now = new Date()): Offer[] {

@@ -39,6 +39,19 @@ it('fails closed on source errors and challenge pages', async () => {
   await expect(fetchPromotions({})).rejects.toThrow('503');
   await expect(fetchPromotions({})).rejects.toThrow('Unexpected homepage');
 });
+it('refuses redirects with an option the Workers runtime accepts', async () => {
+  let homepageStatus = 200;
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.redirect === 'error') throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"');
+    if (url.includes('shopify')) return new Response(null, { status: 302, headers: { location: 'https://example.com/x.jpg' } });
+    return homepageStatus === 200 ? new Response(html) : new Response(null, { status: homepageStatus });
+  }));
+  const result = await fetchPromotions({});
+  expect(result.offers).toHaveLength(1);
+  expect(result.warning).toContain('redirected (HTTP 302)');
+  homepageStatus = 301;
+  await expect(fetchPromotions({})).rejects.toThrow('redirected (HTTP 301)');
+});
 it('reports invalid OCR without treating it as no promotion', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url === 'https://therideside.com/') return new Response(html);
