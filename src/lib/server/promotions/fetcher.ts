@@ -64,6 +64,10 @@ export async function fetchPromotions(env: Env) {
           generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 1000 }
         })
       });
+      if (!ai.ok) {
+        const detail = await ai.json<{ error?: { message?: string } }>().catch(() => null);
+        throw new Error(`Gemini HTTP ${ai.status}${detail?.error?.message ? `: ${detail.error.message.slice(0, 200)}` : ''}`);
+      }
       const payload = JSON.parse(new TextDecoder().decode(await readBounded(ai, 30000))) as {
         candidates?: { content?: { parts?: { text?: string }[] } }[];
       };
