@@ -3,7 +3,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { mergeLocalEnv } from '$lib/server/env';
 import { isAdminAuthorized } from '$lib/server/request-auth';
 import { runAllFetchJobs, runCoeCheckJob, runConcertFetchJob, runDailyDigestJob, runItemDedupJob, runTrendFetchJob } from '$lib/server/jobs';
-import { runPromotionJob } from '$lib/server/promotions/service';
+import { triggerPromotionCheck } from '$lib/server/promotions/service';
 import type { Env } from '$lib/server/types';
 import type { RequestHandler } from './$types';
 
@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (job === 'all-fetch') return json(await runAllFetchJobs(env ?? {}));
   if (job === 'dedup-items') return json(await runItemDedupJob(env ?? {}));
   if (job === 'promotions') {
-    await runPromotionJob(env ?? {});
+    await triggerPromotionCheck(env ?? {});
     return json({ ok: true });
   }
   return json({ error: 'Unknown job' }, { status: 400 });
