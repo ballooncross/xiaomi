@@ -40,6 +40,14 @@ export default {
       return Response.json(await runIcaAppointmentCheckJob(env));
     }
 
+    if (url.pathname === '/promotion-check' && request.method === 'POST') {
+      if (!env.ADMIN_TOKEN || request.headers.get('x-admin-token') !== env.ADMIN_TOKEN) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      await runPromotionJob(env);
+      return Response.json({ ok: true });
+    }
+
     if (url.pathname === '/package-refresh' && request.method === 'POST') {
       if (!env.ADMIN_TOKEN || request.headers.get('x-admin-token') !== env.ADMIN_TOKEN) {
         return new Response('Unauthorized', { status: 401 });

@@ -15,3 +15,12 @@ it('checks promotions only on the daily 08:30 Singapore trigger', async () => {
   await worker.scheduled({ cron: '30 4,8,12 * * *', scheduledTime: Date.UTC(2026, 9, 4, 4, 30) } as ScheduledEvent, {}, ctx);
   expect(mocks.promotions).toHaveBeenCalledTimes(1);
 });
+it('runs a manual promotion check only with the admin token', async () => {
+  mocks.promotions.mockClear();
+  const check = (token?: string) => worker.fetch(new Request('https://cron.local/promotion-check',
+    { method: 'POST', headers: token ? { 'x-admin-token': token } : {} }), { ADMIN_TOKEN: 'secret' });
+  expect((await check()).status).toBe(401);
+  expect((await check('wrong')).status).toBe(401);
+  expect((await check('secret')).status).toBe(200);
+  expect(mocks.promotions).toHaveBeenCalledTimes(1);
+});

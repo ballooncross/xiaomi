@@ -67,6 +67,18 @@ export async function deliverPromotions(env: Env, observedAt: string) {
   return { notified, failed };
 }
 
+// Manual checks run in the cron Worker so they use the same bindings as the daily run.
+export async function triggerPromotionCheck(env: Env): Promise<void> {
+  if (env.CRON_WORKER && env.ADMIN_TOKEN?.trim()) {
+    const response = await env.CRON_WORKER.fetch('https://personal-radar-cron.local/promotion-check', {
+      method: 'POST', headers: { 'x-admin-token': env.ADMIN_TOKEN }
+    });
+    if (!response.ok) throw new Error(`Cron worker promotion check failed: HTTP ${response.status}`);
+    return;
+  }
+  await runPromotionJob(env);
+}
+
 export async function runPromotionJob(env: Env) {
   const logger = getDb(env);
   if (!env.DB) {
