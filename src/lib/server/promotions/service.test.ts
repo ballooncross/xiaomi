@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Env } from '../types';
-import { deliverPromotions, getPromotionData, recordPromotions, runPromotionJob, savePromotionWatch } from './service';
+import { deliverPromotions, getPromotionData, listQueuedBanners, recordPromotions, runPromotionJob, savePromotionWatch, storeBannerTranscriptions } from './service';
 
 const mocks = vi.hoisted(() => ({ send: vi.fn(), fetch: vi.fn(), logJob: vi.fn() }));
 vi.mock('../telegram', () => ({ sendTelegramMessage: mocks.send }));
@@ -24,6 +24,7 @@ beforeEach(() => {
     INSERT INTO users VALUES ('owner', 'tofu.hike@gmail.com'), ('other', 'other@example.com');
     CREATE TABLE sources(id TEXT PRIMARY KEY, type TEXT, name TEXT, config_json TEXT, frequency_minutes INTEGER, enabled INTEGER DEFAULT 1);`);
   sqlite.exec(readFileSync('migrations/0031_promotion_tracking.sql', 'utf8'));
+  sqlite.exec(readFileSync('migrations/0032_promotion_image_queue.sql', 'utf8'));
   const db = {
     prepare(sql: string) {
       let values: SQLInputValue[] = [];
@@ -94,11 +95,22 @@ it('logs fetch failures durably and releases the check lease without retiring hi
   expect(mocks.logJob).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
 });
 it('runs the check with subscriber notifications and rejects overlapping runs', async () => {
-  mocks.fetch.mockResolvedValue({ offers: [offer], warning: null });
+  mocks.fetch.mockResolvedValue({ offers: [offer], warning: null, unreadImages: [] });
   await runPromotionJob(env);
   expect(mocks.logJob).toHaveBeenCalledWith(expect.objectContaining({ status: 'ok' }));
   expect(mocks.send).toHaveBeenCalledTimes(1);
   sqlite.exec("UPDATE promotion_checks SET lease_until = '9999-01-01'");
   await runPromotionJob(env);
   expect(mocks.fetch).toHaveBeenCalledTimes(1);
+});
+it('accepts agent text only for queued banners and drops banners that left the homepage', async () => {
+  const [a, b, unqueued] = ['a', 'b', 'c'].map((char) => char.repeat(64));
+  mocks.fetch.mockResolvedValueOnce({ offers: [], warning: 'Waiting', unreadImages: [{ hash: a, url: 'https://cdn/a' }, { hash: b, url: 'https://cdn/b' }] });
+  await runPromotionJob(env);
+  expect(await storeBannerTranscriptions(env.DB!, [{ hash: a, text: 'Boots 15% off' }, { hash: unqueued, text: 'Boots 90% off' }]))
+    .toEqual({ stored: 1, remaining: 1 });
+  expect(sqlite.prepare('SELECT hash FROM promotion_image_text').all()).toEqual([{ hash: a }]);
+  mocks.fetch.mockResolvedValueOnce({ offers: [], warning: null, unreadImages: [] });
+  await runPromotionJob(env);
+  expect(await listQueuedBanners(env.DB!)).toEqual([]);
 });

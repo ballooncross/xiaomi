@@ -15,6 +15,8 @@ export type CodexExecOptions = {
   sandbox?: string;
   /** Working directory passed with `-C`. */
   cwd?: string;
+  /** Image files attached with `-i`. */
+  images?: string[];
 };
 
 /** Build `codex exec` arguments. The prompt is appended by the caller. */
@@ -24,6 +26,8 @@ export function codexExecArgs(options: CodexExecOptions): string[] {
   if (options.sandbox) args.push('--sandbox', options.sandbox);
   args.push('-c', `model_reasoning_effort=${options.effort}`);
   if (options.cwd) args.push('-C', options.cwd);
+  // `-i` takes several values, so `--` stops it from swallowing the prompt.
+  if (options.images?.length) args.push(...options.images.flatMap((image) => ['-i', image]), '--');
   return args;
 }
 

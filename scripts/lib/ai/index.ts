@@ -48,6 +48,17 @@ export async function askAi(prompt: string): Promise<string | undefined> {
   }
 }
 
+/**
+ * Ask Codex about one local image file. The other backends cannot attach
+ * images here, so callers must check `config.aiBackend` first.
+ */
+export async function askCodexAboutImage(prompt: string, imagePath: string): Promise<string | undefined> {
+  return callCli('codex', [
+    ...codexExecArgs({ effort: 'low', model: config.codexModel, sandbox: 'read-only', images: [imagePath] }),
+    prompt
+  ]);
+}
+
 let lastAiFailure: string | undefined;
 
 function recordAiFailure(detail: string): void {

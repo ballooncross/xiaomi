@@ -77,3 +77,24 @@ export async function submitSignals(signals: AgentSignal[]): Promise<void> {
     log(`Signal submit error: ${error}`);
   }
 }
+
+export type QueuedBanner = { hash: string; url: string };
+
+export async function fetchQueuedBanners(): Promise<QueuedBanner[]> {
+  const response = await radarFetch('/api/agent/promotion-banners', { headers: radarHeaders });
+  if (!response.ok) throw new Error(`Banner queue fetch failed: ${response.status}`);
+  return ((await response.json()) as { pending?: QueuedBanner[] }).pending ?? [];
+}
+
+/** Submitting the last queued banner re-runs the promotion check, so allow it extra time. */
+export async function submitBannerTranscriptions(
+  transcriptions: Array<{ hash: string; text: string }>
+): Promise<{ stored: number; remaining: number; rechecked: boolean }> {
+  const response = await radarFetch('/api/agent/promotion-banners', {
+    method: 'POST',
+    headers: radarHeaders,
+    body: JSON.stringify({ transcriptions })
+  }, 90000);
+  if (!response.ok) throw new Error(`Banner submit failed: ${response.status}`);
+  return (await response.json()) as { stored: number; remaining: number; rechecked: boolean };
+}
