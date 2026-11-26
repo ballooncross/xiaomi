@@ -1,6 +1,6 @@
 import { runCoeCheckJob } from './coe';
 import { clusterForBackfill, dedupeBatch } from './dedup';
-import { buildReminderDigestMessage, buildTemplateDigest, renderTelegramDigest } from './digest';
+import { buildReminderDigestMessage, buildTemplateDigest, renderTelegramDigest, selectDigestItems } from './digest';
 import { getDb } from './db';
 import { fetchBandsintownConcerts } from './fetchers/bandsintown';
 import { fetchTicketmasterConcerts } from './fetchers/ticketmaster';
@@ -148,8 +148,9 @@ async function sendDigestForUser(
   logJob = true
 ): Promise<JobResult> {
   const db = getDb(env, userId);
+  const deliveryType = `digest_item:${userId}`;
   const [items, reminders, prefs] = await Promise.all([
-    db.listItems(12),
+    db.listItems(500, deliveryType),
     db.listReminders(),
     userId ? db.getNotifyPrefs(userId) : Promise.resolve(null)
   ]);
@@ -163,11 +164,23 @@ async function sendDigestForUser(
   let notified = 0;
   const details: string[] = [];
 
-  if (wantTrends) {
-    const digest = buildTemplateDigest(items);
+  const selectedItems = selectDigestItems(items);
+  if (wantTrends && selectedItems.length > 0) {
+    const digest = buildTemplateDigest(selectedItems);
     const trendMessage = renderTelegramDigest(digest);
     const telegram = await sendTelegramMessage(env, trendMessage, chatId);
-    if (telegram.ok) notified += 1;
+    if (telegram.ok) {
+      notified += 1;
+      for (const item of selectedItems) {
+        await logDb.logNotification({
+          itemId: item.id,
+          channel: 'telegram',
+          type: deliveryType,
+          status: 'sent',
+          message: ''
+        });
+      }
+    }
     details.push(`trends:${telegram.detail}`);
     await logDb.logNotification({
       channel: 'telegram',
@@ -176,7 +189,7 @@ async function sendDigestForUser(
       message: trendMessage
     });
   } else {
-    details.push('trends:skipped-unsubscribed');
+    details.push(wantTrends ? 'trends:no-new-items' : 'trends:skipped-unsubscribed');
   }
 
   if (wantDates) {

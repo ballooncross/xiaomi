@@ -3,8 +3,16 @@ import { getAllUpcomingMilestones } from './milestones';
 import { reasonForItem } from './scoring';
 import type { DateReminder, Digest, RadarItem } from './types';
 
+export function selectDigestItems(items: RadarItem[]): RadarItem[] {
+  const activeItems = items.filter((item) => item.status !== 'dismissed');
+  return [
+    ...activeItems.filter((item) => item.kind === 'concert').slice(0, 4),
+    ...activeItems.filter((item) => item.kind !== 'concert').slice(0, 4)
+  ];
+}
+
 export function buildTemplateDigest(items: RadarItem[]): Digest {
-  const activeItems = items.filter((item) => item.status !== 'dismissed').slice(0, 8);
+  const activeItems = selectDigestItems(items);
   const concerts = activeItems.filter((item) => item.kind === 'concert').slice(0, 4);
   const trends = activeItems.filter((item) => item.kind !== 'concert').slice(0, 4);
 

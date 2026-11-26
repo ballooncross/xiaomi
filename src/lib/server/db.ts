@@ -322,7 +322,7 @@ export abstract class RadarDb {
   abstract deleteTopic(topicId: string): Promise<void>;
   /** Union of every user's enabled follow topics, for ingestion/cron jobs — not scoped to this.userId. */
   abstract listTopicsForIngestion(): Promise<WatchTopic[]>;
-  abstract listItems(limit?: number): Promise<RadarItem[]>;
+  abstract listItems(limit?: number, excludeNotificationType?: string): Promise<RadarItem[]>;
   abstract listSavedItems(): Promise<RadarItem[]>;
   abstract upsertItem(item: RadarItem): Promise<'inserted' | 'updated'>;
   abstract listReminders(): Promise<DateReminder[]>;
@@ -466,12 +466,16 @@ class MemoryRadarDb extends RadarDb {
     return dedupeTopicsByName(all);
   }
 
-  async listItems(limit = 30): Promise<RadarItem[]> {
+  async listItems(limit = 30, excludeNotificationType?: string): Promise<RadarItem[]> {
     const cutoff = Date.now() - MAX_TREND_AGE_DAYS * 24 * 60 * 60 * 1000;
     const stateMap = getUserItemStateMap(this.uid);
     const topics = getUserTopics(this.uid).filter((topic) => topic.enabled);
     return memory.items
       .map((item) => mergeItemWithState(item, stateMap.get(item.id)))
+      .filter((item) => !excludeNotificationType || !memory.notifications.some(
+        (notification) => notification.type === excludeNotificationType
+          && notification.itemId === item.id && notification.status === 'sent'
+      ))
       .filter((item) => {
         if (item.status === 'dismissed' || item.status === 'viewed' || item.viewedAt) return false;
         if (item.status === 'saved' || item.status === 'tracking') return true;
@@ -1091,7 +1095,7 @@ class D1RadarDb extends RadarDb {
     }
   }
 
-  async listItems(limit = 30): Promise<RadarItem[]> {
+  async listItems(limit = 30, excludeNotificationType?: string): Promise<RadarItem[]> {
     if (!this.userId) return [];
     const fetchLimit = Math.min(500, Math.max(limit * 5, 150));
     try {
@@ -1107,8 +1111,12 @@ class D1RadarDb extends RadarDb {
               COALESCE(s.viewed_at, i.viewed_at) AS viewed_at
             FROM items i
             LEFT JOIN user_item_state s ON s.item_id = i.id AND s.user_id = ?
-          )
+          ) AS candidate
           WHERE status NOT IN ('dismissed', 'viewed')
+            AND (? IS NULL OR NOT EXISTS (
+              SELECT 1 FROM notifications n
+              WHERE n.item_id = candidate.id AND n.type = ? AND n.status = 'sent'
+            ))
             AND viewed_at IS NULL
             AND (
               status IN ('saved', 'tracking')
@@ -1119,7 +1127,7 @@ class D1RadarDb extends RadarDb {
               )
             )
           ORDER BY score DESC, COALESCE(starts_at, published_at, created_at) ASC LIMIT ?`)
-        .bind(this.userId, fetchLimit)
+        .bind(this.userId, excludeNotificationType ?? null, excludeNotificationType ?? null, fetchLimit)
         .all<ItemRow>();
       const topics = await this.listTopics();
       return results
@@ -1130,7 +1138,7 @@ class D1RadarDb extends RadarDb {
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
     } catch (error) {
-      if (isMissingTableError(error)) return demoItems.slice(0, limit);
+      if (isMissingTableError(error) && !excludeNotificationType) return demoItems.slice(0, limit);
       throw error;
     }
   }
